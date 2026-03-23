@@ -188,13 +188,28 @@ local function entries_from_cache(query)
 end
 
 local function ranked_passthrough_sorter()
+    local function highlight_prompt(prompt, display)
+        local highlights = {}
+        local p = (prompt or ""):lower()
+        local d = (display or ""):lower()
+
+        for word in p:gmatch("%S+") do
+            local start_pos, end_pos = d:find(word, 1, true)
+            if start_pos then
+                table.insert(highlights, { start = start_pos, finish = end_pos })
+            end
+        end
+
+        return highlights
+    end
+
     return sorters.Sorter:new({
         discard = true,
-        scoring_function = function()
-            return 1
+        scoring_function = function(_, _, _, entry)
+            return entry.index
         end,
-        highlighter = function()
-            return {}
+        highlighter = function(_, prompt, display)
+            return highlight_prompt(prompt, display)
         end,
     })
 end
