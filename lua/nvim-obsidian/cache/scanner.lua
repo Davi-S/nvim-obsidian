@@ -12,6 +12,10 @@ local watchers = {
 }
 
 local function note_type_for_path(abs, cfg)
+    if not cfg.journal_enabled then
+        return "standard"
+    end
+
     local parent = path.normalize(path.parent(abs))
     if parent == path.normalize(cfg.journal.daily.dir_abs) then
         return "daily"
@@ -95,6 +99,7 @@ function M.refresh_one(abs)
         relpath = path.rel_to_root(cfg.vault_root, nabs),
         aliases = meta.aliases,
         tags = meta.tags,
+        frontmatter = meta,
         note_type = note_type_for_path(nabs, cfg),
     })
 end

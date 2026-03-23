@@ -24,7 +24,11 @@ local function ensure_note(filepath, title, note_type, cfg)
         path.ensure_dir(path.parent(filepath))
         local tpl = router.template_for_type(note_type, cfg)
         local rendered = router.render_template(tpl, title)
-        vim.fn.writefile(vim.split(rendered, "\n", { plain = true }), filepath)
+        if rendered == "" then
+            vim.fn.writefile({}, filepath)
+        else
+            vim.fn.writefile(vim.split(rendered, "\n", { plain = true }), filepath)
+        end
     end
 end
 
@@ -52,7 +56,7 @@ local function submit(prompt, force_create)
         end
     end
 
-    local note_type, title = router.classify_input(input)
+    local note_type, title = router.classify_input(input, cfg)
     local filepath = router.path_for_type(note_type, title, cfg)
     ensure_note(filepath, title, note_type, cfg)
     open_note(filepath)

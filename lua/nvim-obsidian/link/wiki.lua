@@ -3,14 +3,17 @@ local vault = require("nvim-obsidian.model.vault")
 
 local M = {}
 
+local WIKI_LINK_PATTERN = "()(%[%[[^%]]-%]%])()"
+local WIKI_ALIAS_SPLIT_PATTERN = "^([^|]+)"
+
 function M.link_under_cursor()
     local line = vim.api.nvim_get_current_line()
     local col = vim.api.nvim_win_get_cursor(0)[2] + 1
 
-    for s, body, e in line:gmatch("()(%[%[[^%]]-%]%])()") do
+    for s, body, e in line:gmatch(WIKI_LINK_PATTERN) do
         if col >= s and col <= e then
             local inner = body:sub(3, -3)
-            local target = inner:match("^([^|]+)") or inner
+            local target = inner:match(WIKI_ALIAS_SPLIT_PATTERN) or inner
             return vim.trim(target)
         end
     end

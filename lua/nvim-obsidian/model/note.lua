@@ -10,6 +10,7 @@ function Note.new(filepath, data)
     self.title = path.stem(filepath)
     self.aliases = data.aliases or {}
     self.tags = data.tags or {}
+    self.frontmatter = data.frontmatter or {}
     self.note_type = data.note_type or "standard"
     self.relpath = data.relpath
     return self

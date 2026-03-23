@@ -37,6 +37,8 @@ describe("frontmatter parser", function()
             "tags:",
             "  - x",
             "  - y",
+            "rating: 7",
+            "published: true",
             "---",
             "# T",
         }, "\n")
@@ -44,5 +46,7 @@ describe("frontmatter parser", function()
         local parsed = frontmatter.parse(text)
         assert.are.same({ "A", "B" }, parsed.aliases)
         assert.are.same({ "x", "y" }, parsed.tags)
+        assert.are.equal(7, parsed.rating)
+        assert.are.equal(true, parsed.published)
     end)
 end)

@@ -27,6 +27,10 @@ end
 
 local root = vim.fn.tempname()
 vim.fn.mkdir(root, "p")
+vim.fn.mkdir(root .. "/08 Templates", "p")
+vim.fn.writefile({ "---", "aliases: []", "tags: [nota_diaria]", "---", "", "# {{title}}" },
+    root .. "/08 Templates/Nota diaria.md")
+vim.fn.writefile({ "# {{title}}" }, root .. "/08 Templates/Nova nota.md")
 
 local opts = {
     vault_root = root,
@@ -38,6 +42,18 @@ local opts = {
         weekly = { subdir = "11 Diario/11.02 Semanal" },
         monthly = { subdir = "11 Diario/11.03 Mensal" },
         yearly = { subdir = "11 Diario/11.04 Anual" },
+        title_formats = {
+            daily = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+            weekly = "{{iso_year}} semana {{iso_week}}",
+            monthly = "{{year}} {{month_name}}",
+            yearly = "{{year}}",
+        },
+        templates = {
+            daily = "08 Templates/Nota diaria",
+        },
+    },
+    templates = {
+        standard = "08 Templates/Nova nota",
     },
 }
 
@@ -45,7 +61,7 @@ require("nvim-obsidian").setup(opts)
 
 assert_true(wait_until(2000, 20, function()
     return exists_cmd("ObsidianToday") and exists_cmd("ObsidianNext") and exists_cmd("ObsidianPrev") and
-    exists_cmd("ObsidianFollow") and exists_cmd("ObsidianReindex")
+        exists_cmd("ObsidianFollow") and exists_cmd("ObsidianReindex")
 end), "commands were not registered")
 
 vim.cmd("ObsidianToday")

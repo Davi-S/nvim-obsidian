@@ -6,6 +6,10 @@ local router = require("nvim-obsidian.journal.router")
 local M = {}
 
 local function current_note_type_and_title(cfg)
+    if not cfg.journal_enabled then
+        error("journal is not configured")
+    end
+
     local buf = vim.api.nvim_get_current_buf()
     local file = vim.api.nvim_buf_get_name(buf)
     if file == "" then
@@ -40,13 +44,13 @@ local function anchor_timestamp(note_type, title, cfg)
         return fmt.parse_daily_title(title, cfg) or os.time()
     end
     if note_type == "weekly" then
-        return fmt.parse_weekly_title(title) or os.time()
+        return fmt.parse_weekly_title(title, cfg) or os.time()
     end
     if note_type == "monthly" then
         return fmt.parse_monthly_title(title, cfg) or os.time()
     end
     if note_type == "yearly" then
-        return fmt.parse_yearly_title(title) or os.time()
+        return fmt.parse_yearly_title(title, cfg) or os.time()
     end
     return os.time()
 end
@@ -78,12 +82,12 @@ local function title_for_type(note_type, ts, cfg)
         return fmt.daily_title(ts, cfg)
     end
     if note_type == "weekly" then
-        return fmt.weekly_title(ts)
+        return fmt.weekly_title(ts, cfg)
     end
     if note_type == "monthly" then
         return fmt.monthly_title(ts, cfg)
     end
-    return fmt.yearly_title(ts)
+    return fmt.yearly_title(ts, cfg)
 end
 
 function M.open_relative(delta)

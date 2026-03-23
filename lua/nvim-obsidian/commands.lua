@@ -10,30 +10,38 @@ local function ensure_and_open(note_type, title, filepath)
         path.ensure_dir(path.parent(filepath))
         local tpl = router.template_for_type(note_type, config.get())
         local rendered = router.render_template(tpl, title)
-        vim.fn.writefile(vim.split(rendered, "\n", { plain = true }), filepath)
+        if rendered == "" then
+            vim.fn.writefile({}, filepath)
+        else
+            vim.fn.writefile(vim.split(rendered, "\n", { plain = true }), filepath)
+        end
     end
     vim.cmd.edit(vim.fn.fnameescape(filepath))
 end
 
 function M.register()
+    local cfg = config.get()
+
     vim.api.nvim_create_user_command("ObsidianOmni", function()
         require("nvim-obsidian.picker.omni").open()
     end, {})
 
-    vim.api.nvim_create_user_command("ObsidianToday", function()
-        local note_type, title, filepath = router.today_daily(config.get())
-        ensure_and_open(note_type, title, filepath)
-    end, {})
+    if cfg.journal_enabled then
+        vim.api.nvim_create_user_command("ObsidianToday", function()
+            local note_type, title, filepath = router.today_daily(config.get())
+            ensure_and_open(note_type, title, filepath)
+        end, {})
 
-    vim.api.nvim_create_user_command("ObsidianNext", function()
-        local note_type, title, filepath = time_travel.open_relative(1)
-        ensure_and_open(note_type, title, filepath)
-    end, {})
+        vim.api.nvim_create_user_command("ObsidianNext", function()
+            local note_type, title, filepath = time_travel.open_relative(1)
+            ensure_and_open(note_type, title, filepath)
+        end, {})
 
-    vim.api.nvim_create_user_command("ObsidianPrev", function()
-        local note_type, title, filepath = time_travel.open_relative(-1)
-        ensure_and_open(note_type, title, filepath)
-    end, {})
+        vim.api.nvim_create_user_command("ObsidianPrev", function()
+            local note_type, title, filepath = time_travel.open_relative(-1)
+            ensure_and_open(note_type, title, filepath)
+        end, {})
+    end
 
     vim.api.nvim_create_user_command("ObsidianBacklinks", function()
         require("nvim-obsidian.backlinks").search_current()

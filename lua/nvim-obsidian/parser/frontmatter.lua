@@ -35,50 +35,73 @@ local function split_inline_array(value)
     return out
 end
 
-local function parse_aliases_tags_yaml(yaml)
-    local result = {
-        aliases = {},
-        tags = {},
-    }
-
-    local active_key = nil
-    local function accept_key(key)
-        return key == "aliases" or key == "tags"
+local function parse_scalar(value)
+    local s = vim.trim(value)
+    if s == "" then
+        return ""
     end
 
-    for _, raw_line in ipairs(vim.split(yaml, "\n", { plain = true })) do
-        local line = raw_line
-        local key, rhs = line:match("^([%w_%-]+):%s*(.*)$")
+    if s == "true" then
+        return true
+    end
+    if s == "false" then
+        return false
+    end
+    if s == "null" or s == "~" then
+        return vim.NIL
+    end
+
+    local num = tonumber(s)
+    if num ~= nil then
+        return num
+    end
+
+    local quoted = s:match('^"(.*)"$') or s:match("^'(.*)'$")
+    if quoted then
+        return quoted
+    end
+
+    if s:match("^%[.*%]$") then
+        return split_inline_array(s)
+    end
+
+    return s
+end
+
+local function parse_yaml_fallback(yaml)
+    local parsed = {}
+    local lines = vim.split(yaml, "\n", { plain = true })
+    local active_key = nil
+
+    for _, raw_line in ipairs(lines) do
+        local key, rhs = raw_line:match("^([%w_%-]+):%s*(.*)$")
         if key then
-            if accept_key(key) then
+            active_key = nil
+            if rhs == "" then
+                parsed[key] = {}
                 active_key = key
-                if rhs ~= "" then
-                    if rhs:match("^%[.*%]$") then
-                        result[key] = split_inline_array(rhs)
-                    else
-                        result[key] = normalize_list(rhs)
-                    end
-                    active_key = nil
-                else
-                    result[key] = {}
-                end
             else
-                active_key = nil
+                parsed[key] = parse_scalar(rhs)
             end
         else
-            local item = line:match("^%s*-%s*(.+)%s*$")
-            if active_key and item then
-                local cleaned = vim.trim(item):gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
-                if cleaned ~= "" then
-                    table.insert(result[active_key], cleaned)
+            local list_item = raw_line:match("^%s+-%s*(.+)%s*$")
+            if active_key and list_item then
+                table.insert(parsed[active_key], parse_scalar(list_item))
+            else
+                local sub_key, sub_rhs = raw_line:match("^%s+([%w_%-]+):%s*(.*)$")
+                if active_key and sub_key then
+                    if vim.islist(parsed[active_key]) then
+                        parsed[active_key] = {}
+                    end
+                    parsed[active_key][sub_key] = parse_scalar(sub_rhs)
+                elseif raw_line:match("^%S") then
+                    active_key = nil
                 end
-            elseif line:match("^%S") then
-                active_key = nil
             end
         end
     end
 
-    return result
+    return parsed
 end
 
 local function strip_yaml_markers(block)
@@ -136,7 +159,15 @@ function M.parse(text)
         return { aliases = {}, tags = {} }
     end
 
-    return parse_aliases_tags_yaml(yaml)
+    local ok, decoded = pcall(vim.fn.yaml_decode, yaml)
+    if not ok or type(decoded) ~= "table" then
+        decoded = parse_yaml_fallback(yaml)
+    end
+
+    local parsed = vim.deepcopy(decoded)
+    parsed.aliases = normalize_list(parsed.aliases)
+    parsed.tags = normalize_list(parsed.tags)
+    return parsed
 end
 
 return M
