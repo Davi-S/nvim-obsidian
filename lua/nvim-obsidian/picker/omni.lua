@@ -11,6 +11,14 @@ local vault = require("nvim-obsidian.model.vault")
 
 local M = {}
 
+local SEARCH_POLICY = {
+    order = { "title", "aliases", "relpath" },
+    display = {
+        default = "title",
+        alias_override = true,
+    },
+}
+
 local function ensure_note(filepath, title, note_type, cfg)
     if vim.fn.filereadable(filepath) == 0 then
         path.ensure_dir(path.parent(filepath))
@@ -50,15 +58,21 @@ local function submit(prompt, force_create)
     open_note(filepath)
 end
 
-local function get_query_aware_display(note, query)
-    local rel = note.relpath and ("  ->  " .. note.relpath) or ""
-    if not query or query == "" then
-        return note.title .. rel
+local function compute_match_context(note, query)
+    local q = (query or ""):lower()
+    local aliases = note.aliases or {}
+    local relpath = note.relpath or ""
+
+    if q == "" then
+        return {
+            title_match = false,
+            alias_match = false,
+            path_match = false,
+            matched_alias = nil,
+        }
     end
 
-    local q = query:lower()
-    local title_matches = note.title:lower():find(q, 1, true) ~= nil
-    local aliases = note.aliases or {}
+    local title_match = note.title:lower():find(q, 1, true) ~= nil
 
     local matched_alias = nil
     for _, alias in ipairs(aliases) do
@@ -68,22 +82,48 @@ local function get_query_aware_display(note, query)
         end
     end
 
-    if matched_alias and not title_matches then
-        return matched_alias .. rel
+    return {
+        title_match = title_match,
+        alias_match = matched_alias ~= nil,
+        path_match = relpath ~= "" and relpath:lower():find(q, 1, true) ~= nil,
+        matched_alias = matched_alias,
+    }
+end
+
+local function compute_display_label(note, ctx)
+    if SEARCH_POLICY.display.alias_override and ctx.alias_match and not ctx.title_match then
+        return ctx.matched_alias
+    end
+    return note.title
+end
+
+local function compute_ordinal_text(note)
+    local aliases = note.aliases or {}
+    local relpath = note.relpath or ""
+
+    local parts = {}
+    for _, key in ipairs(SEARCH_POLICY.order) do
+        if key == "title" then
+            table.insert(parts, note.title)
+        elseif key == "aliases" then
+            table.insert(parts, table.concat(aliases, " "))
+        elseif key == "relpath" and relpath ~= "" then
+            table.insert(parts, relpath)
+        end
     end
 
-    return note.title .. rel
+    return table.concat(parts, " "):lower()
 end
 
 local function build_entry(note, query)
-    local aliases = note.aliases or {}
-    local relpath = note.relpath or ""
-    local ordinal = (note.title .. " " .. table.concat(aliases, " ") .. " " .. relpath):lower()
+    local rel = note.relpath and ("  ->  " .. note.relpath) or ""
+    local ctx = compute_match_context(note, query)
+    local label = compute_display_label(note, ctx)
 
     return {
         value = note,
-        display = get_query_aware_display(note, query or ""),
-        ordinal = ordinal,
+        display = label .. rel,
+        ordinal = compute_ordinal_text(note),
     }
 end
 
@@ -180,5 +220,7 @@ function M.open()
 end
 
 M._test_build_entry = build_entry
+M._test_compute_match_context = compute_match_context
+M._test_compute_ordinal_text = compute_ordinal_text
 
 return M
