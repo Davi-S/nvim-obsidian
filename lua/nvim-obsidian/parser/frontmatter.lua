@@ -19,6 +19,68 @@ local function normalize_list(value)
     return {}
 end
 
+local function split_inline_array(value)
+    local out = {}
+    local inner = value:match("^%[(.*)%]$")
+    if not inner then
+        return out
+    end
+
+    for item in inner:gmatch("[^,]+") do
+        local cleaned = vim.trim(item):gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
+        if cleaned ~= "" then
+            table.insert(out, cleaned)
+        end
+    end
+    return out
+end
+
+local function parse_aliases_tags_yaml(yaml)
+    local result = {
+        aliases = {},
+        tags = {},
+    }
+
+    local active_key = nil
+    local function accept_key(key)
+        return key == "aliases" or key == "tags"
+    end
+
+    for _, raw_line in ipairs(vim.split(yaml, "\n", { plain = true })) do
+        local line = raw_line
+        local key, rhs = line:match("^([%w_%-]+):%s*(.*)$")
+        if key then
+            if accept_key(key) then
+                active_key = key
+                if rhs ~= "" then
+                    if rhs:match("^%[.*%]$") then
+                        result[key] = split_inline_array(rhs)
+                    else
+                        result[key] = normalize_list(rhs)
+                    end
+                    active_key = nil
+                else
+                    result[key] = {}
+                end
+            else
+                active_key = nil
+            end
+        else
+            local item = line:match("^%s*-%s*(.+)%s*$")
+            if active_key and item then
+                local cleaned = vim.trim(item):gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
+                if cleaned ~= "" then
+                    table.insert(result[active_key], cleaned)
+                end
+            elseif line:match("^%S") then
+                active_key = nil
+            end
+        end
+    end
+
+    return result
+end
+
 local function strip_yaml_markers(block)
     local lines = vim.split(block, "\n", { plain = true })
     while #lines > 0 and lines[#lines] == "" do
@@ -74,15 +136,7 @@ function M.parse(text)
         return { aliases = {}, tags = {} }
     end
 
-    local ok, decoded = pcall(vim.fn.yaml_decode, yaml)
-    if not ok or type(decoded) ~= "table" then
-        return { aliases = {}, tags = {} }
-    end
-
-    return {
-        aliases = normalize_list(decoded.aliases),
-        tags = normalize_list(decoded.tags),
-    }
+    return parse_aliases_tags_yaml(yaml)
 end
 
 return M

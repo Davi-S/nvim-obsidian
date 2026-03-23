@@ -2,7 +2,9 @@ local config_mod = require("nvim-obsidian.config")
 local scanner = require("nvim-obsidian.cache.scanner")
 local commands = require("nvim-obsidian.commands")
 
-local M = {}
+local M = {
+    _did_setup = false,
+}
 
 local function ensure_hard_dependencies()
     local deps = {
@@ -26,6 +28,10 @@ local function setup_cmp_source()
 end
 
 function M.setup(opts)
+    if M._did_setup then
+        return
+    end
+
     ensure_hard_dependencies()
     local cfg = config_mod.resolve(opts or {})
     config_mod.set(cfg)
@@ -37,6 +43,8 @@ function M.setup(opts)
         scanner.setup_autocmds()
         vim.notify("nvim-obsidian: vault cache ready", vim.log.levels.INFO)
     end)
+
+    M._did_setup = true
 end
 
 return M
