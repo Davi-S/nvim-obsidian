@@ -33,7 +33,7 @@ local LOCALE_NAMES = {
         month_names = {
             [1] = "janeiro",
             [2] = "fevereiro",
-            [3] = "marco",
+            [3] = "março",
             [4] = "abril",
             [5] = "maio",
             [6] = "junho",
@@ -51,7 +51,7 @@ local LOCALE_NAMES = {
             [4] = "quarta-feira",
             [5] = "quinta-feira",
             [6] = "sexta-feira",
-            [7] = "sabado",
+            [7] = "sábado",
         },
     },
 }
