@@ -50,37 +50,108 @@ local function submit(prompt, force_create)
     open_note(filepath)
 end
 
-local function entries_from_cache()
+local function get_query_aware_display(note, query)
+    local rel = note.relpath and ("  ->  " .. note.relpath) or ""
+    if not query or query == "" then
+        return note.title .. rel
+    end
+
+    local q = query:lower()
+    local title_matches = note.title:lower():find(q, 1, true) ~= nil
+    local aliases = note.aliases or {}
+
+    local matched_alias = nil
+    for _, alias in ipairs(aliases) do
+        if alias:lower():find(q, 1, true) then
+            matched_alias = alias
+            break
+        end
+    end
+
+    if matched_alias and not title_matches then
+        return matched_alias .. rel
+    end
+
+    return note.title .. rel
+end
+
+local function entries_from_cache(query)
     local entries = {}
     for _, note in ipairs(vault.all_notes()) do
+        local aliases = note.aliases or {}
         table.insert(entries, {
             value = note,
-            display = note.title .. (note.relpath and ("  ->  " .. note.relpath) or ""),
-            ordinal = (note.title .. " " .. table.concat(note.aliases, " ")):lower(),
+            display = get_query_aware_display(note, query or ""),
+            ordinal = (note.title .. " " .. table.concat(aliases, " ")):lower(),
         })
     end
     return entries
+end
+
+local function make_finder(query)
+    return finders.new_table({
+        results = entries_from_cache(query),
+        entry_maker = function(item)
+            return {
+                value = item.value,
+                display = item.display,
+                ordinal = item.ordinal,
+            }
+        end,
+    })
 end
 
 function M.open()
     local cfg = config.get()
     pickers.new({}, {
         prompt_title = "Obsidian Omni",
-        finder = finders.new_table({
-            results = entries_from_cache(),
-            entry_maker = function(item)
-                return {
-                    value = item.value,
-                    display = item.display,
-                    ordinal = item.ordinal,
-                }
-            end,
-        }),
+        finder = make_finder(""),
         sorter = conf.generic_sorter({}),
         attach_mappings = function(prompt_bufnr, map)
+            local refresh_timer = vim.uv.new_timer()
+
+            local function cleanup_refresh_state()
+                if refresh_timer and not refresh_timer:is_closing() then
+                    refresh_timer:stop()
+                    refresh_timer:close()
+                end
+            end
+
+            local refresh_autocmd_id = vim.api.nvim_create_autocmd("TextChangedI", {
+                buffer = prompt_bufnr,
+                callback = function()
+                    if refresh_timer and not refresh_timer:is_closing() then
+                        refresh_timer:stop()
+                    end
+
+                    refresh_timer:start(60, 0, vim.schedule_wrap(function()
+                        if not vim.api.nvim_buf_is_valid(prompt_bufnr) then
+                            return
+                        end
+
+                        local picker = action_state.get_current_picker(prompt_bufnr)
+                        if not picker then
+                            return
+                        end
+
+                        local query = action_state.get_current_line()
+                        picker:refresh(make_finder(query), { reset_prompt = false })
+                    end))
+                end,
+            })
+
+            vim.api.nvim_create_autocmd("BufWipeout", {
+                buffer = prompt_bufnr,
+                callback = function()
+                    cleanup_refresh_state()
+                    pcall(vim.api.nvim_del_autocmd, refresh_autocmd_id)
+                end,
+            })
+
             actions.select_default:replace(function()
                 local line = action_state.get_current_line()
                 local sel = action_state.get_selected_entry()
+                cleanup_refresh_state()
                 actions.close(prompt_bufnr)
                 if sel and sel.value then
                     open_note(sel.value.filepath)
@@ -91,6 +162,7 @@ function M.open()
 
             map("i", cfg.force_create_key, function()
                 local line = action_state.get_current_line()
+                cleanup_refresh_state()
                 actions.close(prompt_bufnr)
                 submit(line, true)
             end)
