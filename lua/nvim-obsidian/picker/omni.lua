@@ -147,6 +147,8 @@ local function make_finder(query)
                 value = item.value,
                 display = item.display,
                 ordinal = item.ordinal,
+                path = item.value.filepath,
+                filename = item.value.filepath,
             }
         end,
     })
@@ -158,6 +160,7 @@ function M.open()
         prompt_title = "Obsidian Omni",
         finder = make_finder(""),
         sorter = conf.generic_sorter({}),
+        previewer = conf.file_previewer({}),
         attach_mappings = function(prompt_bufnr, map)
             local refresh_timer = vim.uv.new_timer()
 
