@@ -66,6 +66,18 @@ require("nvim-obsidian").setup({
 - `:ObsidianSearch`
 - `:ObsidianReindex`
 
+## Omni behavior
+
+Omni search uses an explicit search/display policy:
+
+- search objects (priority order): `title`, `aliases`, `relpath`
+- display default: `title  ->  relpath`
+- display override: when query matches an alias and does not match title,
+  display becomes `matched_alias  ->  relpath`
+
+This keeps path matching available (for folder-driven discovery) while keeping
+title/alias relevance higher.
+
 ## Developer workflow
 
 Style/lint config files:
@@ -93,3 +105,4 @@ The spec suite currently covers:
 - journal routing classification and paths
 - strict frontmatter parsing behavior
 - duplicate resolution preference in vault matching
+- omni entry policy (title/alias/path ordering and alias-first display rule)

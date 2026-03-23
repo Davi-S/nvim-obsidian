@@ -152,6 +152,20 @@ Force create:
 - Configurable action key in picker, default <S-CR>.
 - Useful when input matches alias/title but user still wants a new note.
 
+Search and display policy:
+
+- Searchable objects are explicit and ordered: title, aliases, relpath.
+- Path search support enables folder-driven discovery when title/alias are
+  unknown.
+- Display defaults to `title -> relpath`.
+- Display switches to `matched_alias -> relpath` only when query matches alias
+  and does not match title.
+
+Implementation note:
+
+- Policy and matching logic are centralized in Omni helper functions so behavior
+  is deterministic and easier to extend.
+
 ### 7.2 Journal Navigation
 
 Context-aware relative navigation:
@@ -285,6 +299,13 @@ An automated headless E2E smoke script exists:
 
 - tests/e2e_smoke.lua
 
+Focused unit/spec tests exist in:
+
+- tests/spec/router_spec.lua
+- tests/spec/frontmatter_spec.lua
+- tests/spec/vault_spec.lua
+- tests/spec/omni_spec.lua
+
 What it validates:
 
 - command registration
@@ -294,6 +315,12 @@ What it validates:
 - wiki-link follow
 - cmp source completion payload
 - external file create/rename/delete synchronization
+
+What the Omni spec validates:
+
+- title/alias/path search ordering semantics
+- alias-first display override rule
+- path-in-ordinal behavior with relpath last (lower priority)
 
 How to run:
 
