@@ -75,15 +75,22 @@ local function get_query_aware_display(note, query)
     return note.title .. rel
 end
 
+local function build_entry(note, query)
+    local aliases = note.aliases or {}
+    local relpath = note.relpath or ""
+    local ordinal = (note.title .. " " .. table.concat(aliases, " ") .. " " .. relpath):lower()
+
+    return {
+        value = note,
+        display = get_query_aware_display(note, query or ""),
+        ordinal = ordinal,
+    }
+end
+
 local function entries_from_cache(query)
     local entries = {}
     for _, note in ipairs(vault.all_notes()) do
-        local aliases = note.aliases or {}
-        table.insert(entries, {
-            value = note,
-            display = get_query_aware_display(note, query or ""),
-            ordinal = (note.title .. " " .. table.concat(aliases, " ")):lower(),
-        })
+        table.insert(entries, build_entry(note, query))
     end
     return entries
 end
@@ -171,5 +178,7 @@ function M.open()
         end,
     }):find()
 end
+
+M._test_build_entry = build_entry
 
 return M
