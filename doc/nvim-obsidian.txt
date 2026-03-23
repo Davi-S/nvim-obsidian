@@ -1,0 +1,35 @@
+*nvim-obsidian.txt*  nvim-obsidian
+
+nvim-obsidian is a configurable Obsidian workflow plugin for Neovim.
+
+COMMANDS
+  :ObsidianOmni        Open omni picker (search/create).
+  :ObsidianToday       Open or create today's daily note.
+  :ObsidianNext        Open or create next journal note for current context.
+  :ObsidianPrev        Open or create previous journal note for current context.
+  :ObsidianFollow      Follow wiki-link under cursor.
+  :ObsidianBacklinks   Search backlinks for current note title.
+  :ObsidianSearch      Vault-scoped text search.
+  :ObsidianReindex     Force full vault cache rebuild.
+
+CONFIG
+  setup({
+    vault_root = "/abs/path",
+    locale = "pt-BR",
+    notes_subdir = "10 Novas notas",
+    force_create_key = "<S-CR>",
+  })
+
+DEPENDENCIES
+  nvim-lua/plenary.nvim
+  nvim-telescope/telescope.nvim
+  hrsh7th/nvim-cmp
+  nvim-treesitter/nvim-treesitter
+
+SCOPE
+  No visual concealment.
+  No markdown formatting.
+
+SYNC
+  Cache sync is driven by write/buffer events, focus-gained reconciliation,
+  and best-effort filesystem watchers for external vault changes.
