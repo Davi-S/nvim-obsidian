@@ -1,4 +1,5 @@
 local omni = require("nvim-obsidian.picker.omni")
+local vault = require("nvim-obsidian.model.vault")
 
 describe("omni entry builder", function()
     it("shows title -> path when query is empty", function()
@@ -81,5 +82,50 @@ describe("omni entry builder", function()
 
         local ordinal = omni._test_compute_ordinal_text(note)
         assert.are.equal("a b c d/e.md", ordinal)
+    end)
+
+    it("matches aliases case-insensitively", function()
+        local note = {
+            title = "Universidade Federal do Parana",
+            aliases = { "ufpr" },
+            relpath = "14 UFPR BBC/Universidade Federal do Parana.md",
+        }
+
+        local ctx = omni._test_compute_match_context(note, "UFPR")
+        assert.is_true(ctx.alias_exact)
+        assert.is_true(ctx.alias_match)
+        assert.are.equal("ufpr", ctx.matched_alias)
+    end)
+
+    it("prioritizes exact alias before partial alias and path matches", function()
+        local original_all_notes = vault.all_notes
+        vault.all_notes = function()
+            return {
+                {
+                    title = "Lucas Leal",
+                    aliases = { "Lucas (ufpr)" },
+                    relpath = "13 Pessoas/Lucas Leal.md",
+                    filepath = "/vault/13 Pessoas/Lucas Leal.md",
+                },
+                {
+                    title = "Universidade Federal do Parana",
+                    aliases = { "UFPR" },
+                    relpath = "14 UFPR BBC/Universidade Federal do Parana.md",
+                    filepath = "/vault/14 UFPR BBC/Universidade Federal do Parana.md",
+                },
+                {
+                    title = "Some Path Note",
+                    aliases = {},
+                    relpath = "15 Universidade/Random.md",
+                    filepath = "/vault/15 Universidade/Random.md",
+                },
+            }
+        end
+
+        local entries = omni._test_entries_from_cache("ufpr")
+        assert.are.equal("Universidade Federal do Parana", entries[1].value.title)
+        assert.are.equal("Lucas Leal", entries[2].value.title)
+
+        vault.all_notes = original_all_notes
     end)
 end)
