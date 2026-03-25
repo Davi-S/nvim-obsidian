@@ -1,4 +1,5 @@
 local writer = require("nvim-obsidian.note.writer")
+local template = require("nvim-obsidian.template")
 
 describe("integration writer and router", function()
     local root
@@ -12,17 +13,34 @@ describe("integration writer and router", function()
         vim.fn.mkdir(root, "p")
         vim.fn.mkdir(root .. "/08 Templates", "p")
 
+        template._reset_for_tests()
+        template.register_placeholder("title", function(ctx)
+            return ctx.note.title
+        end)
+        template.register_placeholder("date", function(ctx)
+            return ctx.time.iso.date
+        end)
+
         vim.fn.writefile({ "# {{title}}", "Date: {{date}}" }, root .. "/08 Templates/Standard.md")
         vim.fn.writefile({ "---", "type: daily", "---", "# {{title}}" }, root .. "/08 Templates/Daily.md")
     end)
 
     after_each(function()
+        template._reset_for_tests()
         vim.fn.delete(root, "rf")
     end)
 
     it("creates standard note from template and renders placeholders", function()
         local cfg = {
             vault_root = root,
+            locale = "en-US",
+            month_names = {
+                [1] = "january", [2] = "february", [3] = "march", [4] = "april", [5] = "may", [6] = "june",
+                [7] = "july", [8] = "august", [9] = "september", [10] = "october", [11] = "november", [12] = "december",
+            },
+            weekday_names = {
+                [1] = "sunday", [2] = "monday", [3] = "tuesday", [4] = "wednesday", [5] = "thursday", [6] = "friday", [7] = "saturday",
+            },
             journal_enabled = true,
             templates = { standard = "08 Templates/Standard" },
             journal = {
@@ -42,6 +60,14 @@ describe("integration writer and router", function()
     it("does not overwrite existing note content", function()
         local cfg = {
             vault_root = root,
+            locale = "en-US",
+            month_names = {
+                [1] = "january", [2] = "february", [3] = "march", [4] = "april", [5] = "may", [6] = "june",
+                [7] = "july", [8] = "august", [9] = "september", [10] = "october", [11] = "november", [12] = "december",
+            },
+            weekday_names = {
+                [1] = "sunday", [2] = "monday", [3] = "tuesday", [4] = "wednesday", [5] = "thursday", [6] = "friday", [7] = "saturday",
+            },
             journal_enabled = false,
             templates = { standard = "08 Templates/Standard" },
         }

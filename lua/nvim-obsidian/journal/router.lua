@@ -56,18 +56,6 @@ function M.template_for_type(note_type, cfg)
     return ""
 end
 
-function M.render_template(template, title)
-    local now = os.time()
-    local src = template or ""
-    if src == "" then
-        return ""
-    end
-
-    return src
-        :gsub("{{title}}", title)
-        :gsub("{{date}}", os.date("%Y-%m-%d", now))
-end
-
 function M.today_daily(cfg)
     if not cfg.journal_enabled then
         error("journal is not configured")

@@ -47,6 +47,12 @@ local opts = {
 }
 
 require("nvim-obsidian").setup(opts)
+require("nvim-obsidian").register_placeholder("title", function(ctx)
+    return ctx.note.title
+end)
+require("nvim-obsidian").register_placeholder("date", function(ctx)
+    return ctx.time.iso.date
+end)
 
 assert_true(wait_until(2000, 20, function()
     return exists_cmd("ObsidianToday") and exists_cmd("ObsidianNext") and exists_cmd("ObsidianPrev") and

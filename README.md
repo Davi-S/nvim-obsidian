@@ -65,6 +65,7 @@ require("nvim-obsidian").setup({
 - `:ObsidianBacklinks`
 - `:ObsidianSearch`
 - `:ObsidianReindex`
+- `:ObsidianInsertTemplate [type|path]`
 
 ## Omni behavior
 

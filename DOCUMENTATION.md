@@ -110,10 +110,7 @@ Main setup fields:
 - month_names: map 1..12 -> localized month names
 - weekday_names: map 1..7 -> localized weekday names
 
-Template placeholders currently supported:
-
-- {{title}}
-- {{date}}
+Template system is fully configurable via optional placeholder registration. See section 6.2 for details.
 
 ## 6. Commands
 
@@ -135,6 +132,195 @@ Global commands provided by the plugin:
   - Vault-scoped text search.
 - :ObsidianReindex
   - Forces full cache rebuild.
+- :ObsidianInsertTemplate [type|path]
+  - Inserts rendered template at cursor.
+  - Optional argument can be a note type (standard/daily/weekly/monthly/yearly) or a file path.
+
+## 6.2 Template System
+
+The plugin includes a flexible template system with user-configurable placeholders.
+
+**Placeholder Syntax:**
+- Templates use `{{placeholder_name}}` syntax.
+- Unknown placeholders are left unchanged in the output (with a warning).
+- No built-in placeholders—all must be registered by the user.
+
+**Registering Placeholders:**
+
+Call `register_placeholder(name, resolver_fn)` during setup:
+
+```lua
+require("nvim-obsidian").setup({
+  vault_root = "/path/to/vault",
+  -- ... other config
+})
+
+-- Register custom placeholders
+require("nvim-obsidian").register_placeholder("title", function(ctx)
+  return ctx.note.title
+end)
+
+require("nvim-obsidian").register_placeholder("date", function(ctx)
+  return ctx.time.format_date("%Y-%m-%d")
+end)
+
+require("nvim-obsidian").register_placeholder("weekday", function(ctx)
+  return ctx.time.format_date("%A")
+end)
+```
+
+**Placeholder Context:**
+
+Each resolver function receives a context object with:
+
+- `ctx.note.title` - the note title
+- `ctx.note.type` - note type (standard/daily/weekly/monthly/yearly)
+- `ctx.note.input` - original user input
+- `ctx.note.rel_path` - vault-relative path
+- `ctx.note.aliases` - array of note aliases
+- `ctx.note.tags` - array of note tags
+- `ctx.note.abs_path` - absolute file path
+- `ctx.time.timestamp` - unix timestamp
+- `ctx.time.local` - local date table {year, month, day, hour, min, sec, wday, yday}
+- `ctx.time.utc` - UTC date table
+- `ctx.time.iso` - ISO date object {year, month, day}
+- `ctx.time.format_date(fmt)` - format function for date formatting
+- `ctx.config` - read-only config object (attempting writes raises an error)
+
+**Using Templates:**
+
+Templates are injected when creating notes via `:ObsidianOmni` based on note type.
+
+To insert a template manually at cursor:
+
+```vim
+:ObsidianInsertTemplate                  " Uses note type from current buffer
+:ObsidianInsertTemplate standard         " Uses 'standard' note template
+:ObsidianInsertTemplate ./my-template.md " Loads template from file
+```
+
+## 6.3 Template Examples
+
+**Basic Setup with Common Placeholders:**
+
+```lua
+require("nvim-obsidian").setup({
+  vault_root = "/home/user/Obsidian Vault",
+  notes_subdir = "10 Notas",
+  templates = {
+    standard = "# {{title}}\n\nDate: {{date}}\n",
+    daily = "# Daily: {{date}}\n\n## Tasks\n\n## Notes\n",
+  },
+})
+
+-- Register common placeholders
+require("nvim-obsidian").register_placeholder("title", function(ctx)
+  return ctx.note.title
+end)
+
+require("nvim-obsidian").register_placeholder("date", function(ctx)
+  return ctx.time.format_date("%Y-%m-%d")
+end)
+
+require("nvim-obsidian").register_placeholder("time", function(ctx)
+  return ctx.time.format_date("%H:%M")
+end)
+
+require("nvim-obsidian").register_placeholder("weekday", function(ctx)
+  return ctx.time.format_date("%A")
+end)
+
+require("nvim-obsidian").register_placeholder("iso_date", function(ctx)
+  return string.format("%04d-%02d-%02d", 
+    ctx.time.iso.year, ctx.time.iso.month, ctx.time.iso.day)
+end)
+
+require("nvim-obsidian").register_placeholder("note_type", function(ctx)
+  return ctx.note.type
+end)
+```
+
+With these placeholders registered, templates like:
+
+```markdown
+# {{title}}
+
+Created: {{date}} at {{time}} ({{weekday}})
+Type: {{note_type}}
+
+---
+
+## Content
+
+Add your content here.
+```
+
+Will render to:
+
+```markdown
+# My Note
+
+Created: 2026-03-25 at 14:30 (Wednesday)
+Type: standard
+
+---
+
+## Content
+
+Add your content here.
+```
+
+**Advanced Placeholder Examples:**
+
+```lua
+-- Extract year for archival paths
+require("nvim-obsidian").register_placeholder("year", function(ctx)
+  return tostring(ctx.time.iso.year)
+end)
+
+-- Access vault path
+require("nvim-obsidian").register_placeholder("vault_name", function(ctx)
+  local parts = vim.fn.split(ctx.config.vault_root, "/")
+  return parts[#parts]
+end)
+
+-- Computed field based on note type
+require("nvim-obsidian").register_placeholder("template_label", function(ctx)
+  if ctx.note.type == "daily" then
+    return "Daily Journal Entry"
+  elseif ctx.note.type == "weekly" then
+    return "Weekly Retrospective"
+  else
+    return "Note"
+  end
+end)
+
+-- Month name from locale config
+require("nvim-obsidian").register_placeholder("month_name", function(ctx)
+  local months = ctx.config.month_names or {}
+  local month = ctx.time.iso.month
+  return months[month] or tostring(month)
+end)
+
+-- ISO format with custom separator
+require("nvim-obsidian").register_placeholder("date_iso", function(ctx)
+  return ctx.time.format_date("%Y%m%d")
+end)
+```
+
+**Using File Path Arguments:**
+
+Create reusable template files in your vault and reference them explicitly:
+
+```vim
+" Use a custom template file
+:ObsidianInsertTemplate ./templates/meeting_notes.md
+
+" Or with absolute path
+:ObsidianInsertTemplate /home/user/Obsidian\ Vault/templates/research.md
+```
+
+Template files work the same way as configured templates—placeholders are still resolved.
 
 ## 7. Workflows
 

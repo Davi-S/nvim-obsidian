@@ -3,14 +3,18 @@
 nvim-obsidian is a configurable Obsidian workflow plugin for Neovim.
 
 COMMANDS
-  :ObsidianOmni        Open omni picker (search/create).
-  :ObsidianToday       Open or create today's daily note.
-  :ObsidianNext        Open or create next journal note for current context.
-  :ObsidianPrev        Open or create previous journal note for current context.
-  :ObsidianFollow      Follow wiki-link under cursor.
-  :ObsidianBacklinks   Search backlinks for current note title.
-  :ObsidianSearch      Vault-scoped text search.
-  :ObsidianReindex     Force full vault cache rebuild.
+  :ObsidianOmni              Open omni picker (search/create).
+  :ObsidianToday             Open or create today's daily note.
+  :ObsidianNext              Open or create next journal note for current context.
+  :ObsidianPrev              Open or create previous journal note for current context.
+  :ObsidianFollow            Follow wiki-link under cursor.
+  :ObsidianBacklinks         Search backlinks for current note title.
+  :ObsidianSearch            Vault-scoped text search.
+  :ObsidianReindex           Force full vault cache rebuild.
+  :ObsidianInsertTemplate [type|path]
+                             Insert rendered template at cursor.
+                             Arg can be a note type (standard/daily/weekly/monthly/yearly)
+                             or a file path to a template file.
 
 CONFIG
   setup({
@@ -19,6 +23,53 @@ CONFIG
     notes_subdir = "10 Novas notas",
     force_create_key = "<S-CR>",
   })
+
+TEMPLATES
+  The plugin provides a flexible template system with user-configurable 
+  placeholders. All placeholders must be registered via register_placeholder().
+
+  Placeholder syntax:
+    {{placeholder_name}}  - replaced with resolver output
+    {{unknown}}           - kept as-is if not registered (with warning)
+
+  Registration (call during setup):
+    require("nvim-obsidian").register_placeholder("title", function(ctx)
+      return ctx.note.title
+    end)
+
+    require("nvim-obsidian").register_placeholder("date", function(ctx)
+      return ctx.time.format_date("%Y-%m-%d")
+    end)
+
+  Context object fields:
+    ctx.note.title        - note title string
+    ctx.note.type         - note type (standard/daily/weekly/monthly/yearly)
+    ctx.note.input        - original user input
+    ctx.note.rel_path     - vault-relative path
+    ctx.note.aliases      - table of aliases
+    ctx.note.tags         - table of tags
+    ctx.note.abs_path     - absolute file path
+    
+    ctx.time.timestamp    - unix timestamp
+    ctx.time.local        - local date table {year,month,day,hour,min,sec,wday,yday}
+    ctx.time.utc          - UTC date table
+    ctx.time.iso          - ISO date {year, month, day}
+    ctx.time.format_date(fmt)  - format function, e.g. "%Y-%m-%d"
+    
+    ctx.config            - read-only config object
+
+  Template usage:
+    :ObsidianInsertTemplate              auto-detect note type
+    :ObsidianInsertTemplate standard     use 'standard' note template
+    :ObsidianInsertTemplate ./path.md    load template from file
+
+  Common placeholders (examples):
+    register_placeholder("title", function(ctx) return ctx.note.title end)
+    register_placeholder("date", function(ctx) return ctx.time.format_date("%Y-%m-%d") end)
+    register_placeholder("time", function(ctx) return ctx.time.format_date("%H:%M") end)
+    register_placeholder("weekday", function(ctx) return ctx.time.format_date("%A") end)
+    register_placeholder("year", function(ctx) return tostring(ctx.time.iso.year) end)
+    register_placeholder("note_type", function(ctx) return ctx.note.type end)
 
 DEPENDENCIES
   nvim-lua/plenary.nvim

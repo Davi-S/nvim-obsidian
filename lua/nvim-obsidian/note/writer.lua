@@ -1,5 +1,6 @@
 local path = require("nvim-obsidian.path")
 local router = require("nvim-obsidian.journal.router")
+local template = require("nvim-obsidian.template")
 
 local M = {}
 
@@ -18,7 +19,15 @@ function M.ensure_note(filepath, title, note_type, cfg)
 
     path.ensure_dir(path.parent(filepath))
     local tpl = router.template_for_type(note_type, cfg)
-    local rendered = router.render_template(tpl, title)
+    local ctx = template.build_context({
+        cfg = cfg,
+        title = title,
+        note_type = note_type,
+        note_abs_path = filepath,
+        input = title,
+        timestamp = os.time(),
+    })
+    local rendered = template.render(tpl, ctx)
     write_content(filepath, rendered)
 end
 
