@@ -1,5 +1,6 @@
 local path = require("nvim-obsidian.path")
 local fmt = require("nvim-obsidian.journal.format")
+local classifier = require("nvim-obsidian.journal.classifier")
 
 local M = {}
 
@@ -15,50 +16,8 @@ local function resolve_template_path(rel_or_abs, cfg)
     return path.join(cfg.vault_root, rel)
 end
 
-local function ensure_md_title(input)
-    local s = vim.trim(input)
-    if s:sub(-3) == ".md" then
-        s = s:sub(1, -4)
-    end
-    return s
-end
-
-local function get_patterns(cfg)
-    if cfg.journal.patterns then
-        return cfg.journal.patterns
-    end
-
-    local derived = fmt.derive_patterns(cfg.journal.title_formats)
-    return {
-        daily = derived.daily.pattern,
-        weekly = derived.weekly.pattern,
-        monthly = derived.monthly.pattern,
-        yearly = derived.yearly.pattern,
-    }
-end
-
 function M.classify_input(input, cfg)
-    local title = ensure_md_title(input)
-
-    if not cfg.journal_enabled then
-        return "standard", title
-    end
-
-    local patterns = get_patterns(cfg)
-
-    if title:match(patterns.yearly) then
-        return "yearly", title
-    end
-    if title:match(patterns.weekly) then
-        return "weekly", title
-    end
-    if title:match(patterns.daily) then
-        return "daily", title
-    end
-    if title:match(patterns.monthly) then
-        return "monthly", title
-    end
-    return "standard", title
+    return classifier.classify_title(input, cfg)
 end
 
 function M.path_for_type(note_type, title, cfg)

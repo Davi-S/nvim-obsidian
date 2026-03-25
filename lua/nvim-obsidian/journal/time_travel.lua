@@ -2,6 +2,7 @@ local config = require("nvim-obsidian.config")
 local path = require("nvim-obsidian.path")
 local fmt = require("nvim-obsidian.journal.format")
 local router = require("nvim-obsidian.journal.router")
+local classifier = require("nvim-obsidian.journal.classifier")
 
 local M = {}
 
@@ -21,19 +22,9 @@ local function current_note_type_and_title(cfg)
 
     local nfile = path.normalize(file)
     local title = path.stem(nfile)
-    local parent = path.normalize(path.parent(nfile))
-
-    if parent == path.normalize(cfg.journal.daily.dir_abs) then
-        return "daily", title
-    end
-    if parent == path.normalize(cfg.journal.weekly.dir_abs) then
-        return "weekly", title
-    end
-    if parent == path.normalize(cfg.journal.monthly.dir_abs) then
-        return "monthly", title
-    end
-    if parent == path.normalize(cfg.journal.yearly.dir_abs) then
-        return "yearly", title
+    local note_type = classifier.note_type_for_path(nfile, cfg)
+    if note_type ~= "standard" then
+        return note_type, title
     end
 
     return "daily", fmt.daily_title(os.time(), cfg)

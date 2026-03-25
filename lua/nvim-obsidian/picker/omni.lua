@@ -6,36 +6,13 @@ local conf = require("telescope.config").values
 local sorters = require("telescope.sorters")
 
 local config = require("nvim-obsidian.config")
-local path = require("nvim-obsidian.path")
 local router = require("nvim-obsidian.journal.router")
 local vault = require("nvim-obsidian.model.vault")
+local writer = require("nvim-obsidian.note.writer")
+local ranker = require("nvim-obsidian.ranker")
+local async_constants = require("nvim-obsidian.async.constants")
 
 local M = {}
-
-local SEARCH_POLICY = {
-    order = { "title", "aliases", "relpath" },
-    display = {
-        default = "title",
-        alias_override = true,
-    },
-}
-
-local function ensure_note(filepath, title, note_type, cfg)
-    if vim.fn.filereadable(filepath) == 0 then
-        path.ensure_dir(path.parent(filepath))
-        local tpl = router.template_for_type(note_type, cfg)
-        local rendered = router.render_template(tpl, title)
-        if rendered == "" then
-            vim.fn.writefile({}, filepath)
-        else
-            vim.fn.writefile(vim.split(rendered, "\n", { plain = true }), filepath)
-        end
-    end
-end
-
-local function open_note(filepath)
-    vim.cmd.edit(vim.fn.fnameescape(filepath))
-end
 
 local function submit(prompt, force_create)
     local cfg = config.get()
@@ -48,7 +25,7 @@ local function submit(prompt, force_create)
         local matches = vault.resolve_by_title_or_alias(input, cfg)
         local preferred = vault.preferred_match(input, matches, cfg)
         if preferred then
-            open_note(preferred.filepath)
+            writer.open(preferred.filepath)
             return
         end
         if #matches > 1 then
@@ -59,112 +36,27 @@ local function submit(prompt, force_create)
 
     local note_type, title = router.classify_input(input, cfg)
     local filepath = router.path_for_type(note_type, title, cfg)
-    ensure_note(filepath, title, note_type, cfg)
-    open_note(filepath)
+    writer.ensure_and_open(filepath, title, note_type, cfg)
 end
 
 local function compute_match_context(note, query)
-    local q = (query or ""):lower()
-    local aliases = note.aliases or {}
-    local relpath = note.relpath or ""
-
-    if q == "" then
-        return {
-            title_exact = false,
-            title_match = false,
-            alias_exact = false,
-            alias_match = false,
-            path_match = false,
-            matched_alias = nil,
-        }
-    end
-
-    local title_lower = note.title:lower()
-    local title_exact = title_lower == q
-    local title_match = title_lower:find(q, 1, true) ~= nil
-
-    local exact_alias = nil
-    local matched_alias = nil
-    for _, alias in ipairs(aliases) do
-        local alias_lower = alias:lower()
-        if alias_lower == q and not exact_alias then
-            exact_alias = alias
-        end
-        if alias_lower:find(q, 1, true) and not matched_alias then
-            matched_alias = alias
-        end
-    end
-
-    matched_alias = exact_alias or matched_alias
-
-    return {
-        title_exact = title_exact,
-        title_match = title_match,
-        alias_exact = exact_alias ~= nil,
-        alias_match = matched_alias ~= nil,
-        path_match = relpath ~= "" and relpath:lower():find(q, 1, true) ~= nil,
-        matched_alias = matched_alias,
-    }
+    return ranker.compute_match_context(note, query)
 end
 
 local function compute_rank(ctx, query)
-    if (query or "") == "" then
-        return 100
-    end
-    if ctx.alias_exact then
-        return 1
-    end
-    if ctx.alias_match then
-        return 2
-    end
-    if ctx.title_exact then
-        return 3
-    end
-    if ctx.title_match then
-        return 4
-    end
-    if ctx.path_match then
-        return 5
-    end
-    return 99
+    return ranker.compute_rank(ctx, query)
 end
 
 local function compute_display_label(note, ctx)
-    if SEARCH_POLICY.display.alias_override and ctx.alias_match and not ctx.title_match then
-        return ctx.matched_alias
-    end
-    return note.title
+    return ranker.compute_display_label(note, ctx)
 end
 
 local function compute_ordinal_text(note)
-    local aliases = note.aliases or {}
-    local relpath = note.relpath or ""
-
-    local parts = {}
-    for _, key in ipairs(SEARCH_POLICY.order) do
-        if key == "title" then
-            table.insert(parts, note.title)
-        elseif key == "aliases" then
-            table.insert(parts, table.concat(aliases, " "))
-        elseif key == "relpath" and relpath ~= "" then
-            table.insert(parts, relpath)
-        end
-    end
-
-    return table.concat(parts, " "):lower()
+    return ranker.compute_ordinal_text(note)
 end
 
 local function build_entry(note, query)
-    local rel = note.relpath and ("  ->  " .. note.relpath) or ""
-    local ctx = compute_match_context(note, query)
-    local label = compute_display_label(note, ctx)
-
-    return {
-        value = note,
-        display = label .. rel,
-        ordinal = compute_ordinal_text(note),
-        rank = compute_rank(ctx, query),
-    }
+    return ranker.build_entry(note, query)
 end
 
 local function entries_from_cache(query)
@@ -253,7 +145,7 @@ function M.open()
                         refresh_timer:stop()
                     end
 
-                    refresh_timer:start(60, 0, vim.schedule_wrap(function()
+                    refresh_timer:start(async_constants.OMNI_QUERY_THROTTLE_MS, 0, vim.schedule_wrap(function()
                         if not vim.api.nvim_buf_is_valid(prompt_bufnr) then
                             return
                         end
@@ -283,7 +175,7 @@ function M.open()
                 cleanup_refresh_state()
                 actions.close(prompt_bufnr)
                 if sel and sel.value then
-                    open_note(sel.value.filepath)
+                    writer.open(sel.value.filepath)
                 else
                     submit(line, false)
                 end

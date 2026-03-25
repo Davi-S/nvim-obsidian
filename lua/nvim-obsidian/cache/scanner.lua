@@ -2,35 +2,23 @@ local config = require("nvim-obsidian.config")
 local path = require("nvim-obsidian.path")
 local parser = require("nvim-obsidian.parser.frontmatter")
 local vault = require("nvim-obsidian.model.vault")
+local classifier = require("nvim-obsidian.journal.classifier")
+local async_constants = require("nvim-obsidian.async.constants")
 
 local M = {}
+
+-- Dependency injection: store references to dependencies (default to real modules)
+local _config = config
+local _vault = vault
+local _parser = parser
+local _classifier = classifier
+
 local reconcile_timer = nil
 local watch_restart_timer = nil
 local watchers = {
     handles = {},
     by_dir = {},
 }
-
-local function note_type_for_path(abs, cfg)
-    if not cfg.journal_enabled then
-        return "standard"
-    end
-
-    local parent = path.normalize(path.parent(abs))
-    if parent == path.normalize(cfg.journal.daily.dir_abs) then
-        return "daily"
-    end
-    if parent == path.normalize(cfg.journal.weekly.dir_abs) then
-        return "weekly"
-    end
-    if parent == path.normalize(cfg.journal.monthly.dir_abs) then
-        return "monthly"
-    end
-    if parent == path.normalize(cfg.journal.yearly.dir_abs) then
-        return "yearly"
-    end
-    return "standard"
-end
 
 local function scan_recursive(root, out)
     local fd = vim.uv.fs_scandir(root)
@@ -81,7 +69,7 @@ local function stop_all_watchers()
 end
 
 function M.refresh_one(abs)
-    local cfg = config.get()
+    local cfg = _config.get()
     if not cfg then
         return
     end
@@ -90,22 +78,22 @@ function M.refresh_one(abs)
         return
     end
     if vim.fn.filereadable(nabs) == 0 then
-        vault.remove_note(nabs)
+        _vault.remove_note(nabs)
         return
     end
     local text = table.concat(vim.fn.readfile(nabs), "\n")
-    local meta = parser.parse(text)
-    vault.upsert_note(nabs, {
+    local meta = _parser.parse(text)
+    _vault.upsert_note(nabs, {
         relpath = path.rel_to_root(cfg.vault_root, nabs),
         aliases = meta.aliases,
         tags = meta.tags,
         frontmatter = meta,
-        note_type = note_type_for_path(nabs, cfg),
+        note_type = _classifier.note_type_for_path(nabs, cfg),
     })
 end
 
 function M.refresh_all_sync()
-    local cfg = config.get()
+    local cfg = _config.get()
     if not cfg then
         return
     end
@@ -113,12 +101,12 @@ function M.refresh_all_sync()
     local files = {}
     scan_recursive(cfg.vault_root, files)
 
-    vault.begin_bulk_update()
-    vault.reset()
+    _vault.begin_bulk_update()
+    _vault.reset()
     for _, file in ipairs(files) do
         M.refresh_one(file)
     end
-    vault.end_bulk_update()
+    _vault.end_bulk_update()
 end
 
 function M.refresh_all_async(cb)
@@ -138,7 +126,7 @@ function M.reconcile_async()
     end
 
     reconcile_timer = vim.uv.new_timer()
-    reconcile_timer:start(200, 0, function()
+    reconcile_timer:start(async_constants.RECONCILE_DEBOUNCE_MS, 0, function()
         vim.schedule(function()
             M.refresh_all_sync()
         end)
@@ -156,7 +144,7 @@ local function restart_watchers_async()
     end
 
     watch_restart_timer = vim.uv.new_timer()
-    watch_restart_timer:start(350, 0, function()
+    watch_restart_timer:start(async_constants.WATCHER_RESTART_DELAY_MS, 0, function()
         vim.schedule(function()
             M.start_fs_watchers()
         end)
@@ -167,7 +155,7 @@ local function restart_watchers_async()
 end
 
 function M.start_fs_watchers()
-    local cfg = config.get()
+    local cfg = _config.get()
     if not cfg then
         return
     end
@@ -207,7 +195,7 @@ function M.start_fs_watchers()
                     if vim.fn.filereadable(changed_norm) == 1 then
                         M.refresh_one(changed_norm)
                     else
-                        vault.remove_note(changed_norm)
+                        _vault.remove_note(changed_norm)
                         M.reconcile_async()
                     end
                 end)
@@ -226,7 +214,7 @@ function M.start_fs_watchers()
 end
 
 function M.setup_autocmds()
-    local cfg = config.get()
+    local cfg = _config.get()
     local group = vim.api.nvim_create_augroup("NvimObsidianCacheSync", { clear = true })
 
     vim.api.nvim_create_autocmd({ "BufFilePre" }, {
@@ -248,7 +236,7 @@ function M.setup_autocmds()
             if file and file ~= "" and path.is_inside(cfg.vault_root, file) then
                 local prev = vim.b[args.buf].nvim_obsidian_prev_path
                 if prev and prev ~= "" and prev ~= path.normalize(file) then
-                    vault.remove_note(prev)
+                    _vault.remove_note(prev)
                 end
                 vim.b[args.buf].nvim_obsidian_prev_path = nil
                 M.refresh_one(file)
@@ -262,7 +250,7 @@ function M.setup_autocmds()
         callback = function(args)
             local file = args.file
             if file and file ~= "" and path.is_inside(cfg.vault_root, file) then
-                vault.remove_note(path.normalize(file))
+                _vault.remove_note(path.normalize(file))
             end
         end,
     })
@@ -292,6 +280,16 @@ function M.setup_autocmds()
     })
 
     M.start_fs_watchers()
+end
+
+--- Initialize scanner with optional dependency injection (for testing)
+--- @param opts table Optional: { config = ..., vault = ..., parser = ..., classifier = ... }
+function M.init(opts)
+    opts = opts or {}
+    if opts.config then _config = opts.config end
+    if opts.vault then _vault = opts.vault end
+    if opts.parser then _parser = opts.parser end
+    if opts.classifier then _classifier = opts.classifier end
 end
 
 return M

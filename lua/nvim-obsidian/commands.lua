@@ -1,23 +1,9 @@
 local config = require("nvim-obsidian.config")
 local router = require("nvim-obsidian.journal.router")
 local time_travel = require("nvim-obsidian.journal.time_travel")
-local path = require("nvim-obsidian.path")
+local writer = require("nvim-obsidian.note.writer")
 
 local M = {}
-
-local function ensure_and_open(note_type, title, filepath)
-    if vim.fn.filereadable(filepath) == 0 then
-        path.ensure_dir(path.parent(filepath))
-        local tpl = router.template_for_type(note_type, config.get())
-        local rendered = router.render_template(tpl, title)
-        if rendered == "" then
-            vim.fn.writefile({}, filepath)
-        else
-            vim.fn.writefile(vim.split(rendered, "\n", { plain = true }), filepath)
-        end
-    end
-    vim.cmd.edit(vim.fn.fnameescape(filepath))
-end
 
 function M.register()
     local cfg = config.get()
@@ -28,18 +14,21 @@ function M.register()
 
     if cfg.journal_enabled then
         vim.api.nvim_create_user_command("ObsidianToday", function()
-            local note_type, title, filepath = router.today_daily(config.get())
-            ensure_and_open(note_type, title, filepath)
+            local run_cfg = config.get()
+            local note_type, title, filepath = router.today_daily(run_cfg)
+            writer.ensure_and_open(filepath, title, note_type, run_cfg)
         end, {})
 
         vim.api.nvim_create_user_command("ObsidianNext", function()
+            local run_cfg = config.get()
             local note_type, title, filepath = time_travel.open_relative(1)
-            ensure_and_open(note_type, title, filepath)
+            writer.ensure_and_open(filepath, title, note_type, run_cfg)
         end, {})
 
         vim.api.nvim_create_user_command("ObsidianPrev", function()
+            local run_cfg = config.get()
             local note_type, title, filepath = time_travel.open_relative(-1)
-            ensure_and_open(note_type, title, filepath)
+            writer.ensure_and_open(filepath, title, note_type, run_cfg)
         end, {})
     end
 
