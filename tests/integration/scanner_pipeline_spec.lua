@@ -23,7 +23,7 @@ describe("integration scanner pipeline", function()
             "# Standard",
         })
 
-        write_file(root .. "/11 Diario/11.01 Diario/2026 marco 21, sabado.md", {
+        write_file(root .. "/11 Diario/11.01 Diario/2026 março 21, sabado.md", {
             "---",
             "aliases: [Daily Alias]",
             "tags: [daily]",

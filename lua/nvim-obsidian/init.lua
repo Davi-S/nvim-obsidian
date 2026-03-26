@@ -25,6 +25,7 @@ local scanner = require("nvim-obsidian.cache.scanner")
 local commands = require("nvim-obsidian.commands")
 local template = require("nvim-obsidian.template")
 local journal_placeholder_registry = require("nvim-obsidian.journal.placeholder_registry")
+local dataview_engine = require("nvim-obsidian.dataview.engine")
 
 local M = {
   _did_setup = false,
@@ -98,6 +99,7 @@ function M.setup(opts)
 
   scanner.refresh_all_async(function()
     scanner.setup_autocmds()
+    dataview_engine.setup_autocmds()
     vim.notify("nvim-obsidian: vault cache ready", vim.log.levels.INFO)
   end)
 

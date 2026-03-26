@@ -16,8 +16,8 @@ describe("journal router", function()
         )
 
         assert.are.equal(
-            "/vault/11 Diario/11.01 Diario/2026 marco 21, sabado.md",
-            router.path_for_type("daily", "2026 marco 21, sabado", cfg)
+            "/vault/11 Diario/11.01 Diario/2026 março 21, sabado.md",
+            router.path_for_type("daily", "2026 março 21, sabado", cfg)
         )
     end)
 end)

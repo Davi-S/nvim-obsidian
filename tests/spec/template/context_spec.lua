@@ -7,7 +7,7 @@ describe("template context", function()
             cfg = {
                 vault_root = "/vault",
                 locale = "pt-BR",
-                month_names = { [3] = "marco" },
+                month_names = { [3] = "março" },
                 weekday_names = { [4] = "quarta" },
             },
             title = "Minha Nota",
@@ -19,7 +19,7 @@ describe("template context", function()
         assert.are.equal("Minha Nota", ctx.note.title)
         assert.are.equal("daily", ctx.note.type)
         assert.are.equal("11 Diario/11.01 Diario/Minha Nota.md", ctx.note.rel_path)
-        assert.are.equal("marco", ctx.time.locale.month_name)
+        assert.are.equal("março", ctx.time.locale.month_name)
         assert.are.equal("2026-03-25", ctx.time.iso.date)
         assert.is_truthy(ctx.time["local"])
         assert.is_truthy(ctx.time.utc)

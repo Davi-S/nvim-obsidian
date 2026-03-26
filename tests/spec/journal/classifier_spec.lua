@@ -13,7 +13,7 @@ describe("journal classifier", function()
         local t1 = classifier.classify_title("2024", cfg)
         local t2 = classifier.classify_title("2024 semana 16", cfg)
         local t3 = classifier.classify_title("2024 abril", cfg)
-        local t4 = classifier.classify_title("2026 marco 21, sabado", cfg)
+        local t4 = classifier.classify_title("2026 março 21, sabado", cfg)
         local t5 = classifier.classify_title("My Standard Note", cfg)
 
         assert.are.equal("yearly", t1)

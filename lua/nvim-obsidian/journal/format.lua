@@ -112,6 +112,41 @@ local function build_render_ctx(ts, cfg, note_type)
     }
 end
 
+local function normalize_for_comparison(text)
+    -- Remove common Portuguese diacritical marks for accent-insensitive comparison
+    -- This allows matching "marco" with "março", "sábado" with "sabado", etc.
+    local replacements = {
+        ["á"] = "a",
+        ["à"] = "a",
+        ["ã"] = "a",
+        ["â"] = "a",
+        ["ä"] = "a",
+        ["é"] = "e",
+        ["è"] = "e",
+        ["ê"] = "e",
+        ["ë"] = "e",
+        ["í"] = "i",
+        ["ì"] = "i",
+        ["î"] = "i",
+        ["ï"] = "i",
+        ["ó"] = "o",
+        ["ò"] = "o",
+        ["õ"] = "o",
+        ["ô"] = "o",
+        ["ö"] = "o",
+        ["ú"] = "u",
+        ["ù"] = "u",
+        ["û"] = "u",
+        ["ü"] = "u",
+        ["ç"] = "c",
+    }
+    local result = text
+    for accented, base in pairs(replacements) do
+        result = result:gsub(accented, base)
+    end
+    return result
+end
+
 local function render_title(format, ts, cfg, note_type)
     local ctx = build_render_ctx(ts, cfg, note_type)
     return (format:gsub("{{([%w_]+)}}", function(key)
@@ -153,8 +188,10 @@ function M.parse_daily_title(title, cfg)
 
     local month_num
     local lowered = vim.fn.tolower(fields.month_name or "")
+    local normalized = normalize_for_comparison(lowered)
     for idx, name in pairs(cfg.month_names) do
-        if vim.fn.tolower(name) == lowered then
+        local normalized_name = normalize_for_comparison(vim.fn.tolower(name))
+        if normalized_name == normalized then
             month_num = idx
             break
         end
@@ -189,9 +226,11 @@ function M.parse_monthly_title(title, cfg)
         return nil
     end
     local lowered = vim.fn.tolower(fields.month_name or "")
+    local normalized = normalize_for_comparison(lowered)
     local month_num
     for idx, name in pairs(cfg.month_names) do
-        if vim.fn.tolower(name) == lowered then
+        local normalized_name = normalize_for_comparison(vim.fn.tolower(name))
+        if normalized_name == normalized then
             month_num = idx
             break
         end
