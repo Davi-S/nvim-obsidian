@@ -56,7 +56,10 @@ end
 function M.parse_query(body_lines)
     local query = {
         kind = nil,
+        without_id = false,
+        projections = {},
         from = nil,
+        from_kind = nil,
         where_expr = nil,
         group_by = nil,
         group_alias = nil,
@@ -67,21 +70,46 @@ function M.parse_query(body_lines)
     local has_where = false
     local has_group = false
     local has_sort = false
+    local parsing_table_projections = false
 
     for _, raw in ipairs(body_lines) do
         local line = trim(raw)
         if line ~= "" then
             if not query.kind then
-                if line:upper() ~= "TASK" then
-                    return nil, "only TASK query is supported"
+                if line:upper() == "TASK" then
+                    query.kind = "TASK"
+                elseif line:upper() == "TABLE WITHOUT ID" then
+                    query.kind = "TABLE"
+                    query.without_id = true
+                    parsing_table_projections = true
+                else
+                    return nil, "only TASK or TABLE WITHOUT ID query is supported"
                 end
-                query.kind = "TASK"
             elseif not query.from then
                 local from_path = line:match('^FROM%s+"([^"]+)"$')
-                if not from_path then
+                local from_tag = line:match("^FROM%s+#([^%s]+)$")
+
+                if from_path then
+                    query.from = from_path
+                    query.from_kind = "path"
+                    parsing_table_projections = false
+                elseif from_tag then
+                    query.from = from_tag
+                    query.from_kind = "tag"
+                    parsing_table_projections = false
+                elseif query.kind == "TABLE" and parsing_table_projections then
+                    local expr, label = line:match('^(.-)%s+AS%s+"([^"]+)"%s*,?$')
+                    expr = trim(expr)
+                    if not expr or expr == "" or not label or label == "" then
+                        return nil, "invalid TABLE projection"
+                    end
+                    table.insert(query.projections, {
+                        expr = expr,
+                        label = label,
+                    })
+                else
                     return nil, "invalid FROM clause"
                 end
-                query.from = from_path
             elseif starts_with_ci(line, "WHERE ") then
                 if has_where then
                     return nil, "duplicate WHERE clause"
@@ -93,6 +121,9 @@ function M.parse_query(body_lines)
                 query.where_expr = expr
                 has_where = true
             elseif starts_with_ci(line, "GROUP BY ") then
+                if query.kind ~= "TASK" then
+                    return nil, "GROUP BY is only supported for TASK"
+                end
                 if has_group then
                     return nil, "duplicate GROUP BY clause"
                 end
@@ -124,11 +155,14 @@ function M.parse_query(body_lines)
         end
     end
 
-    if query.kind ~= "TASK" then
-        return nil, "missing TASK declaration"
+    if not query.kind then
+        return nil, "missing query declaration"
     end
     if not query.from then
         return nil, "missing FROM clause"
+    end
+    if query.kind == "TABLE" and #query.projections == 0 then
+        return nil, "missing TABLE projections"
     end
 
     return query

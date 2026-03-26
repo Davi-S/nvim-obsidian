@@ -1,5 +1,6 @@
 local block_parser = require("nvim-obsidian.dataview.block_parser")
 local task_source = require("nvim-obsidian.dataview.task_source")
+local table_source = require("nvim-obsidian.dataview.table_source")
 local executor = require("nvim-obsidian.dataview.executor")
 local render = require("nvim-obsidian.dataview.render")
 local vault = require("nvim-obsidian.model.vault")
@@ -44,8 +45,14 @@ function M.refresh_buffer(bufnr)
         if not query then
             render.render_block(bufnr, block, nil, { "dataview: " .. parse_err })
         else
-            local tasks, source_errors = task_source.collect(notes, cfg, query.from)
-            local result, exec_errors = executor.execute(query, tasks)
+            local rows, source_errors
+            if query.kind == "TABLE" then
+                rows, source_errors = table_source.collect(notes, query)
+            else
+                rows, source_errors = task_source.collect(notes, cfg, query.from)
+            end
+
+            local result, exec_errors = executor.execute(query, rows)
 
             local all_errors = {}
             for _, e in ipairs(source_errors or {}) do

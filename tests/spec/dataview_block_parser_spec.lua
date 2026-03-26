@@ -30,4 +30,24 @@ describe("dataview block parser", function()
         assert.are.equal("foo", q.group_alias)
         assert.are.equal("foo.date", q.sort_field)
     end)
+
+    it("parses a TABLE WITHOUT ID query with projections and tag source", function()
+        local q, err = parser.parse_query({
+            "TABLE WITHOUT ID",
+            "file.link AS \"Pessoa\",",
+            "nascimento.day AS \"Dia\",",
+            "2026 - nascimento.year AS \"Idade\"",
+            "FROM #pessoa",
+            "WHERE nascimento.month = 03 AND !óbito",
+            "SORT nascimento.day ASC",
+        })
+
+        assert.is_nil(err)
+        assert.are.equal("TABLE", q.kind)
+        assert.are.equal("tag", q.from_kind)
+        assert.are.equal("pessoa", q.from)
+        assert.are.equal(3, #q.projections)
+        assert.are.equal("Pessoa", q.projections[1].label)
+        assert.are.equal("nascimento.day", q.sort_field)
+    end)
 end)

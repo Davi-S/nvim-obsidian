@@ -36,6 +36,54 @@ function M.clear_buffer(bufnr)
     vim.api.nvim_buf_clear_namespace(bufnr, NS, 0, -1)
 end
 
+local function pad_right(s, width)
+    local text = tostring(s or "")
+    local missing = width - #text
+    if missing <= 0 then
+        return text
+    end
+    return text .. string.rep(" ", missing)
+end
+
+local function build_table_lines(columns, rows)
+    local widths = {}
+    for i, col in ipairs(columns) do
+        widths[i] = #tostring(col)
+    end
+
+    for _, row in ipairs(rows) do
+        for i, cell in ipairs(row) do
+            local n = #tostring(cell)
+            if n > (widths[i] or 0) then
+                widths[i] = n
+            end
+        end
+    end
+
+    local lines = {}
+    local header_cells = {}
+    for i, col in ipairs(columns) do
+        header_cells[i] = pad_right(col, widths[i])
+    end
+    lines[#lines + 1] = table.concat(header_cells, "  ")
+
+    local sep_cells = {}
+    for i, w in ipairs(widths) do
+        sep_cells[i] = string.rep("-", w)
+    end
+    lines[#lines + 1] = table.concat(sep_cells, "  ")
+
+    for _, row in ipairs(rows) do
+        local row_cells = {}
+        for i = 1, #columns do
+            row_cells[i] = pad_right(row[i] or "", widths[i])
+        end
+        lines[#lines + 1] = table.concat(row_cells, "  ")
+    end
+
+    return lines
+end
+
 function M.render_block(bufnr, block, result, errors)
     ensure_highlights()
 
@@ -44,6 +92,16 @@ function M.render_block(bufnr, block, result, errors)
     if errors and #errors > 0 then
         for _, err in ipairs(errors) do
             table.insert(virt, { { err, "NvimObsidianDataviewError" } })
+        end
+    elseif result and result.kind == "TABLE" and result.table then
+        local lines = build_table_lines(result.table.columns or {}, result.table.rows or {})
+        if #lines == 0 then
+            table.insert(virt, { { "dataview: no results", "NvimObsidianDataviewHeader" } })
+        else
+            for _, line in ipairs(lines) do
+                table.insert(virt, { { line, "Normal" } })
+            end
+            table.insert(virt, { { "", "Normal" } })
         end
     elseif not result or not result.groups then
         table.insert(virt, { { "dataview: no results", "NvimObsidianDataviewHeader" } })

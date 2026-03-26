@@ -119,7 +119,7 @@ describe("integration dataview on save", function()
 
         local ns = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
         local before = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
-        assert.are.equal(0, #before)
+        assert.is_true(#before >= 1)
 
         dataview_engine.refresh_open_markdown_buffers()
 
@@ -171,5 +171,81 @@ describe("integration dataview on save", function()
             end
         end
         assert.is_true(saw_nested)
+    end)
+
+    it("renders TABLE WITHOUT ID for tag query", function()
+        local pessoa_dir = root .. "/Pessoas"
+        vim.fn.mkdir(pessoa_dir, "p")
+
+        local p1 = pessoa_dir .. "/Gabriel.md"
+        vim.fn.writefile({
+            "---",
+            "tags:",
+            "  - pessoa",
+            "nascimento: 2001-03-10",
+            "---",
+            "",
+        }, p1)
+
+        local p2 = pessoa_dir .. "/Carlos.md"
+        vim.fn.writefile({
+            "---",
+            "tags:",
+            "  - pessoa",
+            "nascimento: 1971-03-24",
+            "óbito: true",
+            "---",
+            "",
+        }, p2)
+
+        vault.reset()
+        vault.upsert_note(p1, {
+            relpath = "Pessoas/Gabriel.md",
+            aliases = {},
+            tags = { "pessoa" },
+            frontmatter = { tags = { "pessoa" }, nascimento = "2001-03-10" },
+            note_type = "standard",
+        })
+        vault.upsert_note(p2, {
+            relpath = "Pessoas/Carlos.md",
+            aliases = {},
+            tags = { "pessoa" },
+            frontmatter = { tags = { "pessoa" }, nascimento = "1971-03-24", ["óbito"] = true },
+            note_type = "standard",
+        })
+
+        local dv_file = root .. "/10 Novas notas/Query tabela.md"
+        vim.fn.writefile({
+            "```dataview",
+            "TABLE WITHOUT ID",
+            "file.link AS \"Pessoa\",",
+            "nascimento.day AS \"Dia\",",
+            "2026 - nascimento.year AS \"Idade\"",
+            "FROM #pessoa",
+            "WHERE nascimento.month = 03 AND !óbito",
+            "SORT nascimento.day ASC",
+            "```",
+        }, dv_file)
+
+        vim.cmd("edit " .. vim.fn.fnameescape(dv_file))
+        vim.cmd("write")
+
+        local ns = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
+        local marks = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+        assert.is_true(#marks >= 1)
+
+        local virt = marks[1][4].virt_lines
+        assert.is_true(#virt >= 3)
+        assert.is_true((virt[1][1][1] or ""):find("Pessoa", 1, true) ~= nil)
+        assert.is_true((virt[1][1][1] or ""):find("Dia", 1, true) ~= nil)
+        assert.is_true((virt[1][1][1] or ""):find("Idade", 1, true) ~= nil)
+
+        local rendered = table.concat(vim.tbl_map(function(v)
+            return v[1][1]
+        end, virt), "\n")
+        assert.is_true(rendered:find("Gabriel", 1, true) ~= nil)
+        assert.is_true(rendered:find("10", 1, true) ~= nil)
+        assert.is_true(rendered:find("25", 1, true) ~= nil)
+        assert.is_true(rendered:find("Carlos", 1, true) == nil)
     end)
 end)

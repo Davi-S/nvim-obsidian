@@ -1,5 +1,9 @@
 local M = {}
 
+local function trim(s)
+    return vim.trim(s or "")
+end
+
 local function tokenize(s)
     local tokens = {}
     local i = 1
@@ -39,7 +43,17 @@ local function tokenize(s)
                 return nil, "unclosed date() literal"
             end
 
-            local date_str = s:sub(i + 5, close_pos - 1)
+            local date_str = trim(s:sub(i + 5, close_pos - 1))
+            local dq = date_str:match('^"(.*)"$')
+            if dq then
+                date_str = dq
+            else
+                local sq = date_str:match("^'(.*)'$")
+                if sq then
+                    date_str = sq
+                end
+            end
+
             -- Validate date format YYYY-MM-DD
             if not date_str:match("^%d%d%d%d%-%d%d%-%d%d$") then
                 return nil, "invalid date format, expected YYYY-MM-DD"
@@ -48,7 +62,7 @@ local function tokenize(s)
             add("DATE", date_str)
             i = close_pos + 1
         else
-            local word = s:sub(i):match("^([%w%._%-]+)")
+            local word = s:sub(i):match("^([^%s%(%)!<>=]+)")
             if not word then
                 return nil, "invalid token near: " .. s:sub(i, math.min(i + 10, #s))
             end
@@ -90,16 +104,15 @@ local function get_field(row, ident)
     if ident == "checked" then
         return row.checked
     end
-    if ident == "file.link.date" then
-        return row.file and row.file.link and row.file.link.date or nil
+
+    local current = row
+    for part in ident:gmatch("[^%.]+") do
+        if type(current) ~= "table" then
+            return nil
+        end
+        current = current[part]
     end
-    if ident == "file.path" then
-        return row.file and row.file.path or nil
-    end
-    if ident == "file.name" then
-        return row.file and row.file.name or nil
-    end
-    return nil
+    return current
 end
 
 local function eval_comparison(lhs, op, rhs)
