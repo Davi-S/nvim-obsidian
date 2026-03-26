@@ -13,7 +13,8 @@ local function backlink_patterns_for_title(title)
     local safe_title = escape_pcre_literal(title)
     local p1 = "\\[\\[" .. safe_title .. "\\]\\]"
     local p2 = "\\[\\[" .. safe_title .. "\\|"
-    return p1, p2
+    local p3 = "\\[\\[" .. safe_title .. "#"
+    return p1, p2, p3
 end
 
 function M.search_current()
@@ -24,11 +25,11 @@ function M.search_current()
         return
     end
     local title = path.stem(file)
-    local p1, p2 = backlink_patterns_for_title(title)
+    local p1, p2, p3 = backlink_patterns_for_title(title)
 
     require("telescope.builtin").live_grep({
         cwd = cfg.vault_root,
-        default_text = p1 .. "|" .. p2,
+        default_text = p1 .. "|" .. p2 .. "|" .. p3,
         additional_args = function()
             return { "--pcre2" }
         end,

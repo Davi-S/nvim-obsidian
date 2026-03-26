@@ -13,6 +13,8 @@ function Note.new(filepath, data)
     self.frontmatter = data.frontmatter or {}
     self.note_type = data.note_type or "standard"
     self.relpath = data.relpath
+    self.headings = data.headings or {}
+    self.blocks = data.blocks or {}
     return self
 end
 

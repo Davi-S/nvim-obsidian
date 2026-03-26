@@ -1,0 +1,27 @@
+local parser = require("nvim-obsidian.link.parser")
+
+describe("wikilink parser", function()
+    it("parses note and alias forms", function()
+        local p1 = parser.parse_wikilink("Target Note")
+        assert.are.equal("Target Note", p1.note_ref)
+        assert.is_nil(p1.anchor)
+        assert.is_nil(p1.alias)
+
+        local p2 = parser.parse_wikilink("Target Note|Anything")
+        assert.are.equal("Target Note", p2.note_ref)
+        assert.are.equal("Anything", p2.alias)
+    end)
+
+    it("parses heading and block anchors", function()
+        local p1 = parser.parse_wikilink("2026 março#Objetivos")
+        assert.are.equal("2026 março", p1.note_ref)
+        assert.are.equal("heading", p1.anchor_kind)
+        assert.are.equal("Objetivos", p1.anchor)
+
+        local p2 = parser.parse_wikilink("2026 abril 21, terça-feira#^d34ac8|T")
+        assert.are.equal("2026 abril 21, terça-feira", p2.note_ref)
+        assert.are.equal("block", p2.anchor_kind)
+        assert.are.equal("d34ac8", p2.anchor)
+        assert.are.equal("T", p2.alias)
+    end)
+end)

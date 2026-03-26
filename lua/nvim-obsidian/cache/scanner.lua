@@ -1,6 +1,7 @@
 local config = require("nvim-obsidian.config")
 local path = require("nvim-obsidian.path")
 local parser = require("nvim-obsidian.parser.frontmatter")
+local markdown_parser = require("nvim-obsidian.parser.markdown")
 local vault = require("nvim-obsidian.model.vault")
 local classifier = require("nvim-obsidian.journal.classifier")
 local async_constants = require("nvim-obsidian.async.constants")
@@ -99,10 +100,14 @@ function M.refresh_one(abs)
     end
     local text = table.concat(vim.fn.readfile(nabs), "\n")
     local meta = _parser.parse(text)
+    local headings = markdown_parser.extract_headings(text)
+    local blocks = markdown_parser.extract_blocks(text)
     _vault.upsert_note(nabs, {
         relpath = path.rel_to_root(cfg.vault_root, nabs),
         aliases = meta.aliases,
         tags = meta.tags,
+        headings = headings,
+        blocks = blocks,
         frontmatter = meta,
         note_type = _classifier.note_type_for_path(nabs, cfg),
     })
