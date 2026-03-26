@@ -5,6 +5,17 @@ local M = {}
 -- Dependency injection: store references to dependencies (default to real modules)
 local _config = require("nvim-obsidian.config")
 
+local function escape_pcre_literal(text)
+    return (text:gsub("([\\%^%$%.%|%?%*%+%(%)%[%]%{%}%-])", "\\%1"))
+end
+
+local function backlink_patterns_for_title(title)
+    local safe_title = escape_pcre_literal(title)
+    local p1 = "\\[\\[" .. safe_title .. "\\]\\]"
+    local p2 = "\\[\\[" .. safe_title .. "\\|"
+    return p1, p2
+end
+
 function M.search_current()
     local cfg = _config.get()
     local file = vim.api.nvim_buf_get_name(0)
@@ -13,8 +24,7 @@ function M.search_current()
         return
     end
     local title = path.stem(file)
-    local p1 = "\\[\\[" .. vim.fn.escape(title, "\\") .. "\\]\\]"
-    local p2 = "\\[\\[" .. vim.fn.escape(title, "\\") .. "\\|"
+    local p1, p2 = backlink_patterns_for_title(title)
 
     require("telescope.builtin").live_grep({
         cwd = cfg.vault_root,
@@ -35,6 +45,11 @@ end
 function M.init(opts)
     opts = opts or {}
     if opts.config then _config = opts.config end
+end
+
+-- Test helper: expose backlink regex construction.
+function M._patterns_for_title_for_tests(title)
+    return backlink_patterns_for_title(title)
 end
 
 return M
