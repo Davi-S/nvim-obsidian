@@ -100,8 +100,10 @@ function M.execute(query, tasks)
         end
 
         local columns = {}
+        local link_cols = {}
         for _, proj in ipairs(query.projections) do
             table.insert(columns, proj.label)
+            table.insert(link_cols, trim(proj.expr) == "file.link")
         end
 
         return {
@@ -109,6 +111,7 @@ function M.execute(query, tasks)
             table = {
                 columns = columns,
                 rows = table_rows,
+                link_cols = link_cols,
             },
         }, {}
     end

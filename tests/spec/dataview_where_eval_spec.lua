@@ -30,7 +30,8 @@ describe("dataview where evaluator", function()
             file = { link = { date = os.time({ year = 2026, month = 4, day = 1, hour = 12 }) } },
         }
 
-        local ok, err = where_eval.match("nascimento.month = 03 AND !óbito AND file.link.date <= date(\"2026-04-30\")", row)
+        local ok, err = where_eval.match("nascimento.month = 03 AND !óbito AND file.link.date <= date(\"2026-04-30\")",
+        row)
         assert.is_nil(err)
         assert.is_true(ok)
     end)

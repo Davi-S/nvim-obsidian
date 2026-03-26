@@ -38,47 +38,82 @@ end
 
 local function pad_right(s, width)
     local text = tostring(s or "")
-    local missing = width - #text
+    local missing = width - vim.fn.strdisplaywidth(text)
     if missing <= 0 then
         return text
     end
     return text .. string.rep(" ", missing)
 end
 
-local function build_table_lines(columns, rows)
+local function pad_left(s, width)
+    local text = tostring(s or "")
+    local missing = width - vim.fn.strdisplaywidth(text)
+    if missing <= 0 then
+        return text
+    end
+    return string.rep(" ", missing) .. text
+end
+
+local function build_table_lines(columns, rows, link_cols)
     local widths = {}
+    local numeric_cols = {}
     for i, col in ipairs(columns) do
-        widths[i] = #tostring(col)
+        widths[i] = vim.fn.strdisplaywidth(tostring(col))
+        numeric_cols[i] = true
     end
 
     for _, row in ipairs(rows) do
-        for i, cell in ipairs(row) do
-            local n = #tostring(cell)
+        for i = 1, #columns do
+            local cell = row[i] or ""
+            local text = tostring(cell)
+            local n = vim.fn.strdisplaywidth(text)
             if n > (widths[i] or 0) then
                 widths[i] = n
+            end
+            if tonumber(text) == nil then
+                numeric_cols[i] = false
             end
         end
     end
 
     local lines = {}
-    local header_cells = {}
-    for i, col in ipairs(columns) do
-        header_cells[i] = pad_right(col, widths[i])
-    end
-    lines[#lines + 1] = table.concat(header_cells, "  ")
 
-    local sep_cells = {}
-    for i, w in ipairs(widths) do
-        sep_cells[i] = string.rep("-", w)
+    local header_line = {}
+    for i, col in ipairs(columns) do
+        header_line[#header_line + 1] = { pad_right(col, widths[i]), "Normal" }
+        if i < #columns then
+            header_line[#header_line + 1] = { "  ", "Normal" }
+        end
     end
-    lines[#lines + 1] = table.concat(sep_cells, "  ")
+    lines[#lines + 1] = header_line
+
+    local total_width = 0
+    for i, w in ipairs(widths) do
+        total_width = total_width + w
+        if i < #widths then
+            total_width = total_width + 2
+        end
+    end
+    lines[#lines + 1] = { { string.rep("-", total_width), "Normal" } }
 
     for _, row in ipairs(rows) do
-        local row_cells = {}
+        local row_line = {}
         for i = 1, #columns do
-            row_cells[i] = pad_right(row[i] or "", widths[i])
+            local text = tostring(row[i] or "")
+            local padded
+            if numeric_cols[i] then
+                padded = pad_left(text, widths[i])
+            else
+                padded = pad_right(text, widths[i])
+            end
+
+            local hl = (link_cols and link_cols[i]) and "NvimObsidianDataviewHeader" or "Normal"
+            row_line[#row_line + 1] = { padded, hl }
+            if i < #columns then
+                row_line[#row_line + 1] = { "  ", "Normal" }
+            end
         end
-        lines[#lines + 1] = table.concat(row_cells, "  ")
+        lines[#lines + 1] = row_line
     end
 
     return lines
@@ -94,12 +129,12 @@ function M.render_block(bufnr, block, result, errors)
             table.insert(virt, { { err, "NvimObsidianDataviewError" } })
         end
     elseif result and result.kind == "TABLE" and result.table then
-        local lines = build_table_lines(result.table.columns or {}, result.table.rows or {})
+        local lines = build_table_lines(result.table.columns or {}, result.table.rows or {}, result.table.link_cols)
         if #lines == 0 then
             table.insert(virt, { { "dataview: no results", "NvimObsidianDataviewHeader" } })
         else
             for _, line in ipairs(lines) do
-                table.insert(virt, { { line, "Normal" } })
+                table.insert(virt, line)
             end
             table.insert(virt, { { "", "Normal" } })
         end

@@ -236,12 +236,21 @@ describe("integration dataview on save", function()
 
         local virt = marks[1][4].virt_lines
         assert.is_true(#virt >= 3)
-        assert.is_true((virt[1][1][1] or ""):find("Pessoa", 1, true) ~= nil)
-        assert.is_true((virt[1][1][1] or ""):find("Dia", 1, true) ~= nil)
-        assert.is_true((virt[1][1][1] or ""):find("Idade", 1, true) ~= nil)
+        local header_chunks = {}
+        for _, c in ipairs(virt[1]) do
+            table.insert(header_chunks, c[1] or "")
+        end
+        local header = table.concat(header_chunks, "")
+        assert.is_true(header:find("Pessoa", 1, true) ~= nil)
+        assert.is_true(header:find("Dia", 1, true) ~= nil)
+        assert.is_true(header:find("Idade", 1, true) ~= nil)
 
         local rendered = table.concat(vim.tbl_map(function(v)
-            return v[1][1]
+            local chunks = {}
+            for _, c in ipairs(v) do
+                table.insert(chunks, c[1] or "")
+            end
+            return table.concat(chunks, "")
         end, virt), "\n")
         assert.is_true(rendered:find("Gabriel", 1, true) ~= nil)
         assert.is_true(rendered:find("10", 1, true) ~= nil)
