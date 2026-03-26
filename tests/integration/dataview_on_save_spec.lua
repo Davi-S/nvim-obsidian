@@ -126,4 +126,50 @@ describe("integration dataview on save", function()
         local after = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
         assert.is_true(#after >= 1)
     end)
+
+    it("renders nested subtasks with original indentation", function()
+        local source_file = root .. "/11 Diario/11.01 Diario/2026 março 26, quinta-feira.md"
+        vim.fn.writefile({
+            "- [ ] tarefa pai",
+            "\t- [ ] tarefa filha",
+        }, source_file)
+
+        vault.reset()
+        vault.upsert_note(source_file, {
+            relpath = "11 Diario/11.01 Diario/2026 março 26, quinta-feira.md",
+            aliases = {},
+            tags = {},
+            frontmatter = {},
+            note_type = "daily",
+        })
+
+        local dv_file = root .. "/10 Novas notas/Query subtarefas.md"
+        vim.fn.writefile({
+            "```dataview",
+            "TASK",
+            "FROM \"11 Diario/11.01 Diario\"",
+            "WHERE !checked",
+            "GROUP BY file.link AS foo",
+            "SORT foo.date ASC",
+            "```",
+        }, dv_file)
+
+        vim.cmd("edit " .. vim.fn.fnameescape(dv_file))
+        vim.cmd("write")
+
+        local ns = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
+        local marks = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+        assert.is_true(#marks >= 1)
+
+        local virt = marks[1][4].virt_lines
+        local saw_nested = false
+        for _, line in ipairs(virt) do
+            local text = line[1] and line[1][1] or ""
+            if text == "\t- [ ] tarefa filha" then
+                saw_nested = true
+                break
+            end
+        end
+        assert.is_true(saw_nested)
+    end)
 end)

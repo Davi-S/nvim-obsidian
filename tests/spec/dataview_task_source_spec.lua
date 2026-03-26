@@ -194,4 +194,58 @@ describe("dataview task source", function()
         vim.fn.delete(root2, "rf")
         vault_mod.reset()
     end)
+
+    it("preserves indentation for nested subtasks", function()
+        local root2 = vim.fn.tempname()
+        vim.fn.mkdir(root2, "p")
+        vim.fn.mkdir(root2 .. "/11 Diario/11.01 Diario", "p")
+
+        local source_file = root2 .. "/11 Diario/11.01 Diario/2026 março 26, quinta-feira.md"
+        vim.fn.writefile({
+            "- [ ] T - Tirar passaporte",
+            "\t- [ ] Protocolo 1.2026.0001092228",
+            "\t- [ ] Levar: CHN e Certificado Militar",
+        }, source_file)
+
+        local cfg = config.resolve({
+            vault_root = root2,
+            locale = "pt-BR",
+            journal = {
+                daily = {
+                    subdir = "11 Diario/11.01 Diario",
+                    title_format = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+                },
+                weekly = {
+                    subdir = "11 Diario/11.02 Semanal",
+                    title_format = "{{iso_year}} semana {{iso_week}}",
+                },
+                monthly = {
+                    subdir = "11 Diario/11.03 Mensal",
+                    title_format = "{{year}} {{month_name}}",
+                },
+                yearly = {
+                    subdir = "11 Diario/11.04 Anual",
+                    title_format = "{{year}}",
+                },
+            },
+        })
+
+        local notes = {
+            {
+                filepath = path.normalize(source_file),
+                relpath = "11 Diario/11.01 Diario/2026 março 26, quinta-feira.md",
+                note_type = "daily",
+                frontmatter = {},
+            },
+        }
+
+        local tasks, errs = task_source.collect(notes, cfg, "11 Diario/11.01 Diario")
+        assert.are.equal(3, #tasks)
+        assert.are.equal(0, #errs)
+        assert.are.equal("- [ ] T - Tirar passaporte", tasks[1].raw)
+        assert.are.equal("\t- [ ] Protocolo 1.2026.0001092228", tasks[2].raw)
+        assert.are.equal("\t- [ ] Levar: CHN e Certificado Militar", tasks[3].raw)
+
+        vim.fn.delete(root2, "rf")
+    end)
 end)

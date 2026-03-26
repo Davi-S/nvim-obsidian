@@ -4,7 +4,7 @@ local journal_format = require("nvim-obsidian.journal.format")
 
 local M = {}
 
-local TASK_PATTERN = "^%s*%- %[(.)%]%s*(.*)$"
+local TASK_PATTERN = "^(%s*)%- %[(.)%]%s*(.*)$"
 
 local function parse_iso_date(s)
     local y, m, d = s:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
@@ -57,12 +57,13 @@ function M.collect(vault_notes, cfg, from_prefix)
 
             local lines = vim.fn.readfile(note.filepath)
             for idx, line in ipairs(lines) do
-                local mark, text = line:match(TASK_PATTERN)
+                local indent, mark, text = line:match(TASK_PATTERN)
                 if mark then
+                    local prefix = indent or ""
                     table.insert(tasks, {
                         checked = mark ~= " ",
                         text = text or "",
-                        raw = string.format("- [%s] %s", mark, text or ""),
+                        raw = string.format("%s- [%s] %s", prefix, mark, text or ""),
                         line = idx,
                         file = {
                             path = rel,
