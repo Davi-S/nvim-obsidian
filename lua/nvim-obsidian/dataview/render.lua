@@ -2,16 +2,34 @@ local M = {}
 
 local NS = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
 
-local function ensure_highlights()
-    vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = "Title", default = true })
-    vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", { link = "WarningMsg", default = true })
+local function hl_fg(name)
+    local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name, link = false })
+    if not ok or not hl then
+        return nil
+    end
+    return hl.fg
 end
 
-local function fmt_date(ts)
-    if not ts then
-        return "(sem data)"
+local function ensure_highlights()
+    local sapphire_fg = hl_fg("markdownLinkText")
+    if not sapphire_fg then
+        sapphire_fg = hl_fg("@lsp.type.class.markdown")
     end
-    return os.date("%Y-%m-%d", ts)
+    if not sapphire_fg then
+        sapphire_fg = hl_fg("@lsp.type.decorator.markdown")
+    end
+
+    if sapphire_fg then
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = sapphire_fg, default = false })
+    else
+        local text_fg = hl_fg("Normal")
+        if text_fg then
+            vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = text_fg, default = false })
+        else
+            vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = "Normal", default = false })
+        end
+    end
+    vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", { link = "WarningMsg", default = true })
 end
 
 function M.clear_buffer(bufnr)
@@ -31,7 +49,9 @@ function M.render_block(bufnr, block, result, errors)
         table.insert(virt, { { "dataview: no results", "NvimObsidianDataviewHeader" } })
     else
         for _, grp in ipairs(result.groups) do
-            local header = string.format("%s (%d)", fmt_date(grp.group_key.date), #grp.rows)
+            -- Get the file name from the first task in the group
+            local file_name = (grp.rows[1] and grp.rows[1].file and grp.rows[1].file.name) or grp.key or "Unknown"
+            local header = file_name
             table.insert(virt, { { header, "NvimObsidianDataviewHeader" } })
             table.insert(virt, { { "", "Normal" } })
             for _, row in ipairs(grp.rows) do
@@ -41,10 +61,9 @@ function M.render_block(bufnr, block, result, errors)
         end
     end
 
-    vim.api.nvim_buf_set_extmark(bufnr, NS, block.start_line - 1, 0, {
+    vim.api.nvim_buf_set_extmark(bufnr, NS, block.end_line - 1, 0, {
         virt_lines = virt,
         virt_lines_above = false,
-        end_line = block.end_line,
         hl_mode = "combine",
     })
 end

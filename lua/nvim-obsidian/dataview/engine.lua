@@ -7,6 +7,17 @@ local config = require("nvim-obsidian.config")
 
 local M = {}
 
+function M.refresh_open_markdown_buffers()
+    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_is_loaded(bufnr) then
+            local name = vim.api.nvim_buf_get_name(bufnr)
+            if name ~= "" and name:sub(-3) == ".md" then
+                M.refresh_buffer(bufnr)
+            end
+        end
+    end
+end
+
 function M.refresh_buffer(bufnr)
     if not vim.api.nvim_buf_is_valid(bufnr) then
         return

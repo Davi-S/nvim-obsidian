@@ -100,6 +100,7 @@ function M.setup(opts)
   scanner.refresh_all_async(function()
     scanner.setup_autocmds()
     dataview_engine.setup_autocmds()
+    dataview_engine.refresh_open_markdown_buffers()
     vim.notify("nvim-obsidian: vault cache ready", vim.log.levels.INFO)
   end)
 

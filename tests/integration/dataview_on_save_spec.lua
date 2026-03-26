@@ -95,5 +95,35 @@ describe("integration dataview on save", function()
         local ns = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
         local marks = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
         assert.is_true(#marks >= 1)
+
+        local virt = marks[1][4].virt_lines
+        assert.is_true(type(virt) == "table" and #virt >= 4)
+        assert.are.equal("2026 março 26, quinta-feira", virt[1][1][1])
+        assert.are.equal("", virt[2][1][1])
+        assert.are.equal("- [ ] tarefa dataview", virt[3][1][1])
+    end)
+
+    it("renders in already-open markdown buffer when refreshed after cache ready", function()
+        local dv_file = root .. "/10 Novas notas/Query aberta antes cache.md"
+        vim.fn.writefile({
+            "```dataview",
+            "TASK",
+            "FROM \"11 Diario/11.01 Diario\"",
+            "WHERE !checked",
+            "GROUP BY file.link AS foo",
+            "SORT foo.date ASC",
+            "```",
+        }, dv_file)
+
+        vim.cmd("edit " .. vim.fn.fnameescape(dv_file))
+
+        local ns = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
+        local before = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+        assert.are.equal(0, #before)
+
+        dataview_engine.refresh_open_markdown_buffers()
+
+        local after = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+        assert.is_true(#after >= 1)
     end)
 end)
