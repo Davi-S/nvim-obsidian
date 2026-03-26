@@ -76,10 +76,10 @@ obsidian.journal.register_placeholder("iso_week", function(ctx)
 end, "(%d%d?)")
 
 obsidian.setup(opts)
-obsidian.register_placeholder("title", function(ctx)
+obsidian.template_register_placeholder("title", function(ctx)
     return ctx.note.title
 end)
-obsidian.register_placeholder("date", function(ctx)
+obsidian.template_register_placeholder("date", function(ctx)
     return ctx.time.iso.date
 end)
 

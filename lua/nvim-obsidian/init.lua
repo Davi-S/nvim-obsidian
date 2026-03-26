@@ -1,21 +1,21 @@
 --[[
 Main plugin module for nvim-obsidian.
 
-Provides setup() for initialization and register_placeholder() for extending the template system.
+Provides setup() for initialization and template_register_placeholder() for extending the template system.
 
 Example setup:
   require("nvim-obsidian").setup({
     vault_root = "/home/user/Obsidian Vault",
       new_notes_subdir = "10 Notas",
-  require("nvim-obsidian").register_placeholder("title", function(ctx)
+  require("nvim-obsidian").template_register_placeholder("title", function(ctx)
     return ctx.note.title
   end)
 
-  require("nvim-obsidian").register_placeholder("date", function(ctx)
+  require("nvim-obsidian").template_register_placeholder("date", function(ctx)
     return ctx.time.format_date("%Y-%m-%d")
   end)
 
-  require("nvim-obsidian").register_placeholder("author", function(ctx)
+  require("nvim-obsidian").template_register_placeholder("author", function(ctx)
     return "John Doe"
   end)
 ]]
@@ -67,13 +67,13 @@ function M.setup(opts)
           journal: table - journal configuration (daily.subdir, weekly.subdir, etc.)
           templates: table - template strings for each note type
 
-    After calling setup(), register custom placeholders via register_placeholder():
+    After calling setup(), register custom placeholders via template_register_placeholder():
 
       require("nvim-obsidian").setup({
         vault_root = "/path/to/vault",
       })
 
-      require("nvim-obsidian").register_placeholder("title", function(ctx)
+      require("nvim-obsidian").template_register_placeholder("title", function(ctx)
         return ctx.note.title
       end)
 
@@ -104,7 +104,7 @@ function M.setup(opts)
   M._did_setup = true
 end
 
-function M.register_placeholder(name, resolver)
+function M.template_register_placeholder(name, resolver)
   --[[
     Register a custom placeholder for use in templates.
 
@@ -118,19 +118,19 @@ function M.register_placeholder(name, resolver)
       ctx.config - read-only configuration object
 
     Examples:
-      register_placeholder("title", function(ctx)
+      template_register_placeholder("title", function(ctx)
         return ctx.note.title
       end)
 
-      register_placeholder("date", function(ctx)
+      template_register_placeholder("date", function(ctx)
         return ctx.time.format_date("%Y-%m-%d")
       end)
 
-      register_placeholder("year", function(ctx)
+      template_register_placeholder("year", function(ctx)
         return tostring(ctx.time.iso.year)
       end)
 
-      register_placeholder("vault", function(ctx)
+      template_register_placeholder("vault", function(ctx)
         return ctx.config.vault_root
       end)
 

@@ -8,11 +8,11 @@ Usage:
   local obsidian = require("nvim-obsidian")
   obsidian.setup({ vault_root = "/path/to/vault" })
   
-  obsidian.register_placeholder("title", function(ctx)
+  obsidian.template_register_placeholder("title", function(ctx)
     return ctx.note.title
   end)
   
-  obsidian.register_placeholder("date", function(ctx)
+  obsidian.template_register_placeholder("date", function(ctx)
     return ctx.time.format_date("%Y-%m-%d")
   end)
   
