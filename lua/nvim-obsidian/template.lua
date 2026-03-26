@@ -7,15 +7,15 @@ Usage:
   -- Register placeholders during setup
   local obsidian = require("nvim-obsidian")
   obsidian.setup({ vault_root = "/path/to/vault" })
-  
+
   obsidian.template_register_placeholder("title", function(ctx)
     return ctx.note.title
   end)
-  
+
   obsidian.template_register_placeholder("date", function(ctx)
     return ctx.time.format_date("%Y-%m-%d")
   end)
-  
+
   -- Render templates manually
   local template = "---\ntitle: {{title}}\ndate: {{date}}\n---\n"
   local ctx = obsidian.template.build_context({
@@ -61,20 +61,20 @@ local context = require("nvim-obsidian.template.context")
 local M = {}
 
 function M.register_placeholder(name, resolver)
-    registry.register_placeholder(name, resolver)
+  registry.register_placeholder(name, resolver)
 end
 
 function M.render(template_text, ctx)
-    return engine.render(template_text, ctx)
+  return engine.render(template_text, ctx)
 end
 
 function M.build_context(params)
-    return context.build(params)
+  return context.build(params)
 end
 
 function M._reset_for_tests()
-    registry.reset_for_tests()
-    engine.reset_for_tests()
+  registry.reset_for_tests()
+  engine.reset_for_tests()
 end
 
 return M
