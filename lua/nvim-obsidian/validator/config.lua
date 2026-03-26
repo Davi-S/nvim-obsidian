@@ -29,21 +29,14 @@ function M.validate_journal(cfg, user)
 
     local required_types = { "daily", "weekly", "monthly", "yearly" }
 
-    if type(journal.title_formats) ~= "table" then
-        error("journal.title_formats must be provided explicitly")
-    end
-    if journal.templates ~= nil and type(journal.templates) ~= "table" then
-        error("journal.templates must be a table when provided")
-    end
-
     for _, note_type in ipairs(required_types) do
         if type(journal[note_type]) ~= "table" then
             error("journal." .. note_type .. " must be provided explicitly")
         end
         require_string(journal[note_type].subdir, "journal." .. note_type .. ".subdir")
-        require_string(journal.title_formats[note_type], "journal.title_formats." .. note_type)
-        if journal.templates and journal.templates[note_type] ~= nil then
-            require_string(journal.templates[note_type], "journal.templates." .. note_type)
+        require_string(journal[note_type].title_format, "journal." .. note_type .. ".title_format")
+        if journal[note_type].template ~= nil then
+            require_string(journal[note_type].template, "journal." .. note_type .. ".template")
         end
     end
 

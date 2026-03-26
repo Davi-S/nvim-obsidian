@@ -24,21 +24,24 @@ vim.fn.writefile({ "# {{title}}" }, root .. "/08 Templates/Nova nota.md")
 local opts = {
     vault_root = root,
     locale = "pt-BR",
-    notes_subdir = "10 Novas notas",
-    force_create_key = "<S-CR>",
+    new_notes_subdir = "10 Novas notas",
     journal = {
-        daily = { subdir = "11 Diario/11.01 Diario" },
-        weekly = { subdir = "11 Diario/11.02 Semanal" },
-        monthly = { subdir = "11 Diario/11.03 Mensal" },
-        yearly = { subdir = "11 Diario/11.04 Anual" },
-        title_formats = {
-            daily = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
-            weekly = "{{iso_year}} semana {{iso_week}}",
-            monthly = "{{year}} {{month_name}}",
-            yearly = "{{year}}",
+        daily = {
+            subdir = "11 Diario/11.01 Diario",
+            title_format = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+            template = "08 Templates/Nota diaria",
         },
-        templates = {
-            daily = "08 Templates/Nota diaria",
+        weekly = {
+            subdir = "11 Diario/11.02 Semanal",
+            title_format = "{{iso_year}} semana {{iso_week}}",
+        },
+        monthly = {
+            subdir = "11 Diario/11.03 Mensal",
+            title_format = "{{year}} {{month_name}}",
+        },
+        yearly = {
+            subdir = "11 Diario/11.04 Anual",
+            title_format = "{{year}}",
         },
     },
     templates = {

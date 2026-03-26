@@ -38,14 +38,15 @@ function M.path_for_type(note_type, title, cfg)
 end
 
 function M.template_for_type(note_type, cfg)
-    if cfg.journal_enabled and cfg.journal.templates and cfg.journal.templates[note_type] then
-        local template_file = resolve_template_path(cfg.journal.templates[note_type], cfg)
+    -- Try journal-specific template first
+    if cfg.journal_enabled and cfg.journal[note_type] and cfg.journal[note_type].template then
+        local template_file = resolve_template_path(cfg.journal[note_type].template, cfg)
         if vim.fn.filereadable(template_file) == 1 then
             return table.concat(vim.fn.readfile(template_file), "\n")
         end
-        return ""
     end
 
+    -- Fall back to standard template
     if cfg.templates and cfg.templates.standard then
         local template_file = resolve_template_path(cfg.templates.standard, cfg)
         if vim.fn.filereadable(template_file) == 1 then

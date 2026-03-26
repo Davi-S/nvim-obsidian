@@ -20,9 +20,53 @@ CONFIG
   setup({
     vault_root = "/abs/path",
     locale = "pt-BR",
-    notes_subdir = "10 Novas notas",
-    force_create_key = "<S-CR>",
+    new_notes_subdir = "10 Novas notas",
   })
+
+  The "cmd" option in lazy.nvim is NOT a plugin config field - it tells lazy.nvim
+  when to load the plugin. If any of the listed commands are invoked, the plugin
+  is loaded automatically. This avoids loading the plugin until actually needed.
+
+  Example lazy.nvim snippet (NOT part of plugin config):
+    cmd = { "ObsidianOmni", "ObsidianToday", "ObsidianNext", ... }
+
+JOURNAL CONFIG
+  Journal notes are organized in a nested configuration where each note type
+  (daily, weekly, monthly, yearly) contains its own subdir, title_format, and
+  optional template.
+  
+  Structure:
+    journal = {
+      daily = {
+        subdir = "path/to/daily",
+        title_format = "{{year}} {{month}}",
+        template = "path/to/template",  -- optional
+      },
+      weekly = { subdir = "...", title_format = "..." },
+      monthly = { subdir = "...", title_format = "..." },
+      yearly = { subdir = "...", title_format = "..." },
+    }
+  
+  Example:
+    journal = {
+      daily = {
+        subdir = "11 Diário/11.01 Diário",
+        title_format = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+        template = "08 Templates/Nota diária",
+      },
+      weekly = {
+        subdir = "11 Diário/11.02 Semanal",
+        title_format = "{{iso_year}} semana {{iso_week}}",
+      },
+      monthly = {
+        subdir = "11 Diário/11.03 Mensal",
+        title_format = "{{year}} {{month_name}}",
+      },
+      yearly = {
+        subdir = "11 Diário/11.04 Anual",
+        title_format = "{{year}}",
+      },
+    }
 
 TEMPLATES
   The plugin provides a flexible template system with user-configurable 

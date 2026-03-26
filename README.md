@@ -50,8 +50,25 @@ vim.g.nvim_obsidian_opts = {
 require("nvim-obsidian").setup({
   vault_root = "/home/davi/Documents/ObsidianAllInVault",
   locale = "pt-BR",
-  notes_subdir = "10 Novas notas",
-  force_create_key = "<S-CR>",
+  new_notes_subdir = "10 Novas notas",
+  journal = {
+    daily = {
+      subdir = "11 Diário/11.01 Diário",
+      title_format = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+    },
+    weekly = {
+      subdir = "11 Diário/11.02 Semanal",
+      title_format = "{{iso_year}} semana {{iso_week}}",
+    },
+    monthly = {
+      subdir = "11 Diário/11.03 Mensal",
+      title_format = "{{year}} {{month_name}}",
+    },
+    yearly = {
+      subdir = "11 Diário/11.04 Anual",
+      title_format = "{{year}}",
+    },
+  },
 })
 ```
 

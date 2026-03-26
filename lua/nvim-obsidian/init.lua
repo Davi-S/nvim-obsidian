@@ -6,10 +6,7 @@ Provides setup() for initialization and register_placeholder() for extending the
 Example setup:
   require("nvim-obsidian").setup({
     vault_root = "/home/user/Obsidian Vault",
-    notes_subdir = "10 Notas",
-  })
-  
-  -- Register custom template placeholders
+      new_notes_subdir = "10 Notas",
   require("nvim-obsidian").register_placeholder("title", function(ctx)
     return ctx.note.title
   end)
@@ -62,7 +59,7 @@ function M.setup(opts)
         Required:
           vault_root: string - absolute path to the Obsidian vault
         Common options:
-          notes_subdir: string - subdirectory for standard notes (default: "10 Novas notas")
+          new_notes_subdir: string - subdirectory where new standard notes are created (default: "10 Novas notas")
           locale: string - locale for month/weekday names (default: "pt-BR")
           force_create_key: string - telescope key for forced creation (default: "<S-CR>")
           journal: table - journal configuration (daily.subdir, weekly.subdir, etc.)

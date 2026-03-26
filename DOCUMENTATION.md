@@ -80,8 +80,8 @@ The plugin setup requires at least:
 Current defaults include:
 
 - locale: pt-BR
-- notes_subdir: 10 Novas notas
-- force_create_key: <S-CR>
+- new_notes_subdir: 10 Novas notas
+- force_create_key: <S-CR> (standard Telescope force-create key)
 - journal subdirs:
   - 11 Diario/11.01 Diario
   - 11 Diario/11.02 Semanal
@@ -93,20 +93,58 @@ Current defaults include:
 Main setup fields:
 
 - vault_root: absolute path to vault
-- locale: localization code
-- notes_subdir: standard note target folder
-- force_create_key: telescope omni force-create mapping
-- journal:
-  - daily.subdir
-  - weekly.subdir
-  - monthly.subdir
-  - yearly.subdir
-- templates:
-  - standard
-  - daily
-  - weekly
-  - monthly
-  - yearly
+- locale: localization code (default: "en-US")
+- new_notes_subdir: directory where new standard notes are created (default: "10 Novas notas")
+- force_create_key: telescope omni force-create key (default: "<S-CR>")
+- templates: template configuration for note creation
+  - standard: template file or string for standard notes
+- journal: configuration for journal note types (daily/weekly/monthly/yearly)
+  - Each journal type has the same structure:
+    ```lua
+    journal = {
+      daily = {
+        subdir = "path/to/daily",           -- where daily notes are stored
+        title_format = "{{year}} {{month}}", -- how to format daily note titles
+        template = "path/to/template",      -- optional: template for daily notes
+      },
+      weekly = { subdir = "...", title_format = "...", template = "..." },
+      monthly = { subdir = "...", title_format = "...", template = "..." },
+      yearly = { subdir = "...", title_format = "...", template = "..." },
+    }
+    ```
+
+Example configuration:
+
+```lua
+require("nvim-obsidian").setup({
+  vault_root = "/path/to/vault",
+  locale = "pt-BR",
+  new_notes_subdir = "10 Notas",
+  journal = {
+    daily = {
+      subdir = "11 Diario/11.01 Diario",
+      title_format = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+      template = "08 Templates/Nota diaria",
+    },
+    weekly = {
+      subdir = "11 Diario/11.02 Semanal",
+      title_format = "{{iso_year}} semana {{iso_week}}",
+    },
+    monthly = {
+      subdir = "11 Diario/11.03 Mensal",
+      title_format = "{{year}} {{month_name}}",
+    },
+    yearly = {
+      subdir = "11 Diario/11.04 Anual",
+      title_format = "{{year}}",
+    },
+  },
+  templates = {
+    standard = "08 Templates/Nova nota",
+  },
+})
+```
+
 - month_names: map 1..12 -> localized month names
 - weekday_names: map 1..7 -> localized weekday names
 
@@ -206,7 +244,7 @@ To insert a template manually at cursor:
 ```lua
 require("nvim-obsidian").setup({
   vault_root = "/home/user/Obsidian Vault",
-  notes_subdir = "10 Notas",
+  new_notes_subdir = "10 Notas",
   templates = {
     standard = "# {{title}}\n\nDate: {{date}}\n",
     daily = "# Daily: {{date}}\n\n## Tasks\n\n## Notes\n",
@@ -331,7 +369,7 @@ Omni picker supports both discovery and creation:
 - existing match: opens note
 - no match: routes input through journal classifier
 - journal match: creates in corresponding journal folder
-- non-journal match: creates in notes_subdir
+- non-journal match: creates in new_notes_subdir
 
 Force create:
 

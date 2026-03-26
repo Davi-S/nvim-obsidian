@@ -1,6 +1,33 @@
 local M = {}
 
+function M.journal_dirs_new(root)
+    -- New nested structure with title_format in each type
+    return {
+        daily = {
+            subdir = "11 Diario/11.01 Diario",
+            title_format = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+            dir_abs = root .. "/11 Diario/11.01 Diario",
+        },
+        weekly = {
+            subdir = "11 Diario/11.02 Semanal",
+            title_format = "{{iso_year}} semana {{iso_week}}",
+            dir_abs = root .. "/11 Diario/11.02 Semanal",
+        },
+        monthly = {
+            subdir = "11 Diario/11.03 Mensal",
+            title_format = "{{year}} {{month_name}}",
+            dir_abs = root .. "/11 Diario/11.03 Mensal",
+        },
+        yearly = {
+            subdir = "11 Diario/11.04 Anual",
+            title_format = "{{year}}",
+            dir_abs = root .. "/11 Diario/11.04 Anual",
+        },
+    }
+end
+
 function M.journal_title_formats()
+    -- Flat title formats (computed by config, but kept for test reference)
     return {
         daily = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
         weekly = "{{iso_year}} semana {{iso_week}}",
@@ -9,23 +36,15 @@ function M.journal_title_formats()
     }
 end
 
-function M.journal_dirs(root)
-    return {
-        daily = { dir_abs = root .. "/11 Diario/11.01 Diario" },
-        weekly = { dir_abs = root .. "/11 Diario/11.02 Semanal" },
-        monthly = { dir_abs = root .. "/11 Diario/11.03 Mensal" },
-        yearly = { dir_abs = root .. "/11 Diario/11.04 Anual" },
-    }
-end
-
 function M.journal_cfg(root)
     local vault_root = root or "/vault"
+    local journal = M.journal_dirs_new(vault_root)
+    -- Config.lua builds title_formats table from nested structure
+    journal.title_formats = M.journal_title_formats()
     return {
         journal_enabled = true,
         notes_dir_abs = vault_root .. "/10 Novas notas",
-        journal = vim.tbl_deep_extend("force", {}, M.journal_dirs(vault_root), {
-            title_formats = M.journal_title_formats(),
-        }),
+        journal = journal,
     }
 end
 
