@@ -12,7 +12,7 @@ Example setup:
   end)
 
   require("nvim-obsidian").template_register_placeholder("date", function(ctx)
-    return ctx.time.format_date("%Y-%m-%d")
+    return ctx.time.format_local("%Y-%m-%d")
   end)
 
   require("nvim-obsidian").template_register_placeholder("author", function(ctx)
@@ -114,7 +114,7 @@ function M.template_register_placeholder(name, resolver)
 
     The resolver function receives a context object with:
       ctx.note - note metadata (title, type, input, rel_path, aliases, tags, abs_path)
-      ctx.time - timestamp and date info (timestamp, local, utc, iso tables, format_date function)
+      ctx.time - timestamp and date info (timestamp, local, utc, iso tables, format_local/format_utc functions)
       ctx.config - read-only configuration object
 
     Examples:
@@ -123,7 +123,7 @@ function M.template_register_placeholder(name, resolver)
       end)
 
       template_register_placeholder("date", function(ctx)
-        return ctx.time.format_date("%Y-%m-%d")
+        return ctx.time.format_local("%Y-%m-%d")
       end)
 
       template_register_placeholder("year", function(ctx)

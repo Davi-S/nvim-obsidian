@@ -88,6 +88,22 @@ Current defaults include:
   - 11 Diario/11.03 Mensal
   - 11 Diario/11.04 Anual
 
+## 4.1 API Quick Reference
+
+```lua
+local obsidian = require("nvim-obsidian")
+
+-- Template engine (note body templates)
+obsidian.template_register_placeholder("title", function(ctx)
+  return ctx.note.title
+end)
+
+-- Journal title formats (render + parse)
+obsidian.journal.register_placeholder("year", function(ctx)
+  return tostring(ctx.date.year)
+end, "(%d%d%d%d)")
+```
+
 ## 5. Configuration Reference
 
 Main setup fields:
@@ -217,7 +233,7 @@ The plugin includes a flexible template system with user-configurable placeholde
 
 **Registering Placeholders:**
 
-Call `register_placeholder(name, resolver_fn)` during setup:
+Call `template_register_placeholder(name, resolver_fn)` during setup:
 
 ```lua
 require("nvim-obsidian").setup({
@@ -226,16 +242,16 @@ require("nvim-obsidian").setup({
 })
 
 -- Register custom placeholders
-require("nvim-obsidian").register_placeholder("title", function(ctx)
+require("nvim-obsidian").template_register_placeholder("title", function(ctx)
   return ctx.note.title
 end)
 
-require("nvim-obsidian").register_placeholder("date", function(ctx)
-  return ctx.time.format_date("%Y-%m-%d")
+require("nvim-obsidian").template_register_placeholder("date", function(ctx)
+  return ctx.time.format_local("%Y-%m-%d")
 end)
 
-require("nvim-obsidian").register_placeholder("weekday", function(ctx)
-  return ctx.time.format_date("%A")
+require("nvim-obsidian").template_register_placeholder("weekday", function(ctx)
+  return ctx.time.format_local("%A")
 end)
 ```
 
@@ -253,8 +269,9 @@ Each resolver function receives a context object with:
 - `ctx.time.timestamp` - unix timestamp
 - `ctx.time.local` - local date table {year, month, day, hour, min, sec, wday, yday}
 - `ctx.time.utc` - UTC date table
-- `ctx.time.iso` - ISO date object {year, month, day}
-- `ctx.time.format_date(fmt)` - format function for date formatting
+- `ctx.time.iso` - ISO object {date, datetime, week, year}
+- `ctx.time.format_local(fmt)` - local-time format function for date formatting
+- `ctx.time.format_utc(fmt)` - UTC format function for date formatting
 - `ctx.config` - read-only config object (attempting writes raises an error)
 
 **Using Templates:**
@@ -284,28 +301,28 @@ require("nvim-obsidian").setup({
 })
 
 -- Register common placeholders
-require("nvim-obsidian").register_placeholder("title", function(ctx)
+require("nvim-obsidian").template_register_placeholder("title", function(ctx)
   return ctx.note.title
 end)
 
-require("nvim-obsidian").register_placeholder("date", function(ctx)
-  return ctx.time.format_date("%Y-%m-%d")
+require("nvim-obsidian").template_register_placeholder("date", function(ctx)
+  return ctx.time.format_local("%Y-%m-%d")
 end)
 
-require("nvim-obsidian").register_placeholder("time", function(ctx)
-  return ctx.time.format_date("%H:%M")
+require("nvim-obsidian").template_register_placeholder("time", function(ctx)
+  return ctx.time.format_local("%H:%M")
 end)
 
-require("nvim-obsidian").register_placeholder("weekday", function(ctx)
-  return ctx.time.format_date("%A")
+require("nvim-obsidian").template_register_placeholder("weekday", function(ctx)
+  return ctx.time.format_local("%A")
 end)
 
-require("nvim-obsidian").register_placeholder("iso_date", function(ctx)
+require("nvim-obsidian").template_register_placeholder("iso_date", function(ctx)
   return string.format("%04d-%02d-%02d", 
     ctx.time.iso.year, ctx.time.iso.month, ctx.time.iso.day)
 end)
 
-require("nvim-obsidian").register_placeholder("note_type", function(ctx)
+require("nvim-obsidian").template_register_placeholder("note_type", function(ctx)
   return ctx.note.type
 end)
 ```
@@ -344,18 +361,18 @@ Add your content here.
 
 ```lua
 -- Extract year for archival paths
-require("nvim-obsidian").register_placeholder("year", function(ctx)
+require("nvim-obsidian").template_register_placeholder("year", function(ctx)
   return tostring(ctx.time.iso.year)
 end)
 
 -- Access vault path
-require("nvim-obsidian").register_placeholder("vault_name", function(ctx)
+require("nvim-obsidian").template_register_placeholder("vault_name", function(ctx)
   local parts = vim.fn.split(ctx.config.vault_root, "/")
   return parts[#parts]
 end)
 
 -- Computed field based on note type
-require("nvim-obsidian").register_placeholder("template_label", function(ctx)
+require("nvim-obsidian").template_register_placeholder("template_label", function(ctx)
   if ctx.note.type == "daily" then
     return "Daily Journal Entry"
   elseif ctx.note.type == "weekly" then
@@ -366,15 +383,15 @@ require("nvim-obsidian").register_placeholder("template_label", function(ctx)
 end)
 
 -- Month name from locale config
-require("nvim-obsidian").register_placeholder("month_name", function(ctx)
+require("nvim-obsidian").template_register_placeholder("month_name", function(ctx)
   local months = ctx.config.month_names or {}
   local month = ctx.time.iso.month
   return months[month] or tostring(month)
 end)
 
 -- ISO format with custom separator
-require("nvim-obsidian").register_placeholder("date_iso", function(ctx)
-  return ctx.time.format_date("%Y%m%d")
+require("nvim-obsidian").template_register_placeholder("date_iso", function(ctx)
+  return ctx.time.format_local("%Y%m%d")
 end)
 ```
 

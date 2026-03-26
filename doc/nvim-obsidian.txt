@@ -30,6 +30,19 @@ CONFIG
   Example lazy.nvim snippet (NOT part of plugin config):
     cmd = { "ObsidianOmni", "ObsidianToday", "ObsidianNext", ... }
 
+API QUICK REFERENCE
+  local obsidian = require("nvim-obsidian")
+
+  -- Template engine (note body templates)
+  obsidian.template_register_placeholder("title", function(ctx)
+    return ctx.note.title
+  end)
+
+  -- Journal title formats (render + parse)
+  obsidian.journal.register_placeholder("year", function(ctx)
+    return tostring(ctx.date.year)
+  end, "(%d%d%d%d)")
+
 JOURNAL CONFIG
   Journal notes are organized in a nested configuration where each note type
   (daily, weekly, monthly, yearly) contains its own subdir, title_format, and
@@ -100,19 +113,19 @@ JOURNAL CONFIG
 
 TEMPLATES
   The plugin provides a flexible template system with user-configurable 
-  placeholders. All placeholders must be registered via register_placeholder().
+  placeholders. All placeholders must be registered via template_register_placeholder().
 
   Placeholder syntax:
     {{placeholder_name}}  - replaced with resolver output
     {{unknown}}           - kept as-is if not registered (with warning)
 
   Registration (call during setup):
-    require("nvim-obsidian").register_placeholder("title", function(ctx)
+    require("nvim-obsidian").template_register_placeholder("title", function(ctx)
       return ctx.note.title
     end)
 
-    require("nvim-obsidian").register_placeholder("date", function(ctx)
-      return ctx.time.format_date("%Y-%m-%d")
+    require("nvim-obsidian").template_register_placeholder("date", function(ctx)
+      return ctx.time.format_local("%Y-%m-%d")
     end)
 
   Context object fields:
@@ -127,8 +140,9 @@ TEMPLATES
     ctx.time.timestamp    - unix timestamp
     ctx.time.local        - local date table {year,month,day,hour,min,sec,wday,yday}
     ctx.time.utc          - UTC date table
-    ctx.time.iso          - ISO date {year, month, day}
-    ctx.time.format_date(fmt)  - format function, e.g. "%Y-%m-%d"
+    ctx.time.iso          - ISO object {date, datetime, week, year}
+    ctx.time.format_local(fmt)  - format function, e.g. "%Y-%m-%d"
+    ctx.time.format_utc(fmt)    - UTC format function, e.g. "%Y-%m-%d"
     
     ctx.config            - read-only config object
 
@@ -138,12 +152,12 @@ TEMPLATES
     :ObsidianInsertTemplate ./path.md    load template from file
 
   Common placeholders (examples):
-    register_placeholder("title", function(ctx) return ctx.note.title end)
-    register_placeholder("date", function(ctx) return ctx.time.format_date("%Y-%m-%d") end)
-    register_placeholder("time", function(ctx) return ctx.time.format_date("%H:%M") end)
-    register_placeholder("weekday", function(ctx) return ctx.time.format_date("%A") end)
-    register_placeholder("year", function(ctx) return tostring(ctx.time.iso.year) end)
-    register_placeholder("note_type", function(ctx) return ctx.note.type end)
+    template_register_placeholder("title", function(ctx) return ctx.note.title end)
+    template_register_placeholder("date", function(ctx) return ctx.time.format_local("%Y-%m-%d") end)
+    template_register_placeholder("time", function(ctx) return ctx.time.format_local("%H:%M") end)
+    template_register_placeholder("weekday", function(ctx) return ctx.time.format_local("%A") end)
+    template_register_placeholder("year", function(ctx) return tostring(ctx.time.iso.year) end)
+    template_register_placeholder("note_type", function(ctx) return ctx.note.type end)
 
 DEPENDENCIES
   nvim-lua/plenary.nvim

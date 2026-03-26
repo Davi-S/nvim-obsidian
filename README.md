@@ -101,6 +101,22 @@ obsidian.setup({
 Journal placeholders are separate from template placeholders and must be
 registered before `setup()` when journal is enabled.
 
+## API Quick Reference
+
+```lua
+local obsidian = require("nvim-obsidian")
+
+-- Template engine (note body templates)
+obsidian.template_register_placeholder("title", function(ctx)
+  return ctx.note.title
+end)
+
+-- Journal title formats (render + parse)
+obsidian.journal.register_placeholder("year", function(ctx)
+  return tostring(ctx.date.year)
+end, "(%d%d%d%d)")
+```
+
 ## Commands
 
 - `:ObsidianOmni`
