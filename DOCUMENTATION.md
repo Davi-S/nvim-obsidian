@@ -215,7 +215,7 @@ Global commands provided by the plugin:
 - :ObsidianBacklinks
   - Finds usages of current note title across vault.
 - :ObsidianSearch
-  - Vault-scoped text search.
+  - Vault-scoped text search (Telescope `live_grep` with `cwd = vault_root`).
 - :ObsidianReindex
   - Forces full cache rebuild.
 - :ObsidianInsertTemplate [type|path]

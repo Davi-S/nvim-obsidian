@@ -9,7 +9,7 @@ COMMANDS
   :ObsidianPrev              Open or create previous journal note for current context.
   :ObsidianFollow            Follow wiki-link under cursor.
   :ObsidianBacklinks         Search backlinks for current note title.
-  :ObsidianSearch            Vault-scoped text search.
+  :ObsidianSearch            Vault-scoped text search (Telescope live_grep with vault_root cwd).
   :ObsidianReindex           Force full vault cache rebuild.
   :ObsidianInsertTemplate [type|path]
                              Insert rendered template at cursor.

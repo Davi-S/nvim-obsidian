@@ -125,7 +125,7 @@ end, "(%d%d%d%d)")
 - `:ObsidianPrev`
 - `:ObsidianFollow`
 - `:ObsidianBacklinks`
-- `:ObsidianSearch`
+- `:ObsidianSearch` (Telescope `live_grep` scoped to `vault_root`)
 - `:ObsidianReindex`
 - `:ObsidianInsertTemplate [type|path]`
 
