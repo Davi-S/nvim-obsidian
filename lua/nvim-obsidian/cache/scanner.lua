@@ -20,6 +20,22 @@ local watchers = {
     by_dir = {},
 }
 
+local refresh_state = {
+    token = 0,
+    in_progress = false,
+}
+
+local function abort_active_refresh()
+    if refresh_state.in_progress then
+        refresh_state.token = refresh_state.token + 1
+        refresh_state.in_progress = false
+        -- Ensure indexes are not left stale if a previous async refresh is interrupted.
+        pcall(function()
+            _vault.end_bulk_update()
+        end)
+    end
+end
+
 local function scan_recursive(root, out)
     local fd = vim.uv.fs_scandir(root)
     if not fd then
@@ -93,6 +109,8 @@ function M.refresh_one(abs)
 end
 
 function M.refresh_all_sync()
+    abort_active_refresh()
+
     local cfg = _config.get()
     if not cfg then
         return
@@ -110,11 +128,66 @@ function M.refresh_all_sync()
 end
 
 function M.refresh_all_async(cb)
-    vim.schedule(function()
-        M.refresh_all_sync()
+    abort_active_refresh()
+
+    local cfg = _config.get()
+    if not cfg then
         if cb then
             cb()
         end
+        return
+    end
+
+    local files = {}
+    scan_recursive(cfg.vault_root, files)
+
+    local batch_size = async_constants.SCANNER_BATCH_SIZE or 40
+    local batch_delay_ms = async_constants.SCANNER_BATCH_DELAY_MS or 1
+
+    refresh_state.token = refresh_state.token + 1
+    local my_token = refresh_state.token
+    refresh_state.in_progress = true
+
+    _vault.begin_bulk_update()
+    _vault.reset()
+
+    local idx = 1
+
+    local function finish()
+        if refresh_state.token ~= my_token then
+            return
+        end
+        _vault.end_bulk_update()
+        refresh_state.in_progress = false
+        if cb then
+            cb()
+        end
+    end
+
+    local function step()
+        if refresh_state.token ~= my_token then
+            return
+        end
+
+        local last = math.min(idx + batch_size - 1, #files)
+        for i = idx, last do
+            M.refresh_one(files[i])
+        end
+        idx = last + 1
+
+        if idx <= #files then
+            vim.defer_fn(step, batch_delay_ms)
+        else
+            finish()
+        end
+    end
+
+    vim.schedule(function()
+        if #files == 0 then
+            finish()
+            return
+        end
+        step()
     end)
 end
 
