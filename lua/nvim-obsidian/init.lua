@@ -101,7 +101,9 @@ function M.setup(opts)
     scanner.setup_autocmds()
     dataview_engine.setup_autocmds()
     dataview_engine.refresh_open_markdown_buffers()
-    vim.notify("nvim-obsidian: vault cache ready", vim.log.levels.INFO)
+    vim.notify("nvim-obsidian: vault cache ready", vim.log.levels.INFO, {
+      timeout = 2000,
+    })
   end)
 
   M._did_setup = true
