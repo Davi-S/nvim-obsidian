@@ -1,5 +1,7 @@
 -- Configuration validation functions
 local path = require("nvim-obsidian.path")
+local journal_format = require("nvim-obsidian.journal.format")
+local journal_placeholders = require("nvim-obsidian.journal.placeholder_registry")
 
 local M = {}
 
@@ -35,6 +37,11 @@ function M.validate_journal(cfg, user)
         end
         require_string(journal[note_type].subdir, "journal." .. note_type .. ".subdir")
         require_string(journal[note_type].title_format, "journal." .. note_type .. ".title_format")
+        for _, key in ipairs(journal_format.extract_placeholders(journal[note_type].title_format)) do
+            if not journal_placeholders.has(key) then
+                error("journal." .. note_type .. ".title_format uses unregistered placeholder: " .. key)
+            end
+        end
         if journal[note_type].template ~= nil then
             require_string(journal[note_type].template, "journal." .. note_type .. ".template")
         end

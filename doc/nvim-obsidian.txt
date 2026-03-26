@@ -39,13 +39,43 @@ JOURNAL CONFIG
     journal = {
       daily = {
         subdir = "path/to/daily",
-        title_format = "{{year}} {{month}}",
+        title_format = "{{year}} {{month_name}}",
         template = "path/to/template",  -- optional
       },
       weekly = { subdir = "...", title_format = "..." },
       monthly = { subdir = "...", title_format = "..." },
       yearly = { subdir = "...", title_format = "..." },
     }
+
+  Journal placeholders must be explicitly registered before setup.
+  API:
+    require("nvim-obsidian").journal.register_placeholder(name, resolver, regex_fragment)
+
+  Default-compatible registrations:
+    local obsidian = require("nvim-obsidian")
+    obsidian.journal.register_placeholder("year", function(ctx)
+      return tostring(ctx.date.year)
+    end, "(%d%d%d%d)")
+
+    obsidian.journal.register_placeholder("iso_year", function(ctx)
+      return tostring(ctx.date.iso_year)
+    end, "(%d%d%d%d)")
+
+    obsidian.journal.register_placeholder("month_name", function(ctx)
+      return ctx.locale.month_name or ""
+    end, "(.+)")
+
+    obsidian.journal.register_placeholder("day2", function(ctx)
+      return string.format("%02d", ctx.date.day or 0)
+    end, "(%d%d?)")
+
+    obsidian.journal.register_placeholder("weekday_name", function(ctx)
+      return ctx.locale.weekday_name or ""
+    end, "(.+)")
+
+    obsidian.journal.register_placeholder("iso_week", function(ctx)
+      return tostring(ctx.date.iso_week)
+    end, "(%d%d?)")
   
   Example:
     journal = {

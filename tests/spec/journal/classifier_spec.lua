@@ -1,7 +1,12 @@
 local classifier = require("nvim-obsidian.journal.classifier")
 local fixtures = require("tests.spec.support.fixtures")
+local journal_registry = require("nvim-obsidian.journal.placeholder_registry")
 
 describe("journal classifier", function()
+    before_each(function()
+        journal_registry.reset_for_tests()
+    end)
+
     it("classifies title input using title formats", function()
         local cfg = fixtures.journal_cfg("/vault")
 

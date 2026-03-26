@@ -104,7 +104,7 @@ Main setup fields:
     journal = {
       daily = {
         subdir = "path/to/daily",           -- where daily notes are stored
-        title_format = "{{year}} {{month}}", -- how to format daily note titles
+        title_format = "{{year}} {{month_name}}", -- how to format daily note titles
         template = "path/to/template",      -- optional: template for daily notes
       },
       weekly = { subdir = "...", title_format = "...", template = "..." },
@@ -144,6 +144,38 @@ require("nvim-obsidian").setup({
   },
 })
 ```
+
+Journal placeholders are explicitly registered and are separate from template placeholders.
+
+```lua
+local obsidian = require("nvim-obsidian")
+
+obsidian.journal.register_placeholder("year", function(ctx)
+  return tostring(ctx.date.year)
+end, "(%d%d%d%d)")
+
+obsidian.journal.register_placeholder("iso_year", function(ctx)
+  return tostring(ctx.date.iso_year)
+end, "(%d%d%d%d)")
+
+obsidian.journal.register_placeholder("month_name", function(ctx)
+  return ctx.locale.month_name or ""
+end, "(.+)")
+
+obsidian.journal.register_placeholder("day2", function(ctx)
+  return string.format("%02d", ctx.date.day or 0)
+end, "(%d%d?)")
+
+obsidian.journal.register_placeholder("weekday_name", function(ctx)
+  return ctx.locale.weekday_name or ""
+end, "(.+)")
+
+obsidian.journal.register_placeholder("iso_week", function(ctx)
+  return tostring(ctx.date.iso_week)
+end, "(%d%d?)")
+```
+
+The second argument is a resolver function and the third argument is the Lua regex capture fragment used for parsing.
 
 - month_names: map 1..12 -> localized month names
 - weekday_names: map 1..7 -> localized weekday names

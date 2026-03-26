@@ -1,16 +1,17 @@
-local M = {}
+local registry = require("nvim-obsidian.journal.placeholder_registry")
 
-local PLACEHOLDER_CAPTURE = {
-    year = "(%d%d%d%d)",
-    iso_year = "(%d%d%d%d)",
-    month_name = "(.+)",
-    day2 = "(%d%d?)",
-    weekday_name = "(.+)",
-    iso_week = "(%d%d?)",
-}
+local M = {}
 
 local function escape_lua_pattern_literal(text)
     return (text:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"))
+end
+
+function M.extract_placeholders(format)
+    local out = {}
+    for key in (format or ""):gmatch("{{([%w_]+)}}") do
+        out[#out + 1] = key
+    end
+    return out
 end
 
 local function compile_title_pattern(format)
@@ -26,7 +27,7 @@ local function compile_title_pattern(format)
         end
 
         table.insert(parts, escape_lua_pattern_literal(format:sub(from, s - 1)))
-        local capture = PLACEHOLDER_CAPTURE[key]
+        local capture = registry.get_regex_fragment(key)
         if not capture then
             error("unsupported title format placeholder: " .. key)
         end
@@ -84,50 +85,58 @@ local function iso_week_start(year, week)
     return week1_monday + ((week - 1) * 7 * 86400)
 end
 
-local function render_title(format, parts)
-    return format
-        :gsub("{{year}}", tostring(parts.year or ""))
-        :gsub("{{iso_year}}", tostring(parts.iso_year or ""))
-        :gsub("{{month_name}}", tostring(parts.month_name or ""))
-        :gsub("{{day2}}", string.format("%02d", parts.day or 0))
-        :gsub("{{weekday_name}}", tostring(parts.weekday_name or ""))
-        :gsub("{{iso_week}}", tostring(parts.iso_week or ""))
+local function build_render_ctx(ts, cfg, note_type)
+    local local_dt = os.date("*t", ts)
+    local utc_dt = os.date("!*t", ts)
+    local month_name = cfg.month_names[local_dt.month] or vim.fn.tolower(os.date("%B", ts))
+    local weekday_name = cfg.weekday_names[local_dt.wday] or vim.fn.tolower(os.date("%A", ts))
+
+    return {
+        timestamp = ts,
+        note_type = note_type,
+        date = {
+            ["local"] = local_dt,
+            utc = utc_dt,
+            year = local_dt.year,
+            month = local_dt.month,
+            day = local_dt.day,
+            wday = local_dt.wday,
+            iso_year = tonumber(os.date("%G", ts)) or local_dt.year,
+            iso_week = tonumber(os.date("%V", ts)) or 0,
+        },
+        locale = {
+            month_name = month_name,
+            weekday_name = weekday_name,
+        },
+        config = cfg,
+    }
+end
+
+local function render_title(format, ts, cfg, note_type)
+    local ctx = build_render_ctx(ts, cfg, note_type)
+    return (format:gsub("{{([%w_]+)}}", function(key)
+        local value, ok = registry.resolve(key, ctx)
+        if not ok then
+            error("unsupported title format placeholder: " .. key)
+        end
+        return value
+    end))
 end
 
 function M.daily_title(ts, cfg)
-    local t = os.date("*t", ts)
-    local month = cfg.month_names[t.month] or vim.fn.tolower(os.date("%B", ts))
-    local weekday = cfg.weekday_names[t.wday] or vim.fn.tolower(os.date("%A", ts))
-    return render_title(cfg.journal.title_formats.daily, {
-        year = t.year,
-        month_name = month,
-        day = t.day,
-        weekday_name = weekday,
-    })
+    return render_title(cfg.journal.title_formats.daily, ts, cfg, "daily")
 end
 
 function M.weekly_title(ts, cfg)
-    local y = tonumber(os.date("%G", ts))
-    local w = tonumber(os.date("%V", ts))
-    return render_title(cfg.journal.title_formats.weekly, {
-        iso_year = y,
-        iso_week = w,
-    })
+    return render_title(cfg.journal.title_formats.weekly, ts, cfg, "weekly")
 end
 
 function M.monthly_title(ts, cfg)
-    local t = os.date("*t", ts)
-    local month = cfg.month_names[t.month] or vim.fn.tolower(os.date("%B", ts))
-    return render_title(cfg.journal.title_formats.monthly, {
-        year = t.year,
-        month_name = month,
-    })
+    return render_title(cfg.journal.title_formats.monthly, ts, cfg, "monthly")
 end
 
 function M.yearly_title(ts, cfg)
-    return render_title(cfg.journal.title_formats.yearly, {
-        year = os.date("%Y", ts),
-    })
+    return render_title(cfg.journal.title_formats.yearly, ts, cfg, "yearly")
 end
 
 function M.parse_daily_title(title, cfg)

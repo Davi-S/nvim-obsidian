@@ -1,5 +1,33 @@
 local M = {}
 
+function M.register_default_journal_placeholders()
+    local registry = require("nvim-obsidian.journal.placeholder_registry")
+
+    registry.register_placeholder("year", function(ctx)
+        return tostring(ctx.date.year)
+    end, "(%d%d%d%d)")
+
+    registry.register_placeholder("iso_year", function(ctx)
+        return tostring(ctx.date.iso_year)
+    end, "(%d%d%d%d)")
+
+    registry.register_placeholder("month_name", function(ctx)
+        return ctx.locale.month_name or ""
+    end, "(.+)")
+
+    registry.register_placeholder("day2", function(ctx)
+        return string.format("%02d", ctx.date.day or 0)
+    end, "(%d%d?)")
+
+    registry.register_placeholder("weekday_name", function(ctx)
+        return ctx.locale.weekday_name or ""
+    end, "(.+)")
+
+    registry.register_placeholder("iso_week", function(ctx)
+        return tostring(ctx.date.iso_week)
+    end, "(%d%d?)")
+end
+
 function M.journal_dirs_new(root)
     -- New nested structure with title_format in each type
     return {
@@ -38,6 +66,7 @@ end
 
 function M.journal_cfg(root)
     local vault_root = root or "/vault"
+    M.register_default_journal_placeholders()
     local journal = M.journal_dirs_new(vault_root)
     -- Config.lua builds title_formats table from nested structure
     journal.title_formats = M.journal_title_formats()

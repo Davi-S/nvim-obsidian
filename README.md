@@ -47,7 +47,33 @@ vim.g.nvim_obsidian_opts = {
 ## Basic setup
 
 ```lua
-require("nvim-obsidian").setup({
+local obsidian = require("nvim-obsidian")
+
+obsidian.journal.register_placeholder("year", function(ctx)
+  return tostring(ctx.date.year)
+end, "(%d%d%d%d)")
+
+obsidian.journal.register_placeholder("iso_year", function(ctx)
+  return tostring(ctx.date.iso_year)
+end, "(%d%d%d%d)")
+
+obsidian.journal.register_placeholder("month_name", function(ctx)
+  return ctx.locale.month_name or ""
+end, "(.+)")
+
+obsidian.journal.register_placeholder("day2", function(ctx)
+  return string.format("%02d", ctx.date.day or 0)
+end, "(%d%d?)")
+
+obsidian.journal.register_placeholder("weekday_name", function(ctx)
+  return ctx.locale.weekday_name or ""
+end, "(.+)")
+
+obsidian.journal.register_placeholder("iso_week", function(ctx)
+  return tostring(ctx.date.iso_week)
+end, "(%d%d?)")
+
+obsidian.setup({
   vault_root = "/home/davi/Documents/ObsidianAllInVault",
   locale = "pt-BR",
   new_notes_subdir = "10 Novas notas",
@@ -71,6 +97,9 @@ require("nvim-obsidian").setup({
   },
 })
 ```
+
+Journal placeholders are separate from template placeholders and must be
+registered before `setup()` when journal is enabled.
 
 ## Commands
 

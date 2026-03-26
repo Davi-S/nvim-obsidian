@@ -49,11 +49,37 @@ local opts = {
     },
 }
 
-require("nvim-obsidian").setup(opts)
-require("nvim-obsidian").register_placeholder("title", function(ctx)
+local obsidian = require("nvim-obsidian")
+
+obsidian.journal.register_placeholder("year", function(ctx)
+    return tostring(ctx.date.year)
+end, "(%d%d%d%d)")
+
+obsidian.journal.register_placeholder("iso_year", function(ctx)
+    return tostring(ctx.date.iso_year)
+end, "(%d%d%d%d)")
+
+obsidian.journal.register_placeholder("month_name", function(ctx)
+    return ctx.locale.month_name or ""
+end, "(.+)")
+
+obsidian.journal.register_placeholder("day2", function(ctx)
+    return string.format("%02d", ctx.date.day or 0)
+end, "(%d%d?)")
+
+obsidian.journal.register_placeholder("weekday_name", function(ctx)
+    return ctx.locale.weekday_name or ""
+end, "(.+)")
+
+obsidian.journal.register_placeholder("iso_week", function(ctx)
+    return tostring(ctx.date.iso_week)
+end, "(%d%d?)")
+
+obsidian.setup(opts)
+obsidian.register_placeholder("title", function(ctx)
     return ctx.note.title
 end)
-require("nvim-obsidian").register_placeholder("date", function(ctx)
+obsidian.register_placeholder("date", function(ctx)
     return ctx.time.iso.date
 end)
 
