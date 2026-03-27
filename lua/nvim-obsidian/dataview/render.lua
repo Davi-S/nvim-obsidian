@@ -138,6 +138,8 @@ function M.render_block(bufnr, block, result, errors)
             end
             table.insert(virt, { { "", "Normal" } })
         end
+    elseif result and result.groups and #result.groups == 0 then
+        table.insert(virt, { { "Dataview: No results to show for task query.", "NvimObsidianDataviewHeader" } })
     elseif not result or not result.groups then
         table.insert(virt, { { "dataview: no results", "NvimObsidianDataviewHeader" } })
     else
