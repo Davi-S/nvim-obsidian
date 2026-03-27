@@ -572,7 +572,6 @@ Cache sync currently uses:
 - buffer write/new/filepost events
 - rename-aware old path removal via file pre/post hooks
 - buffer delete removal
-- focus-gained debounced reconciliation
 - external filesystem watcher (best effort)
 - manual full rebuild via :ObsidianReindex
 
@@ -583,7 +582,7 @@ Best-effort recursive directory watchers are started for the vault.
 Behavior:
 
 - external markdown create/update -> refresh single note
-- external rename/delete -> remove stale path and reconcile
+- external rename/delete -> remove stale path and watcher-driven reconciliation
 - directory topology changes -> watcher restart debounce
 - cleanup on VimLeavePre
 

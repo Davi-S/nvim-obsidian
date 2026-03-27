@@ -213,5 +213,5 @@ OMNI POLICY
   If query matches an alias and not title, display becomes: alias -> relpath.
 
 SYNC
-  Cache sync is driven by write/buffer events, focus-gained reconciliation,
-  and best-effort filesystem watchers for external vault changes.
+  Cache sync is driven by write/buffer events and best-effort filesystem
+  watchers for external vault changes.

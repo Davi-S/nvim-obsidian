@@ -333,13 +333,6 @@ function M.setup_autocmds()
         end,
     })
 
-    vim.api.nvim_create_autocmd({ "FocusGained" }, {
-        group = group,
-        callback = function()
-            M.reconcile_async()
-        end,
-    })
-
     vim.api.nvim_create_autocmd({ "VimLeavePre" }, {
         group = group,
         callback = function()
