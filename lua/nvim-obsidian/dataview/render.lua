@@ -34,24 +34,24 @@ local function ensure_highlights(cfg)
     if header_hl and vim.fn.hlexists(header_hl) == 1 then
         vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = header_hl, default = false })
     else
-    local sapphire_fg = hl_fg("markdownLinkText")
-    if not sapphire_fg then
-        sapphire_fg = hl_fg("@lsp.type.class.markdown")
-    end
-    if not sapphire_fg then
-        sapphire_fg = hl_fg("@lsp.type.decorator.markdown")
-    end
-
-    if sapphire_fg then
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = sapphire_fg, default = false })
-    else
-        local text_fg = hl_fg("Normal")
-        if text_fg then
-            vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = text_fg, default = false })
-        else
-            vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = "Normal", default = false })
+        local sapphire_fg = hl_fg("markdownLinkText")
+        if not sapphire_fg then
+            sapphire_fg = hl_fg("@lsp.type.class.markdown")
         end
-    end
+        if not sapphire_fg then
+            sapphire_fg = hl_fg("@lsp.type.decorator.markdown")
+        end
+
+        if sapphire_fg then
+            vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = sapphire_fg, default = false })
+        else
+            local text_fg = hl_fg("Normal")
+            if text_fg then
+                vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = text_fg, default = false })
+            else
+                vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = "Normal", default = false })
+            end
+        end
     end
 
     local table_link_hl = user_hl.table_link
@@ -65,7 +65,8 @@ local function ensure_highlights(cfg)
     if no_results_hl and vim.fn.hlexists(no_results_hl) == 1 then
         vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults", { link = no_results_hl, default = false })
     else
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults", { link = "NvimObsidianDataviewHeader", default = false })
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults",
+        { link = "NvimObsidianDataviewHeader", default = false })
     end
 
     local error_hl = user_hl.error or "WarningMsg"
