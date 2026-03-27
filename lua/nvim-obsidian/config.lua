@@ -11,6 +11,24 @@ local defaults = {
     new_notes_subdir = "10 Novas notas",
     force_create_key = "<S-CR>",
     templates = {},
+    dataview = {
+        enabled = true,
+        render = {
+            when = { "on_open", "on_save" },
+            scope = "event",
+            patterns = { "*.md" },
+        },
+        placement = "below_block",
+        messages = {
+            task_no_results = {
+                enabled = true,
+                text = "Dataview: No results to show for task query.",
+            },
+        },
+        highlights = {
+            error = "WarningMsg",
+        },
+    },
 }
 
 local state = {}

@@ -8,14 +8,59 @@ local config = require("nvim-obsidian.config")
 
 local M = {}
 
-function M.refresh_open_markdown_buffers()
+local WHEN_TO_EVENTS = {
+    on_open = "BufReadPost",
+    on_save = "BufWritePost",
+    on_buf_enter = "BufEnter",
+}
+
+local function markdown_loaded_buffers()
+    local out = {}
     for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
         if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_is_loaded(bufnr) then
             local name = vim.api.nvim_buf_get_name(bufnr)
             if name ~= "" and name:sub(-3) == ".md" then
-                M.refresh_buffer(bufnr)
+                table.insert(out, bufnr)
             end
         end
+    end
+    return out
+end
+
+local function visible_markdown_buffers()
+    local out = {}
+    local seen = {}
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+        local bufnr = vim.api.nvim_win_get_buf(win)
+        if not seen[bufnr] then
+            seen[bufnr] = true
+            if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_is_loaded(bufnr) then
+                local name = vim.api.nvim_buf_get_name(bufnr)
+                if name ~= "" and name:sub(-3) == ".md" then
+                    table.insert(out, bufnr)
+                end
+            end
+        end
+    end
+    return out
+end
+
+local function target_buffers_for_scope(scope, event_buf)
+    if scope == "current" then
+        return { vim.api.nvim_get_current_buf() }
+    end
+    if scope == "visible" then
+        return visible_markdown_buffers()
+    end
+    if scope == "loaded" then
+        return markdown_loaded_buffers()
+    end
+    return { event_buf }
+end
+
+function M.refresh_open_markdown_buffers()
+    for _, bufnr in ipairs(markdown_loaded_buffers()) do
+        M.refresh_buffer(bufnr)
     end
 end
 
@@ -26,6 +71,11 @@ function M.refresh_buffer(bufnr)
 
     local cfg = config.get()
     if not cfg then
+        return
+    end
+
+    if cfg.dataview and cfg.dataview.enabled == false then
+        render.clear_buffer(bufnr)
         return
     end
 
@@ -43,7 +93,7 @@ function M.refresh_buffer(bufnr)
     for _, block in ipairs(blocks) do
         local query, parse_err = block_parser.parse_query(block.body_lines)
         if not query then
-            render.render_block(bufnr, block, nil, { "dataview: " .. parse_err })
+            render.render_block(bufnr, block, nil, { "dataview: " .. parse_err }, cfg.dataview)
         else
             local rows, source_errors
             if query.kind == "TABLE" then
@@ -63,9 +113,9 @@ function M.refresh_buffer(bufnr)
             end
 
             if #all_errors > 0 then
-                render.render_block(bufnr, block, result, all_errors)
+                render.render_block(bufnr, block, result, all_errors, cfg.dataview)
             else
-                render.render_block(bufnr, block, result, nil)
+                render.render_block(bufnr, block, result, nil, cfg.dataview)
             end
         end
     end
@@ -74,11 +124,43 @@ end
 function M.setup_autocmds()
     local group = vim.api.nvim_create_augroup("NvimObsidianDataview", { clear = true })
 
-    vim.api.nvim_create_autocmd({ "BufRead", "BufWritePost" }, {
+    local cfg = config.get() or {}
+    local dv = cfg.dataview or {}
+    local render_cfg = dv.render or {}
+
+    if dv.enabled == false then
+        for _, bufnr in ipairs(markdown_loaded_buffers()) do
+            render.clear_buffer(bufnr)
+        end
+        return
+    end
+
+    local events = {}
+    local seen = {}
+    for _, w in ipairs(render_cfg.when or {}) do
+        local ev = WHEN_TO_EVENTS[w]
+        if ev and not seen[ev] then
+            seen[ev] = true
+            table.insert(events, ev)
+        end
+    end
+
+    if #events == 0 then
+        return
+    end
+
+    vim.api.nvim_create_autocmd(events, {
         group = group,
-        pattern = "*.md",
+        pattern = render_cfg.patterns or { "*.md" },
         callback = function(args)
-            M.refresh_buffer(args.buf)
+            local buffers = target_buffers_for_scope(render_cfg.scope or "event", args.buf)
+            local seen_bufs = {}
+            for _, bufnr in ipairs(buffers) do
+                if bufnr and not seen_bufs[bufnr] then
+                    seen_bufs[bufnr] = true
+                    M.refresh_buffer(bufnr)
+                end
+            end
         end,
     })
 end

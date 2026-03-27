@@ -2,6 +2,22 @@ local M = {}
 
 local NS = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
 
+local function dv_opts(cfg)
+    local defaults = {
+        placement = "below_block",
+        messages = {
+            task_no_results = {
+                enabled = true,
+                text = "Dataview: No results to show for task query.",
+            },
+        },
+        highlights = {
+            error = "WarningMsg",
+        },
+    }
+    return vim.tbl_deep_extend("force", defaults, cfg or {})
+end
+
 local function hl_fg(name)
     local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name, link = false })
     if not ok or not hl then
@@ -10,7 +26,14 @@ local function hl_fg(name)
     return hl.fg
 end
 
-local function ensure_highlights()
+local function ensure_highlights(cfg)
+    local opts = dv_opts(cfg)
+    local user_hl = opts.highlights or {}
+
+    local header_hl = user_hl.header
+    if header_hl and vim.fn.hlexists(header_hl) == 1 then
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = header_hl, default = false })
+    else
     local sapphire_fg = hl_fg("markdownLinkText")
     if not sapphire_fg then
         sapphire_fg = hl_fg("@lsp.type.class.markdown")
@@ -29,7 +52,28 @@ local function ensure_highlights()
             vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = "Normal", default = false })
         end
     end
-    vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", { link = "WarningMsg", default = true })
+    end
+
+    local table_link_hl = user_hl.table_link
+    if table_link_hl and vim.fn.hlexists(table_link_hl) == 1 then
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTableLink", { link = table_link_hl, default = false })
+    else
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTableLink", { link = "NvimObsidianDataviewHeader", default = false })
+    end
+
+    local no_results_hl = user_hl.task_no_results
+    if no_results_hl and vim.fn.hlexists(no_results_hl) == 1 then
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults", { link = no_results_hl, default = false })
+    else
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults", { link = "NvimObsidianDataviewHeader", default = false })
+    end
+
+    local error_hl = user_hl.error or "WarningMsg"
+    if vim.fn.hlexists(error_hl) == 1 then
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", { link = error_hl, default = false })
+    else
+        vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", { link = "WarningMsg", default = false })
+    end
 end
 
 function M.clear_buffer(bufnr)
@@ -107,7 +151,7 @@ local function build_table_lines(columns, rows, link_cols)
                 padded = pad_right(text, widths[i])
             end
 
-            local hl = (link_cols and link_cols[i]) and "NvimObsidianDataviewHeader" or "Normal"
+            local hl = (link_cols and link_cols[i]) and "NvimObsidianDataviewTableLink" or "Normal"
             row_line[#row_line + 1] = { padded, hl }
             if i < #columns then
                 row_line[#row_line + 1] = { "  ", "Normal" }
@@ -119,8 +163,9 @@ local function build_table_lines(columns, rows, link_cols)
     return lines
 end
 
-function M.render_block(bufnr, block, result, errors)
-    ensure_highlights()
+function M.render_block(bufnr, block, result, errors, cfg)
+    local opts = dv_opts(cfg)
+    ensure_highlights(opts)
 
     local virt = {}
 
@@ -139,7 +184,9 @@ function M.render_block(bufnr, block, result, errors)
             table.insert(virt, { { "", "Normal" } })
         end
     elseif result and result.groups and #result.groups == 0 then
-        table.insert(virt, { { "Dataview: No results to show for task query.", "NvimObsidianDataviewHeader" } })
+        if opts.messages.task_no_results.enabled then
+            table.insert(virt, { { opts.messages.task_no_results.text, "NvimObsidianDataviewTaskNoResults" } })
+        end
     elseif not result or not result.groups then
         table.insert(virt, { { "dataview: no results", "NvimObsidianDataviewHeader" } })
     else
@@ -156,9 +203,12 @@ function M.render_block(bufnr, block, result, errors)
         end
     end
 
-    vim.api.nvim_buf_set_extmark(bufnr, NS, block.end_line - 1, 0, {
+    local place_above = opts.placement == "above_block"
+    local anchor_line = place_above and math.max(block.start_line - 1, 0) or (block.end_line - 1)
+
+    vim.api.nvim_buf_set_extmark(bufnr, NS, anchor_line, 0, {
         virt_lines = virt,
-        virt_lines_above = false,
+        virt_lines_above = place_above,
         hl_mode = "combine",
     })
 end

@@ -23,6 +23,44 @@ CONFIG
     new_notes_subdir = "10 Novas notas",
   })
 
+DATAVIEW CONFIG
+  First-wave dataview options are available under the dataview setup key.
+
+  Shape:
+    dataview = {
+      enabled = true,
+      render = {
+        when = { "on_open", "on_save" },
+        scope = "event",       -- event | current | visible | loaded
+        patterns = { "*.md" },
+      },
+      placement = "below_block", -- below_block | above_block
+      messages = {
+        task_no_results = {
+          enabled = true,
+          text = "Dataview: No results to show for task query.",
+        },
+      },
+      highlights = {
+        -- optional highlight group overrides
+        -- header = "markdownLinkText",
+        -- error = "WarningMsg",
+        -- table_link = "markdownLinkText",
+        -- task_no_results = "Comment",
+      },
+    }
+
+  render.when options (multi-select):
+    on_open      -> BufReadPost
+    on_save      -> BufWritePost
+    on_buf_enter -> BufEnter
+
+  render.scope options:
+    event   = refresh only the event buffer
+    current = refresh only current buffer
+    visible = refresh visible-window markdown buffers
+    loaded  = refresh all loaded markdown buffers
+
   The "cmd" option in lazy.nvim is NOT a plugin config field - it tells lazy.nvim
   when to load the plugin. If any of the listed commands are invoked, the plugin
   is loaded automatically. This avoids loading the plugin until actually needed.

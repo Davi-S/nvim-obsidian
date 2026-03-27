@@ -12,11 +12,12 @@ and configurable template rendering without forcing a specific visual style.
 - Omni picker for search, open, or create
 - Journal routing for daily, weekly, monthly, and yearly notes
 - Time travel commands for journal notes (today, next, previous)
-- Wiki-link follow for [[Title]] and [[Title|Alias]]
+- Wiki-link follow for [[Title]], [[Title|Alias]], [[Title#Heading]], and [[Title#^blockid|Alias]]
 - Backlinks search for current note title
 - Vault-scoped full-text search
 - User-defined template placeholders
 - nvim-cmp completion source for wiki links
+- Dataview rendering for TASK and TABLE WITHOUT ID queries
 
 ## Non-goals
 
@@ -74,6 +75,28 @@ and configurable template rendering without forcing a specific visual style.
       vault_root = "/home/user/ObsidianVault",
       locale = "pt-BR",
       new_notes_subdir = "10 Novas notas",
+      dataview = {
+        enabled = true,
+        render = {
+          when = { "on_open", "on_save" },
+          scope = "event", -- event | current | visible | loaded
+          patterns = { "*.md" },
+        },
+        placement = "below_block", -- below_block | above_block
+        messages = {
+          task_no_results = {
+            enabled = true,
+            text = "Dataview: No results to show for task query.",
+          },
+        },
+        highlights = {
+          -- optional highlight group overrides
+          -- header = "markdownLinkText",
+          -- error = "WarningMsg",
+          -- table_link = "markdownLinkText",
+          -- task_no_results = "Comment",
+        },
+      },
       journal = {
         daily = {
           subdir = "11 Diário/11.01 Diário",
@@ -134,6 +157,37 @@ end, "(%d%d%d%d)")
 
 Journal placeholders are separate from template placeholders and must be
 registered before setup when journal is enabled.
+
+## Dataview Configuration
+
+First-wave dataview options are exposed under `dataview`:
+
+- `enabled`: globally enable/disable dataview rendering.
+- `render.when`: trigger list with predetermined options:
+  - `on_open` -> `BufReadPost`
+  - `on_save` -> `BufWritePost`
+  - `on_buf_enter` -> `BufEnter`
+- `render.scope`: choose which buffers to refresh per event:
+  - `event`, `current`, `visible`, `loaded`
+- `render.patterns`: autocmd patterns (default `{ "*.md" }`).
+- `placement`: render `below_block` or `above_block`.
+- `messages.task_no_results`: control text shown when a TASK query is valid but returns no rows.
+- `highlights`: optional highlight-group overrides for header/error/table links/no-results text.
+
+Example (save-only rendering for current buffer):
+
+```lua
+require("nvim-obsidian").setup({
+  vault_root = "/home/user/ObsidianVault",
+  dataview = {
+    render = {
+      when = { "on_save" },
+      scope = "current",
+      patterns = { "*.md" },
+    },
+  },
+})
+```
 
 ## Search Behavior
 

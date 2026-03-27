@@ -129,6 +129,28 @@ Main setup fields:
     }
     ```
 
+- dataview: configuration for dataview rendering behavior
+  - enabled: boolean, enable/disable dataview rendering globally (default: true)
+  - render.when: list of trigger options (default: { "on_open", "on_save" })
+    - on_open -> BufReadPost
+    - on_save -> BufWritePost
+    - on_buf_enter -> BufEnter
+  - render.scope: which buffers to refresh per event (default: "event")
+    - event: only the event buffer (`args.buf`)
+    - current: only current buffer
+    - visible: all visible-window markdown buffers
+    - loaded: all loaded markdown buffers
+  - render.patterns: autocmd pattern list (default: { "*.md" })
+  - placement: where virtual output is rendered (`below_block` or `above_block`, default: `below_block`)
+  - messages.task_no_results:
+    - enabled: boolean (default: true)
+    - text: message for valid TASK query with zero rows
+  - highlights (optional group-name overrides):
+    - header
+    - error
+    - table_link
+    - task_no_results
+
 Example configuration:
 
 ```lua
@@ -136,6 +158,28 @@ require("nvim-obsidian").setup({
   vault_root = "/path/to/vault",
   locale = "pt-BR",
   new_notes_subdir = "10 Notas",
+  dataview = {
+    enabled = true,
+    render = {
+      when = { "on_open", "on_save" },
+      scope = "event",
+      patterns = { "*.md" },
+    },
+    placement = "below_block",
+    messages = {
+      task_no_results = {
+        enabled = true,
+        text = "Dataview: No results to show for task query.",
+      },
+    },
+    highlights = {
+      -- optional overrides by highlight-group name
+      -- header = "markdownLinkText",
+      -- error = "WarningMsg",
+      -- table_link = "markdownLinkText",
+      -- task_no_results = "Comment",
+    },
+  },
   journal = {
     daily = {
       subdir = "11 Diario/11.01 Diario",
@@ -157,6 +201,21 @@ require("nvim-obsidian").setup({
   },
   templates = {
     standard = "08 Templates/Nova nota",
+  },
+})
+```
+
+Minimal example (save-only, current-buffer rendering):
+
+```lua
+require("nvim-obsidian").setup({
+  vault_root = "/path/to/vault",
+  dataview = {
+    render = {
+      when = { "on_save" },
+      scope = "current",
+      patterns = { "*.md" },
+    },
   },
 })
 ```

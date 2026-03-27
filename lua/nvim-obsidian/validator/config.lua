@@ -15,6 +15,88 @@ local function require_string(value, label)
     end
 end
 
+local function require_boolean(value, label)
+    if type(value) ~= "boolean" then
+        error(label .. " must be a boolean")
+    end
+end
+
+local function validate_string_list(value, label)
+    if type(value) ~= "table" or #value == 0 then
+        error(label .. " must be a non-empty list of strings")
+    end
+    for _, v in ipairs(value) do
+        require_string(v, label .. "[]")
+    end
+end
+
+local function validate_optional_hl_group(name, label)
+    if name == nil then
+        return
+    end
+    require_string(name, label)
+end
+
+function M.validate_dataview(cfg)
+    local dv = cfg.dataview
+    if type(dv) ~= "table" then
+        error("dataview must be a table when provided")
+    end
+
+    require_boolean(dv.enabled, "dataview.enabled")
+
+    if type(dv.render) ~= "table" then
+        error("dataview.render must be a table")
+    end
+
+    validate_string_list(dv.render.when, "dataview.render.when")
+    local allowed_when = {
+        on_open = true,
+        on_save = true,
+        on_buf_enter = true,
+    }
+    for _, w in ipairs(dv.render.when) do
+        if not allowed_when[w] then
+            error("dataview.render.when contains invalid option: " .. w)
+        end
+    end
+
+    require_string(dv.render.scope, "dataview.render.scope")
+    local allowed_scope = {
+        event = true,
+        current = true,
+        visible = true,
+        loaded = true,
+    }
+    if not allowed_scope[dv.render.scope] then
+        error("dataview.render.scope must be one of: event,current,visible,loaded")
+    end
+
+    validate_string_list(dv.render.patterns, "dataview.render.patterns")
+
+    require_string(dv.placement, "dataview.placement")
+    if dv.placement ~= "below_block" and dv.placement ~= "above_block" then
+        error("dataview.placement must be one of: below_block,above_block")
+    end
+
+    if type(dv.messages) ~= "table" then
+        error("dataview.messages must be a table")
+    end
+    if type(dv.messages.task_no_results) ~= "table" then
+        error("dataview.messages.task_no_results must be a table")
+    end
+    require_boolean(dv.messages.task_no_results.enabled, "dataview.messages.task_no_results.enabled")
+    require_string(dv.messages.task_no_results.text, "dataview.messages.task_no_results.text")
+
+    if type(dv.highlights) ~= "table" then
+        error("dataview.highlights must be a table")
+    end
+    validate_optional_hl_group(dv.highlights.header, "dataview.highlights.header")
+    validate_optional_hl_group(dv.highlights.error, "dataview.highlights.error")
+    validate_optional_hl_group(dv.highlights.table_link, "dataview.highlights.table_link")
+    validate_optional_hl_group(dv.highlights.task_no_results, "dataview.highlights.task_no_results")
+end
+
 --- Validate journal configuration block
 -- @param cfg table Config object being built
 -- @param user table User-provided options
@@ -69,6 +151,8 @@ function M.validate_config(cfg)
     if cfg.templates and cfg.templates.standard ~= nil then
         require_string(cfg.templates.standard, "templates.standard")
     end
+
+    M.validate_dataview(cfg)
 end
 
 return M

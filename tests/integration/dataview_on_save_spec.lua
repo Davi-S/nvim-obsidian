@@ -257,4 +257,61 @@ describe("integration dataview on save", function()
         assert.is_true(rendered:find("25", 1, true) ~= nil)
         assert.is_true(rendered:find("Carlos", 1, true) == nil)
     end)
+
+    it("respects render.when on_save only", function()
+        local cfg = config.resolve({
+            vault_root = root,
+            locale = "pt-BR",
+            new_notes_subdir = "10 Novas notas",
+            dataview = {
+                render = {
+                    when = { "on_save" },
+                    scope = "event",
+                    patterns = { "*.md" },
+                },
+            },
+            journal = {
+                daily = {
+                    subdir = "11 Diario/11.01 Diario",
+                    title_format = "{{year}} {{month_name}} {{day2}}, {{weekday_name}}",
+                },
+                weekly = {
+                    subdir = "11 Diario/11.02 Semanal",
+                    title_format = "{{iso_year}} semana {{iso_week}}",
+                },
+                monthly = {
+                    subdir = "11 Diario/11.03 Mensal",
+                    title_format = "{{year}} {{month_name}}",
+                },
+                yearly = {
+                    subdir = "11 Diario/11.04 Anual",
+                    title_format = "{{year}}",
+                },
+            },
+        })
+        config.set(cfg)
+        dataview_engine.setup_autocmds()
+
+        local dv_file = root .. "/10 Novas notas/Query only save.md"
+        vim.fn.writefile({
+            "```dataview",
+            "TASK",
+            "FROM \"11 Diario/11.01 Diario\"",
+            "WHERE !checked",
+            "GROUP BY file.link AS foo",
+            "SORT foo.date ASC",
+            "```",
+        }, dv_file)
+
+        vim.cmd("edit " .. vim.fn.fnameescape(dv_file))
+
+        local ns = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
+        local before = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+        assert.are.equal(0, #before)
+
+        vim.cmd("write")
+
+        local after = vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+        assert.is_true(#after >= 1)
+    end)
 end)
