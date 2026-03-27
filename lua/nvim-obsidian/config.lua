@@ -25,9 +25,7 @@ local defaults = {
                 text = "Dataview: No results to show for task query.",
             },
         },
-        highlights = {
-            error = "WarningMsg",
-        },
+        highlights = {},
     },
 }
 

@@ -11,70 +11,41 @@ local function dv_opts(cfg)
                 text = "Dataview: No results to show for task query.",
             },
         },
-        highlights = {
-            error = "WarningMsg",
-        },
+        highlights = {},
     }
     return vim.tbl_deep_extend("force", defaults, cfg or {})
 end
 
-local function hl_fg(name)
-    local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name, link = false })
-    if not ok or not hl then
-        return nil
+local function hl_or_default(name, fallback)
+    if name and vim.fn.hlexists(name) == 1 then
+        return name
     end
-    return hl.fg
+    return fallback
 end
 
 local function ensure_highlights(cfg)
     local opts = dv_opts(cfg)
     local user_hl = opts.highlights or {}
 
-    local header_hl = user_hl.header
-    if header_hl and vim.fn.hlexists(header_hl) == 1 then
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = header_hl, default = false })
-    else
-        local sapphire_fg = hl_fg("markdownLinkText")
-        if not sapphire_fg then
-            sapphire_fg = hl_fg("@lsp.type.class.markdown")
-        end
-        if not sapphire_fg then
-            sapphire_fg = hl_fg("@lsp.type.decorator.markdown")
-        end
+    vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", {
+        link = hl_or_default(user_hl.header, "Normal"),
+        default = false,
+    })
 
-        if sapphire_fg then
-            vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = sapphire_fg, default = false })
-        else
-            local text_fg = hl_fg("Normal")
-            if text_fg then
-                vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { fg = text_fg, default = false })
-            else
-                vim.api.nvim_set_hl(0, "NvimObsidianDataviewHeader", { link = "Normal", default = false })
-            end
-        end
-    end
+    vim.api.nvim_set_hl(0, "NvimObsidianDataviewTableLink", {
+        link = hl_or_default(user_hl.table_link, "Normal"),
+        default = false,
+    })
 
-    local table_link_hl = user_hl.table_link
-    if table_link_hl and vim.fn.hlexists(table_link_hl) == 1 then
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTableLink", { link = table_link_hl, default = false })
-    else
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTableLink", { link = "NvimObsidianDataviewHeader", default = false })
-    end
+    vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults", {
+        link = hl_or_default(user_hl.task_no_results, "Normal"),
+        default = false,
+    })
 
-    local no_results_hl = user_hl.task_no_results
-    if no_results_hl and vim.fn.hlexists(no_results_hl) == 1 then
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults", { link = no_results_hl, default = false })
-    else
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewTaskNoResults",
-        { link = "NvimObsidianDataviewHeader", default = false })
-    end
-
-    local error_hl = user_hl.error or "WarningMsg"
-    if vim.fn.hlexists(error_hl) == 1 then
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", { link = error_hl, default = false })
-    else
-        vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", { link = "WarningMsg", default = false })
-    end
+    vim.api.nvim_set_hl(0, "NvimObsidianDataviewError", {
+        link = hl_or_default(user_hl.error, "Normal"),
+        default = false,
+    })
 end
 
 function M.clear_buffer(bufnr)
