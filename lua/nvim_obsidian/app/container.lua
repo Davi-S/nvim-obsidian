@@ -1,4 +1,5 @@
 local config = require("nvim_obsidian.app.config")
+local notifications = require("nvim_obsidian.adapters.neovim.notifications")
 
 local M = {}
 
@@ -24,7 +25,10 @@ function M.build(user_opts)
         },
         adapters = {
             commands = require("nvim_obsidian.adapters.neovim.commands"),
-            notifications = require("nvim_obsidian.adapters.neovim.notifications"),
+            notifications = notifications.create_notifier({
+                vim = vim,
+                config = opts,
+            }),
             navigation = require("nvim_obsidian.adapters.neovim.navigation"),
             telescope = require("nvim_obsidian.adapters.picker.telescope"),
             cmp_source = require("nvim_obsidian.adapters.completion.cmp_source"),
