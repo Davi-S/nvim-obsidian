@@ -243,6 +243,14 @@ local function register_obsidian_render_dataview(ctx)
     end, { desc = "Render dataview blocks in current buffer" })
 end
 
+local function register_obsidian_health(ctx)
+    create_user_command("ObsidianHealth", function()
+        if ctx and ctx.adapters and ctx.adapters.notifications then
+            ctx.adapters.notifications.info("nvim-obsidian health: ok")
+        end
+    end, { desc = "Check nvim-obsidian adapter wiring health" })
+end
+
 function M.register(container)
     if not container then
         return
@@ -258,6 +266,7 @@ function M.register(container)
     register_obsidian_reindex(container)
     register_obsidian_insert_template(container)
     register_obsidian_render_dataview(container)
+    register_obsidian_health(container)
 end
 
 return M
