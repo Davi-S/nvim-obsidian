@@ -195,7 +195,7 @@ local function register_obsidian_reindex(ctx)
             ctx.adapters.notifications.info("Reindexing vault...")
         end
 
-        local result = ctx.use_cases.reindex_sync.execute(ctx, { kind = "full" })
+        local result = ctx.use_cases.reindex_sync.execute(ctx, { mode = "manual" })
 
         if not result.ok then
             error_to_notification(ctx, result.error)
