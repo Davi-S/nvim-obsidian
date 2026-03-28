@@ -2,7 +2,9 @@
 
 describe("adapter wiring", function()
     it("builds a container with domains, use-cases, and adapters", function()
-        local container = require("nvim_obsidian.app.container").build({})
+        local container = require("nvim_obsidian.app.container").build({
+            vault_root = "/tmp/nvim_obsidian_test_vault",
+        })
 
         assert(type(container) == "table")
         assert(type(container.domains) == "table")
@@ -21,7 +23,9 @@ describe("adapter wiring", function()
     end)
 
     it("registers command adapter during setup", function()
-        require("nvim_obsidian").setup({})
+        require("nvim_obsidian").setup({
+            vault_root = "/tmp/nvim_obsidian_test_vault",
+        })
         local commands = vim.api.nvim_get_commands({ builtin = false })
 
         assert(commands.ObsidianHealth ~= nil, "ObsidianHealth should be registered")
@@ -29,7 +33,7 @@ describe("adapter wiring", function()
 
     it("navigation adapter open_path is no longer phase2 skeleton", function()
         local ok, err = require("nvim_obsidian.adapters.neovim.navigation").open_path(
-        "/tmp/nvim_obsidian_adapter_wiring_test.md")
+            "/tmp/nvim_obsidian_adapter_wiring_test.md")
         assert(type(ok) == "boolean")
         assert(err ~= "phase2-skeleton-not-implemented")
     end)

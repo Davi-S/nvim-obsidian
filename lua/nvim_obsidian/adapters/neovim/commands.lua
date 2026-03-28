@@ -6,7 +6,8 @@ local function create_user_command(name, fn, opts)
     if not vim or not vim.api or not vim.api.nvim_create_user_command then
         return
     end
-    vim.api.nvim_create_user_command(name, fn, opts or {})
+    local merged = vim.tbl_deep_extend("force", { force = true }, opts or {})
+    vim.api.nvim_create_user_command(name, fn, merged)
 end
 
 local function error_to_notification(ctx, error_obj)

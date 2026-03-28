@@ -15,6 +15,7 @@ This document is the execution roadmap for V2. It captures phase goals, delivera
 - Phase 5: Completed
 - Phase 6: Completed
 - Phase 7: Completed
+- Phase 8: In progress (Part 1 complete)
 
 ---
 
@@ -230,6 +231,19 @@ Verification:
 1. API contract tests pass.
 2. Invalid config cases fail with clear messages.
 3. Setup is deterministic and idempotent.
+
+Status notes (March 2026):
+1. Part 1 completed: setup API and config schema foundations.
+   - setup now validates required config through app/config normalization.
+   - setup is deterministic and idempotent for repeated calls with equal options.
+   - plugin load no longer performs implicit setup; setup is explicit/user-driven.
+2. Config schema baseline implemented with clear validation failures:
+   - `vault_root` is required and must be absolute.
+   - sensible defaults are applied for locale/log level/dataview/force-create key.
+   - `new_notes_subdir` defaults deterministically when omitted.
+3. Verification evidence is green:
+   - New API/config unit specs pass.
+   - Existing unit, integration, and e2e suites remain green.
 
 ---
 
