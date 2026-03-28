@@ -96,6 +96,14 @@ Phase 0 specification documents are complete and synchronized:
 Next milestone:
 - Phase 1 ADR authoring.
 
+Phase 1 ADR baseline (Accepted):
+- docs/adr/README.md
+- docs/adr/ADR-001-layering-and-dependency-rules.md
+- docs/adr/ADR-002-domain-boundaries-and-ownership.md
+- docs/adr/ADR-003-public-api-and-command-surface-philosophy.md
+- docs/adr/ADR-004-vault-sync-strategy.md
+- docs/adr/ADR-005-testing-strategy.md
+
 ---
 
 ## Section 5: Decision Log Updates
