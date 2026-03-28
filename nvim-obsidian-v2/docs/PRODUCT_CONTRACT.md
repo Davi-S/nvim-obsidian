@@ -4,6 +4,12 @@ Version: 2.0
 Status: Phase 0 Specification (Revised)
 Date: March 28, 2026
 
+Document role: Canonical source for product requirements and policy semantics.
+Related documents:
+- UX behavior contract: docs/UX_BEHAVIOR_CONTRACT.md
+- Ownership map: docs/DOMAIN_OWNERSHIP_MAP.md
+- Context and decisions: PROJECT_CONTEXT.md
+
 ---
 
 ## Overview
@@ -111,9 +117,6 @@ Clarification on wikilink resolution and ambiguity:
 
 ### 6. Note Creation Workflow
 - [ ] Note creation is primarily handled through :ObsidianOmni and link-follow creation behavior.
-- [ ] Singular-responsibility create commands (for example :ObsidianNew and :ObsidianNewFromTemplate) may exist as internal building blocks and/or advanced commands.
-- [ ] End-user primary workflow remains :ObsidianOmni.
-- [ ] Internal use cases for ensure/create note remain part of architecture.
 
 ### 7. Template System
 - [ ] Template placeholders are user-registered only.

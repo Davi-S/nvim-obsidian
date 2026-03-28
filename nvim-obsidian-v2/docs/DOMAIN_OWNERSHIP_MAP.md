@@ -6,6 +6,8 @@ Date: March 28, 2026
 
 This document maps each feature to an owning domain/service/adapter.
 Ownership is exclusive at the rule level.
+Document role: Canonical source for responsibility ownership only.
+Policy authority: Product rules are canonical in docs/PRODUCT_CONTRACT.md.
 
 ---
 
@@ -110,24 +112,21 @@ Ownership is exclusive at the rule level.
 
 ## Command Set Ownership
 
-| Command                       | Owner                                                    |
-| ----------------------------- | -------------------------------------------------------- |
-| :ObsidianOmni                 | Neovim Adapter + Search Ranking + Note Lifecycle Service |
-| :ObsidianToday                | Neovim Adapter + Journal + Note Lifecycle Service        |
-| :ObsidianNext                 | Neovim Adapter + Journal + Note Lifecycle Service        |
-| :ObsidianPrev                 | Neovim Adapter + Journal + Note Lifecycle Service        |
-| :ObsidianFollow               | Neovim Adapter + Wiki Link + Note Lifecycle Service      |
-| :ObsidianBacklinks            | Neovim Adapter + Wiki Link                               |
-| :ObsidianSearch               | Neovim Adapter                                           |
-| :ObsidianReindex              | Neovim Adapter + Sync Service                            |
-| :ObsidianInsertTemplate [type | path]                                                    | Neovim Adapter + Template + Note Lifecycle Service |
-| :ObsidianRenderDataview       | Neovim Adapter + Query Render Service                    |
+| Command                              | Owner                                                    |
+| ------------------------------------ | -------------------------------------------------------- |
+| :ObsidianOmni                        | Neovim Adapter + Search Ranking + Note Lifecycle Service |
+| :ObsidianToday                       | Neovim Adapter + Journal + Note Lifecycle Service        |
+| :ObsidianNext                        | Neovim Adapter + Journal + Note Lifecycle Service        |
+| :ObsidianPrev                        | Neovim Adapter + Journal + Note Lifecycle Service        |
+| :ObsidianFollow                      | Neovim Adapter + Wiki Link + Note Lifecycle Service      |
+| :ObsidianBacklinks                   | Neovim Adapter + Wiki Link                               |
+| :ObsidianSearch                      | Neovim Adapter                                           |
+| :ObsidianReindex                     | Neovim Adapter + Sync Service                            |
+| :ObsidianInsertTemplate [type\|path] | Neovim Adapter + Template + Note Lifecycle Service       |
+| :ObsidianRenderDataview              | Neovim Adapter + Query Render Service                    |
 
-Not part of primary V2.0 end-user command workflow:
-- :ObsidianYesterday
-- :ObsidianTomorrow
-- :ObsidianNew (not in primary user workflow)
-- :ObsidianNewFromTemplate (not in primary user workflow)
+Command scope authority:
+- See docs/PRODUCT_CONTRACT.md for canonical in-scope vs out-of-primary-workflow command policy.
 
 ---
 

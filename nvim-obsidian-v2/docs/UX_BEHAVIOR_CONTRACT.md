@@ -5,6 +5,8 @@ Status: Phase 0 Specification (Revised)
 Date: March 28, 2026
 
 This document defines observable command behavior, including create/open semantics, warnings, and picker behavior.
+Document role: Canonical source for user-visible command behavior and notifications.
+Policy authority: Product rules are canonical in docs/PRODUCT_CONTRACT.md.
 
 ---
 
@@ -119,37 +121,14 @@ Behavior:
 
 ---
 
-## Link Safety UX
+## Policy References
 
-### Valid link, note missing
-- Action: create note and open it.
-- Notification: info-level creation message (optional configurable).
+- Link safety behavior is specified in docs/PRODUCT_CONTRACT.md under Wiki Link Parsing and Resolution.
+- Omni matching and creation policy is specified in docs/PRODUCT_CONTRACT.md under Omni Search/Create and Text Search.
+- Case sensitivity and identity policy is specified in docs/PRODUCT_CONTRACT.md under Vault Management.
+- Performance and responsiveness requirements are specified in docs/PRODUCT_CONTRACT.md under Performance Characteristics.
 
-### Valid link, note exists, heading/block missing
-- Action: open note normally.
-- Notification: warning that anchor/block was not found.
-
-### Invalid link (not wikilink)
-- Action: no-op.
-- Notification: none by default.
-
-### Ambiguous target
-- Action: disambiguation picker.
-- Definition: multiple canonical targets match the same case-sensitive token (for example path/basename collisions).
-
----
-
-## Fuzzy Matching Policy
-
-- Omni discovery uses fuzzy matching on title, aliases, and relpath.
-- Case-insensitive fuzzy matching enables typo tolerance and fast discovery.
-
-## Case Sensitivity UX
-
-- Canonical note identity remains case-sensitive.
-- Search and completion matching are case-insensitive for discoverability.
-- Wikilink target resolution is case-sensitive and deterministic.
-- Display alias in [[target|alias]] is visual text and not part of resolution.
+This contract captures how those rules appear to users through command behavior and notifications.
 
 ---
 
@@ -182,7 +161,7 @@ All major behaviors are configurable, including:
 
 Top-level requirement: no noticeable UI lag.
 
-Behavioral implications:
+Operational UX implications:
 - Heavy operations are async/non-blocking.
 - Picker interactions remain responsive.
 - Dataview rendering can be scoped to reduce cost.
