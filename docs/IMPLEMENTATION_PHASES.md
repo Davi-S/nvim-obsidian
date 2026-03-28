@@ -233,17 +233,28 @@ Verification:
 3. Setup is deterministic and idempotent.
 
 Status notes (March 2026):
-1. Part 1 completed: setup API and config schema foundations.
-   - setup now validates required config through app/config normalization.
-   - setup is deterministic and idempotent for repeated calls with equal options.
-   - plugin load no longer performs implicit setup; setup is explicit/user-driven.
-2. Config schema baseline implemented with clear validation failures:
-   - `vault_root` is required and must be absolute.
-   - sensible defaults are applied for locale/log level/dataview/force-create key.
-   - `new_notes_subdir` defaults deterministically when omitted.
-3. Verification evidence is green:
-   - New API/config unit specs pass.
-   - Existing unit, integration, and e2e suites remain green.
+
+**Part 1: Setup API & Config Schema Foundations** ✅ Complete
+- setup now validates required config through app/config normalization.
+- setup is deterministic and idempotent for repeated calls with equal options.
+- plugin load no longer performs implicit setup; setup is explicit/user-driven.
+- `vault_root` is required and must be absolute.
+- sensible defaults are applied for locale/log level/dataview/force-create key.
+- Verification: New API/config unit specs pass. All unit, integration, and e2e suites green.
+
+**Part 2: Config Schema Validation Expansion** ✅ Complete
+- Full dataview schema validation (render.when, render.scope, render.patterns, placement, messages).
+- Optional journal section validation (daily/weekly/monthly/yearly with required subdir + title_format).
+- Strict enum validation for log_level ("error", "warn", "info"), dataview triggers (on_open, on_save, on_buf_enter), dataview scope (event, current, visible, loaded), dataview placement (below_block, above_block).
+- Clear fastfail error messages for all invalid configuration cases.
+- Validation functions: validate_enum(), validate_string_list(), validate_dataview(), validate_journal().
+- Verification: 11 new unit test cases in config_schema_spec.lua covering all invalid enum/shape scenarios. All unit, integration, and e2e suites remain green. See docs/PHASE_8_CONFIG_SCHEMA.md for full contract.
+
+**Part 3: Pending** ⏳
+- User-facing API documentation (README update with config examples).
+- Full command set documentation (all 10 commands defined).
+- Config error recovery hints.
+- API reference for setup() contract and returned container shape.
 
 ---
 

@@ -49,4 +49,95 @@ describe("app config schema", function()
         local _ = config.normalize(user)
         assert.same(before, user)
     end)
+
+    it("rejects invalid log_level", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            log_level = "debug",
+        })
+        assert.is_false(ok)
+        assert.matches("log_level has invalid value", tostring(err))
+    end)
+
+    it("rejects invalid dataview render scope", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            dataview = {
+                render = {
+                    scope = "workspace",
+                },
+            },
+        })
+        assert.is_false(ok)
+        assert.matches("dataview.render.scope has invalid value", tostring(err))
+    end)
+
+    it("rejects invalid dataview render trigger", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            dataview = {
+                render = {
+                    when = { "on_open", "on_write" },
+                },
+            },
+        })
+        assert.is_false(ok)
+        assert.matches("dataview.render.when has invalid value", tostring(err))
+    end)
+
+    it("rejects invalid dataview placement", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            dataview = {
+                placement = "inline",
+            },
+        })
+        assert.is_false(ok)
+        assert.matches("dataview.placement has invalid value", tostring(err))
+    end)
+
+    it("rejects invalid dataview patterns type", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            dataview = {
+                render = {
+                    patterns = "*.md",
+                },
+            },
+        })
+        assert.is_false(ok)
+        assert.matches("dataview.render.patterns must be a list of strings", tostring(err))
+    end)
+
+    it("rejects invalid journal section shape when provided", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            journal = {
+                daily = {
+                    subdir = "journal/daily",
+                },
+            },
+        })
+        assert.is_false(ok)
+        assert.is_truthy(tostring(err):find("journal.daily.title_format must be a non-empty string", 1, true))
+    end)
+
+    it("accepts valid optional journal configuration", function()
+        local opts = config.normalize({
+            vault_root = "/tmp/nvim_obsidian_vault",
+            journal = {
+                daily = {
+                    subdir = "journal/daily",
+                    title_format = "{{year}}-{{month}}-{{day}}",
+                },
+                weekly = {
+                    subdir = "journal/weekly",
+                    title_format = "{{iso_year}}-W{{iso_week}}",
+                },
+            },
+        })
+
+        assert.equals("journal/daily", opts.journal.daily.subdir)
+        assert.equals("journal/weekly", opts.journal.weekly.subdir)
+    end)
 end)
