@@ -14,7 +14,7 @@ This document is the execution roadmap for V2. It captures phase goals, delivera
 - Phase 4: Completed
 - Phase 5: Completed
 - Phase 6: Completed
-- Phase 7: Not started
+- Phase 7: Completed
 
 ---
 
@@ -196,6 +196,23 @@ Verification:
 1. Integration tests validate adapter-to-use-case wiring.
 2. No business rules introduced in adapters.
 3. Adapter failures produce normalized domain/app errors.
+
+Status notes (March 2026):
+1. All seven Phase 7 adapter deliverables are implemented:
+   - Neovim command adapter
+   - Telescope picker adapter
+   - Completion source adapter
+   - Buffer/window navigation adapter
+   - Notification adapter
+   - File IO and watcher adapter
+   - Parser adapters (frontmatter/markdown extraction)
+2. Strict-cleanup pass completed to satisfy architecture checks:
+   - Command orchestration for backlinks/search/template is delegated to use cases.
+   - Adapter failure paths were normalized to structured domain/app errors.
+3. Verification evidence is green:
+   - Unit suite passes.
+   - Adapter wiring integration tests pass.
+   - E2E command smoke test passes.
 
 ---
 
