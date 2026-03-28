@@ -99,13 +99,19 @@ Execution roadmap:
 Current phase progression:
 - Phase 0 completed
 - Phase 1 completed (ADRs accepted)
-- Phase 2 in progress
+- Phase 2 completed
+- Phase 3 in progress
 
 Phase 2 artifacts:
 - docs/REPOSITORY_LAYOUT.md
 - docs/COMPOSITION_ROOT.md
 - docs/DEPENDENCY_RULES.md
 - docs/PHASE_2_REVIEW.md
+
+Phase 3 artifacts:
+- docs/DOMAIN_AND_USECASE_CONTRACTS.md
+- docs/PHASE_3_REVIEW.md
+- lua/nvim_obsidian_v2/core/shared/primitives.lua
 
 Phase 1 ADR baseline (Accepted):
 - docs/adr/README.md
