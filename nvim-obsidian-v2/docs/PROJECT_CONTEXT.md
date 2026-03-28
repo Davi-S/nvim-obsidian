@@ -93,8 +93,13 @@ Phase 0 specification documents are complete and synchronized:
 - docs/DOMAIN_OWNERSHIP_MAP.md
 - PHASE_0_REVIEW.md
 
-Next milestone:
-- Phase 1 ADR authoring.
+Execution roadmap:
+- docs/IMPLEMENTATION_PHASES.md
+
+Current phase progression:
+- Phase 0 completed
+- Phase 1 completed (ADRs accepted)
+- Phase 2 next
 
 Phase 1 ADR baseline (Accepted):
 - docs/adr/README.md
