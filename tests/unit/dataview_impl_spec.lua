@@ -99,4 +99,31 @@ describe("dataview domain impl", function()
         assert.is_not_nil(out.error)
         assert.equals("invalid_input", out.error.code)
     end)
+
+    it("filters deterministically for FROM #tag", function()
+        local block = {
+            query = {
+                kind = "task",
+                from_kind = "tag",
+                from_value = "work",
+                where_title_eq = nil,
+                sort_field = nil,
+                sort_dir = "ASC",
+            },
+        }
+
+        local notes = {
+            { path = "notes/1.md", title = "A", tags = { "#work" } },
+            { path = "notes/2.md", title = "B", tags = { "home" } },
+            { path = "notes/3.md", title = "C", tags = { "work", "x" } },
+            { path = "notes/4.md", title = "D" },
+        }
+
+        local out = dataview.execute_query(block, notes)
+        assert.is_nil(out.error)
+        assert.equals("task", out.result.kind)
+        assert.equals(2, #out.result.rows)
+        assert.equals("notes/1.md", out.result.rows[1].file.path)
+        assert.equals("notes/3.md", out.result.rows[2].file.path)
+    end)
 end)

@@ -3,14 +3,53 @@ local errors = require("nvim_obsidian.core.shared.errors")
 local M = {}
 
 local function trim(s)
-    return vim.trim(s or "")
+    local text = tostring(s or "")
+    return (text:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 local function split_lines(text)
-    if text == "" then
+    local src = tostring(text or "")
+    if src == "" then
         return {}
     end
-    return vim.split(text, "\n", { plain = true })
+    local out = {}
+    local start = 1
+    while true do
+        local nl = src:find("\n", start, true)
+        if not nl then
+            table.insert(out, src:sub(start))
+            break
+        end
+        table.insert(out, src:sub(start, nl - 1))
+        start = nl + 1
+    end
+    return out
+end
+
+local function normalize_tag(tag)
+    local t = trim(tag):lower()
+    if t:sub(1, 1) == "#" then
+        t = t:sub(2)
+    end
+    return t
+end
+
+local function note_has_tag(note, tag)
+    if type(note.tags) ~= "table" then
+        return false
+    end
+
+    local target = normalize_tag(tag)
+    if target == "" then
+        return false
+    end
+
+    for _, raw in ipairs(note.tags) do
+        if normalize_tag(raw) == target then
+            return true
+        end
+    end
+    return false
 end
 
 local function parse_block_query(body_lines)
@@ -169,8 +208,11 @@ local function note_matches_from(note, query)
         return prefix == "" or path:sub(1, #prefix) == prefix
     end
 
-    -- Tag-based filtering is adapter-backed in later phases; for domain baseline we include all notes.
-    return true
+    if query.from_kind == "tag" then
+        return note_has_tag(note, query.from_value)
+    end
+
+    return false
 end
 
 local function apply_where(notes, query)
@@ -257,6 +299,7 @@ function M.execute_query(block, notes)
                     path = tostring(n.path or ""),
                     title = tostring(n.title or ""),
                     aliases = type(n.aliases) == "table" and n.aliases or {},
+                    tags = type(n.tags) == "table" and n.tags or {},
                 })
             end
         end

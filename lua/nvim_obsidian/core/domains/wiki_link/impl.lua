@@ -3,7 +3,8 @@ local errors = require("nvim_obsidian.core.shared.errors")
 local M = {}
 
 local function trim(text)
-    return vim.trim(text or "")
+    local s = tostring(text or "")
+    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 local function basename(path)

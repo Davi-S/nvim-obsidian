@@ -5,7 +5,8 @@ local function lower(s)
 end
 
 local function trim(s)
-    return vim.trim(s or "")
+    local text = tostring(s or "")
+    return (text:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 local function contains_ci(haystack, needle)

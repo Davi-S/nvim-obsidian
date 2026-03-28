@@ -60,7 +60,8 @@ local PT_MONTHS = {
 }
 
 local function trim(text)
-    return vim.trim(text or "")
+    local s = tostring(text or "")
+    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 local function normalize_date_input(date)
