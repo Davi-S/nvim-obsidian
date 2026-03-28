@@ -190,4 +190,14 @@ describe("reindex_sync use case", function()
         assert.is_false(out.ok)
         assert.equals("internal", out.error.code)
     end)
+
+    it("returns internal when atomic replace hook is missing for full reindex", function()
+        local ctx = base_ctx({
+            replace_catalog = false,
+        })
+
+        local out = use_case.execute(ctx, { mode = "manual", event = nil })
+        assert.is_false(out.ok)
+        assert.equals("internal", out.error.code)
+    end)
 end)

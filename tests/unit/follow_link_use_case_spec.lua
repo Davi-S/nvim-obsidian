@@ -59,6 +59,9 @@ describe("follow_link use case", function()
                     table.insert(warned, msg)
                 end,
             },
+            open_disambiguation_picker = function()
+                return { action = "cancel" }
+            end,
             anchor_exists = function()
                 return true
             end,
@@ -185,6 +188,80 @@ describe("follow_link use case", function()
         assert.is_true(out.ok)
         assert.equals("ambiguous", out.status)
         assert.equals(1, #ctx._warned)
+    end)
+
+    it("opens selected target from disambiguation picker", function()
+        local ctx = base_ctx({
+            wiki_link = {
+                parse_at_cursor = function()
+                    return {
+                        target = {
+                            raw = "[[Foo]]",
+                            note_ref = "Foo",
+                            anchor = nil,
+                            block_id = nil,
+                            display_alias = nil,
+                        },
+                        error = nil,
+                    }
+                end,
+                resolve_target = function()
+                    return {
+                        status = "ambiguous",
+                        resolved_path = nil,
+                        ambiguous_matches = {
+                            { path = "a/foo.md" },
+                            { path = "b/foo.md" },
+                        },
+                    }
+                end,
+            },
+            open_disambiguation_picker = function()
+                return { path = "b/foo.md" }
+            end,
+        })
+
+        local out = run(ctx)
+        assert.is_true(out.ok)
+        assert.equals("opened", out.status)
+        assert.equals("b/foo.md", ctx._opened[1])
+    end)
+
+    it("returns invalid when ambiguous target has no disambiguation picker", function()
+        local ctx = base_ctx({
+            wiki_link = {
+                parse_at_cursor = function()
+                    return {
+                        target = {
+                            raw = "[[Foo]]",
+                            note_ref = "Foo",
+                            anchor = nil,
+                            block_id = nil,
+                            display_alias = nil,
+                        },
+                        error = nil,
+                    }
+                end,
+                resolve_target = function()
+                    return {
+                        status = "ambiguous",
+                        resolved_path = nil,
+                        ambiguous_matches = {
+                            { path = "a/foo.md" },
+                            { path = "b/foo.md" },
+                        },
+                    }
+                end,
+            },
+            pick_ambiguous_target = false,
+            open_disambiguation_picker = false,
+            telescope = false,
+        })
+
+        local out = run(ctx)
+        assert.is_false(out.ok)
+        assert.equals("invalid", out.status)
+        assert.equals("invalid_input", out.error.code)
     end)
 
     it("returns missing_anchor when heading or block target is absent", function()

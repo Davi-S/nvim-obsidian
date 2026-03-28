@@ -47,6 +47,11 @@ describe("search_open_create use case", function()
                     }
                 end,
             },
+            journal = {
+                classify_input = function(_raw)
+                    return { kind = "none" }
+                end,
+            },
             open_omni_picker = function(payload)
                 picker_payload = payload
                 return {
@@ -132,6 +137,31 @@ describe("search_open_create use case", function()
         assert.equals("notes/gamma.md", out.path)
         assert.equals(true, ctx._ensured[1].create_if_missing)
         assert.equals("Gamma", ctx._ensured[1].title_or_token)
+    end)
+
+    it("routes omni create through journal origin when classifier matches", function()
+        local ctx = base_ctx({
+            journal = {
+                classify_input = function(_raw)
+                    return { kind = "daily" }
+                end,
+            },
+            open_omni_picker = function(_payload)
+                return {
+                    action = "create",
+                    query = "2026-03-28",
+                }
+            end,
+        })
+
+        local out = run(ctx, {
+            query = "2026-03",
+            allow_force_create = true,
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("created", out.action)
+        assert.equals("journal", ctx._ensured[1].origin)
     end)
 
     it("forbids create when exact/full match exists", function()

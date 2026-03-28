@@ -128,7 +128,7 @@ function M.execute(_ctx, _input)
     for _, entry in ipairs(ranked) do
         local candidate = entry.candidate or {}
         local label = (search_ranking.select_display(query, candidate, display_separator) or {}).label or
-        tostring(candidate.title or "")
+            tostring(candidate.title or "")
         table.insert(items, {
             label = label,
             rank = entry.rank,
@@ -158,11 +158,11 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local function run_ensure(title_or_token, create_if_missing)
+    local function run_ensure(title_or_token, create_if_missing, origin)
         local out = ensure_open_note.execute(ctx, {
             title_or_token = title_or_token,
             create_if_missing = create_if_missing,
-            origin = "omni",
+            origin = origin or "omni",
         })
 
         if not out.ok then
@@ -207,7 +207,7 @@ function M.execute(_ctx, _input)
             }
         end
 
-        return run_ensure(token, false)
+        return run_ensure(token, false, "omni")
     end
 
     if picker_result.action == "create" then
@@ -231,7 +231,16 @@ function M.execute(_ctx, _input)
             }
         end
 
-        return run_ensure(create_query, true)
+        local create_origin = "omni"
+        if type(ctx.journal) == "table" and type(ctx.journal.classify_input) == "function" then
+            local classified = ctx.journal.classify_input(create_query, input.now)
+            local kind = tostring((classified and classified.kind) or "none")
+            if kind ~= "none" then
+                create_origin = "journal"
+            end
+        end
+
+        return run_ensure(create_query, true, create_origin)
     end
 
     return {

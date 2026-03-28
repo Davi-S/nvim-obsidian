@@ -9,6 +9,7 @@ M.contract = {
         "wiki_link",
         "vault_catalog",
         "ensure_open_note",
+        "picker.telescope",
         "neovim.navigation",
         "neovim.notifications",
     },
@@ -136,10 +137,69 @@ function M.execute(_ctx, _input)
     end
 
     if resolved.status == "ambiguous" then
-        maybe_warn("ObsidianFollow: ambiguous target")
+        local pick_ambiguous = ctx.pick_ambiguous_target
+        if type(pick_ambiguous) ~= "function" and type(ctx.open_disambiguation_picker) == "function" then
+            pick_ambiguous = ctx.open_disambiguation_picker
+        end
+        if type(pick_ambiguous) ~= "function" and type(ctx.telescope) == "table" and type(ctx.telescope.open_disambiguation) == "function" then
+            pick_ambiguous = ctx.telescope.open_disambiguation
+        end
+
+        if type(pick_ambiguous) ~= "function" then
+            return {
+                ok = false,
+                status = "invalid",
+                error = errors.new(errors.codes.INVALID_INPUT, "ambiguous target requires disambiguation picker"),
+            }
+        end
+
+        local picked = pick_ambiguous({
+            target = target,
+            matches = resolved.ambiguous_matches or {},
+            buffer_path = input.buffer_path,
+        })
+
+        local picked_path = nil
+        if type(picked) == "string" then
+            picked_path = picked
+        elseif type(picked) == "table" then
+            if picked.action == "cancel" then
+                picked_path = nil
+            else
+                picked_path = tostring(picked.path or ((picked.item or {}).path or ""))
+                if picked_path == "" and type((picked.item or {}).candidate) == "table" then
+                    picked_path = tostring(picked.item.candidate.path or "")
+                end
+                if picked_path == "" then
+                    picked_path = nil
+                end
+            end
+        end
+
+        if not picked_path then
+            maybe_warn("ObsidianFollow: ambiguous target")
+            return {
+                ok = true,
+                status = "ambiguous",
+                error = nil,
+            }
+        end
+
+        local opened, open_err = navigation.open_path(picked_path)
+        if not opened then
+            return {
+                ok = false,
+                status = "invalid",
+                error = errors.new(errors.codes.INTERNAL, "failed to open disambiguation target", {
+                    path = picked_path,
+                    reason = open_err,
+                }),
+            }
+        end
+
         return {
             ok = true,
-            status = "ambiguous",
+            status = "opened",
             error = nil,
         }
     end

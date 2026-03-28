@@ -159,28 +159,25 @@ function M.execute(_ctx, _input)
             end
         end
 
-        if type(ctx.replace_catalog) == "function" then
-            local ok, replace_err = ctx.replace_catalog(rebuilt)
-            if not ok then
-                return {
-                    ok = false,
-                    stats = nil,
-                    error = errors.new(errors.codes.INTERNAL, "failed to replace vault catalog", {
-                        reason = replace_err,
-                    }),
-                }
-            end
-            stats.upserted = #rebuilt
-        else
-            for _, note in ipairs(rebuilt) do
-                local upsert = vault_catalog.upsert_note(note)
-                if upsert and upsert.ok then
-                    stats.upserted = stats.upserted + 1
-                else
-                    stats.errors = stats.errors + 1
-                end
-            end
+        if type(ctx.replace_catalog) ~= "function" then
+            return {
+                ok = false,
+                stats = nil,
+                error = errors.new(errors.codes.INTERNAL, "replace_catalog hook is required for atomic full reindex"),
+            }
         end
+
+        local ok, replace_err = ctx.replace_catalog(rebuilt)
+        if not ok then
+            return {
+                ok = false,
+                stats = nil,
+                error = errors.new(errors.codes.INTERNAL, "failed to replace vault catalog", {
+                    reason = replace_err,
+                }),
+            }
+        end
+        stats.upserted = #rebuilt
 
         if mode == "startup" and type(watcher) == "table" and type(watcher.start) == "function" then
             local started, start_err = watcher.start(ctx)

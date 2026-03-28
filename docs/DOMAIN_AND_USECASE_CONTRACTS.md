@@ -93,3 +93,59 @@ Semantics contract:
 
 - Domain functions return structured error objects (`code`, `message`, optional `meta`) instead of raising runtime exceptions for expected failures.
 - Deterministic non-error outcomes use canonical status/result fields defined by each domain contract.
+
+## Phase 6 Use-Case Invariants
+
+This section captures orchestration invariants introduced by Phase 6 use-case implementations.
+
+### Ensure/Open Note
+
+- Title/token validation is enforced before any catalog or filesystem interaction.
+- Single match opens existing note; multiple matches return `ambiguous_target` (error-code based).
+- Missing note honors `create_if_missing`; disabled creation returns `not_found`.
+- Journal origin uses journal-aware pathing behavior; non-journal origin uses default note pathing.
+
+### Follow Link
+
+- Cursor-not-on-link is a no-op success with `invalid` status (non-crashing behavior).
+- Resolution status is deterministic: `resolved|missing|ambiguous` from wiki link domain.
+- Missing targets delegate to `ensure_open_note` with create enabled and `origin = "link"`.
+- Ambiguous targets require disambiguation picker support; cancel preserves `ambiguous` status.
+- Heading/block anchors degrade to `missing_anchor` with warning when unresolved.
+
+### Reindex/Sync
+
+- Full reindex (`startup|manual`) rebuilds note set then atomically swaps catalog state.
+- Atomic full reindex requires replacement hook; missing hook is `internal` error.
+- Incremental sync (`event`) supports `create|modify|delete|rename` with deterministic stats.
+- Startup mode starts watcher only after successful full rebuild.
+
+### Render Query Blocks
+
+- Trigger gating is explicit and deterministic (`on_save|manual`).
+- Parse/execute/render pipeline continues across blocks while capturing per-block execution errors.
+- Patch application failure returns `internal`; parse warnings may still render valid blocks.
+
+### Search/Open/Create
+
+- Picker action drives deterministic outcome: `cancelled|opened|created`.
+- Create is forbidden when exact/full title match exists unless explicit force behavior is allowed.
+- Omni create path classifies query for journal intent and forwards origin accordingly.
+- All open/create actions delegate to `ensure_open_note` rather than duplicating note logic.
+
+## Phase 6 Use-Case Error Semantics
+
+- `invalid_input`:
+	- Missing required ports or malformed input payloads.
+	- Invalid mode/trigger/event kinds.
+- `not_found`:
+	- Creation disabled while target does not exist.
+- `ambiguous_target`:
+	- Multiple candidate note matches for ensure/open behavior.
+- `internal`:
+	- Filesystem/write/open failures, atomic replacement failures, or missing required runtime hooks.
+
+Use-case semantics contract:
+
+- Use cases normalize failures into structured domain errors and avoid leaking adapter-specific exceptions.
+- Use cases orchestrate domain behavior and ports only; domain/business rules remain outside adapters.

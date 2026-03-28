@@ -11,7 +11,10 @@ This document is the execution roadmap for V2. It captures phase goals, delivera
 - Phase 1: Completed and approved (ADRs accepted)
 - Phase 2: Completed
 - Phase 3: Completed
-- Phase 4: In progress
+- Phase 4: Completed
+- Phase 5: Completed
+- Phase 6: Completed
+- Phase 7: Not started
 
 ---
 
@@ -161,6 +164,18 @@ Verification:
 1. Use-case tests pass with mocked ports/adapters.
 2. Happy path and failure paths verified for each use case.
 3. No adapter-specific code in use cases.
+
+Status notes (March 2026):
+1. All five Phase 6 workflows are implemented and unit-tested:
+   - Ensure note workflow
+   - Follow link workflow
+   - Reindex/sync workflow
+   - Dataview render workflow
+   - Search/open/create workflow
+2. Contract-alignment gaps identified during review were patched:
+   - Omni create path routes through journal classification when applicable.
+   - Follow-link ambiguous targets support disambiguation picker flow.
+   - Full reindex enforces atomic catalog replacement via required hook.
 
 ---
 
