@@ -9,7 +9,7 @@ This document is the execution roadmap for V2. It captures phase goals, delivera
 
 - Phase 0: Completed
 - Phase 1: Completed and approved (ADRs accepted)
-- Phase 2: Next
+- Phase 2: In progress
 
 ---
 
