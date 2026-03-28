@@ -37,6 +37,9 @@ function M.build(user_opts)
             reindex_sync = require("nvim_obsidian.use_cases.reindex_sync"),
             render_query_blocks = require("nvim_obsidian.use_cases.render_query_blocks"),
             search_open_create = require("nvim_obsidian.use_cases.search_open_create"),
+            show_backlinks = require("nvim_obsidian.use_cases.show_backlinks"),
+            vault_search = require("nvim_obsidian.use_cases.vault_search"),
+            insert_template = require("nvim_obsidian.use_cases.insert_template"),
         },
         adapters = adapter_set,
 

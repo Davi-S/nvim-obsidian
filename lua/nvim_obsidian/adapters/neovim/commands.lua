@@ -42,11 +42,6 @@ local function split_lines(text)
     return out
 end
 
-local function basename(path)
-    local p = tostring(path or ""):gsub("\\", "/")
-    return p:match("[^/]+$") or p
-end
-
 local function get_current_buffer_path()
     if not vim or not vim.api or type(vim.api.nvim_buf_get_name) ~= "function" then
         return nil
@@ -198,154 +193,52 @@ end
 
 local function register_obsidian_backlinks(ctx)
     create_user_command("ObsidianBacklinks", function()
-        if not ctx or not ctx.adapters then
-            return
-        end
-
-        local notifications = ctx.adapters.notifications
-        local telescope = ctx.adapters.telescope
-        local navigation = ctx.adapters.navigation
-        local fs_io = ctx.fs_io or (ctx.adapters and ctx.adapters.fs_io)
-        local markdown = ctx.markdown or (ctx.adapters and ctx.adapters.markdown)
-        local vault_catalog = ctx.vault_catalog
-
-        if type(vault_catalog) ~= "table" or type(vault_catalog.list_notes) ~= "function" then
-            if notifications and notifications.warn then
-                notifications.warn("Backlinks unavailable: vault catalog list_notes is missing")
-            end
+        if not ctx or not ctx.use_cases or not ctx.use_cases.show_backlinks then
             return
         end
 
         local current_path = get_current_buffer_path()
         if not current_path then
+            local notifications = ctx.adapters and ctx.adapters.notifications
             if notifications and notifications.warn then
                 notifications.warn("Backlinks unavailable: current buffer has no path")
             end
             return
         end
 
-        local notes = vault_catalog.list_notes() or {}
-        local by_path = {}
-        local current_note = nil
-        for _, note in ipairs(notes) do
-            if type(note) == "table" and type(note.path) == "string" then
-                by_path[note.path] = note
-                if note.path == current_path then
-                    current_note = note
-                end
-            end
-        end
-
-        if not current_note then
-            if notifications and notifications.warn then
-                notifications.warn("Backlinks unavailable: current note is not indexed")
-            end
-            return
-        end
-
-        if type(fs_io) ~= "table" or type(fs_io.list_markdown_files) ~= "function" or type(fs_io.read_file) ~= "function" then
-            if notifications and notifications.warn then
-                notifications.warn("Backlinks unavailable: filesystem adapter is missing")
-            end
-            return
-        end
-
-        if type(markdown) ~= "table" or type(markdown.extract_wikilinks) ~= "function" then
-            if notifications and notifications.warn then
-                notifications.warn("Backlinks unavailable: markdown parser adapter is missing")
-            end
-            return
-        end
-
-        local token_map = {}
-        token_map[tostring(current_note.title or "")] = true
-        for _, alias in ipairs(current_note.aliases or {}) do
-            token_map[tostring(alias)] = true
-        end
-
-        local root = (ctx.config and ctx.config.vault_root) or (vim and vim.fn and vim.fn.getcwd and vim.fn.getcwd())
-        local files = fs_io.list_markdown_files(root) or {}
-        local matches = {}
-        local seen = {}
-
-        for _, path in ipairs(files) do
-            if path ~= current_path then
-                local content = fs_io.read_file(path)
-                if type(content) == "string" then
-                    local links = markdown.extract_wikilinks(content) or {}
-                    for _, link in ipairs(links) do
-                        local ref = tostring(link.note_ref or "")
-                        if token_map[ref] and not seen[path] then
-                            seen[path] = true
-                            local n = by_path[path] or {
-                                path = path,
-                                title = basename(path):gsub("%.md$", ""),
-                                aliases = {},
-                            }
-                            table.insert(matches, n)
-                        end
-                    end
-                end
-            end
-        end
-
-        if #matches == 0 then
-            if notifications and notifications.info then
-                notifications.info({
-                    command = "ObsidianBacklinks",
-                    message = "No backlinks found",
-                    target = current_note.path,
-                })
-            end
-            return
-        end
-
-        if type(telescope) ~= "table" or type(telescope.open_disambiguation) ~= "function" then
-            if notifications and notifications.warn then
-                notifications.warn("Backlinks found but picker adapter is unavailable")
-            end
-            return
-        end
-
-        local picked = telescope.open_disambiguation({
-            target = { note_ref = current_note.title },
-            matches = matches,
+        local result = ctx.use_cases.show_backlinks.execute(ctx, {
             buffer_path = current_path,
         })
 
-        if type(picked) == "table" and picked.action == "open" and type(picked.path) == "string" then
-            if navigation and type(navigation.open_path) == "function" then
-                navigation.open_path(picked.path)
-            end
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+
+        if result.match_count == 0 and ctx.adapters and ctx.adapters.notifications then
+            ctx.adapters.notifications.info({
+                command = "ObsidianBacklinks",
+                message = "No backlinks found",
+                target = current_path,
+            })
         end
     end, { desc = "Show notes linking to current note" })
 end
 
 local function register_obsidian_search(ctx)
     create_user_command("ObsidianSearch", function()
-        if not ctx or not ctx.adapters then
+        if not ctx or not ctx.use_cases or not ctx.use_cases.vault_search then
             return
         end
 
-        local telescope = ctx.adapters.telescope
-        local navigation = ctx.adapters.navigation
-        local notifications = ctx.adapters.notifications
-        local root = (ctx.config and ctx.config.vault_root) or (vim and vim.fn and vim.fn.getcwd and vim.fn.getcwd())
-
-        if type(telescope) ~= "table" or type(telescope.open_search) ~= "function" then
-            if notifications and notifications.warn then
-                notifications.warn("Search unavailable: telescope search adapter is missing")
-            end
+        local result = ctx.use_cases.vault_search.execute(ctx, {})
+        if not result.ok then
+            error_to_notification(ctx, result.error)
             return
         end
 
-        local ok = telescope.open_search({
-            root = root,
-            navigation = navigation,
-        })
-
-        if not ok and notifications and notifications.info then
-            notifications.info({
+        if not result.selected and ctx.adapters and ctx.adapters.notifications then
+            ctx.adapters.notifications.info({
                 command = "ObsidianSearch",
                 message = "No search result selected",
             })
@@ -378,72 +271,37 @@ end
 
 local function register_obsidian_insert_template(ctx)
     create_user_command("ObsidianInsertTemplate", function(cmd)
-        if not ctx or not ctx.adapters then
+        if not ctx or not ctx.use_cases or not ctx.use_cases.insert_template then
             return
         end
 
-        local notifications = ctx.adapters.notifications
-        local fs_io = ctx.fs_io or (ctx.adapters and ctx.adapters.fs_io)
         local query = trim((cmd and cmd.args) or "")
-        local template_content = nil
+        local result = ctx.use_cases.insert_template.execute(ctx, {
+            query = query,
+            now = os.time(),
+        })
 
-        if query and type(ctx.resolve_template_content) == "function" then
-            local resolved = ctx.resolve_template_content({
-                query = query,
-                command = "ObsidianInsertTemplate",
-            })
-            if type(resolved) == "string" and resolved ~= "" then
-                template_content = resolved
-            end
-        end
-
-        if not template_content and query and type(fs_io) == "table" and type(fs_io.read_file) == "function" then
-            local content = fs_io.read_file(query)
-            if type(content) == "string" and content ~= "" then
-                template_content = content
-            end
-        end
-
-        if not template_content then
-            if notifications and notifications.warn then
-                notifications.warn({
+        if not result.ok then
+            if ctx.adapters and ctx.adapters.notifications and result.error and result.error.code == "not_found" then
+                ctx.adapters.notifications.warn({
                     command = "ObsidianInsertTemplate",
                     message = "Template not found",
                     target = query or "<picker>",
                     next_step = "Provide a template path or configure resolve_template_content",
                 })
+                return
             end
+
+            error_to_notification(ctx, result.error)
             return
         end
 
-        local rendered = template_content
-        if type(ctx.template) == "table" and type(ctx.template.render) == "function" then
-            local out = ctx.template.render(template_content, {
-                now = os.time(),
-                date = os.date("%Y-%m-%d"),
+        if ctx.adapters and ctx.adapters.notifications then
+            ctx.adapters.notifications.info({
                 command = "ObsidianInsertTemplate",
+                message = "Template inserted",
+                target = query,
             })
-            if type(out) == "table" and type(out.rendered) == "string" then
-                rendered = out.rendered
-            elseif type(out) == "string" then
-                rendered = out
-            end
-        end
-
-        if vim and vim.api and type(vim.api.nvim_put) == "function" then
-            local lines = split_lines(rendered)
-            pcall(vim.api.nvim_put, lines, "c", true, true)
-            if notifications and notifications.info then
-                notifications.info({
-                    command = "ObsidianInsertTemplate",
-                    message = "Template inserted",
-                    target = query,
-                })
-            end
-        else
-            if notifications and notifications.warn then
-                notifications.warn("Template insertion unavailable: nvim_put is missing")
-            end
         end
     end, { desc = "Insert rendered template at cursor", nargs = "?" })
 end

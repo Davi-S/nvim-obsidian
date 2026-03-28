@@ -2,6 +2,7 @@
 
 local io_adapter = require("nvim_obsidian.adapters.filesystem.io")
 local watcher = require("nvim_obsidian.adapters.filesystem.watcher")
+local errors = require("nvim_obsidian.core.shared.errors")
 
 describe("filesystem adapters", function()
     local original_vim
@@ -40,7 +41,8 @@ describe("filesystem adapters", function()
         it("should return error for missing file", function()
             local content, err = io_adapter.read_file(temp_root .. "/missing.md")
             assert.is_nil(content)
-            assert.is_string(err)
+            assert.is_table(err)
+            assert.equals(errors.codes.NOT_FOUND, err.code)
         end)
 
         it("should write file contents and create parent directories", function()
@@ -135,7 +137,8 @@ describe("filesystem adapters", function()
             local started, err = watcher.start({ config = {} })
 
             assert.is_false(started)
-            assert.is_string(err)
+            assert.is_table(err)
+            assert.equals(errors.codes.INVALID_INPUT, err.code)
         end)
 
         it("should fail when fs event handle cannot be created", function()
@@ -144,7 +147,8 @@ describe("filesystem adapters", function()
 
             local started, err = watcher.start({ config = { vault_root = temp_root } })
             assert.is_false(started)
-            assert.is_string(err)
+            assert.is_table(err)
+            assert.equals(errors.codes.INTERNAL, err.code)
         end)
 
         it("should emit mapped events to callback", function()
