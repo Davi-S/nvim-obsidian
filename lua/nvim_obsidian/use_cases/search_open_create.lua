@@ -1,3 +1,5 @@
+local errors = require("nvim_obsidian.core.shared.errors")
+
 local M = {}
 
 M.contract = {
@@ -23,7 +25,221 @@ M.contract = {
 }
 
 function M.execute(_ctx, _input)
-    return { ok = false, reason = "phase3-contract-not-implemented" }
+    local ctx = _ctx or {}
+    local input = _input or {}
+
+    if type(input.query) ~= "string" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "query must be a string"),
+        }
+    end
+
+    if type(input.allow_force_create) ~= "boolean" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "allow_force_create must be a boolean"),
+        }
+    end
+
+    local query = (input.query:gsub("^%s+", ""):gsub("%s+$", ""))
+
+    local search_ranking = ctx.search_ranking
+    local vault_catalog = ctx.vault_catalog
+    local ensure_open_note = ctx.ensure_open_note
+
+    if type(search_ranking) ~= "table" or type(search_ranking.score_candidates) ~= "function" or type(search_ranking.select_display) ~= "function" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.search_ranking score/select functions are required"),
+        }
+    end
+
+    if type(vault_catalog) ~= "table" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.vault_catalog is required"),
+        }
+    end
+
+    if type(ensure_open_note) ~= "table" or type(ensure_open_note.execute) ~= "function" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.ensure_open_note.execute is required"),
+        }
+    end
+
+    local picker_open = nil
+    if type(ctx.telescope) == "table" and type(ctx.telescope.open_omni) == "function" then
+        picker_open = ctx.telescope.open_omni
+    elseif type(ctx.open_omni_picker) == "function" then
+        picker_open = ctx.open_omni_picker
+    end
+
+    if type(picker_open) ~= "function" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "omni picker opener is required"),
+        }
+    end
+
+    local notes = {}
+    if type(vault_catalog.list_notes) == "function" then
+        local listed = vault_catalog.list_notes()
+        if type(listed) == "table" then
+            notes = listed
+        end
+    elseif type(vault_catalog._all_notes_for_tests) == "function" then
+        local listed = vault_catalog._all_notes_for_tests()
+        if type(listed) == "table" then
+            notes = listed
+        end
+    end
+
+    local candidates = {}
+    for _, note in ipairs(notes) do
+        if type(note) == "table" then
+            table.insert(candidates, {
+                title = tostring(note.title or ""),
+                aliases = type(note.aliases) == "table" and note.aliases or {},
+                relpath = tostring(note.path or ""),
+                path = tostring(note.path or ""),
+            })
+        end
+    end
+
+    local ranked = (search_ranking.score_candidates(query, candidates) or {}).ranked or {}
+    local display_separator = tostring((((ctx.config or {}).omni or {}).display_separator) or "->")
+
+    local items = {}
+    local has_exact_or_full_match = false
+    for _, entry in ipairs(ranked) do
+        local candidate = entry.candidate or {}
+        local label = (search_ranking.select_display(query, candidate, display_separator) or {}).label or
+        tostring(candidate.title or "")
+        table.insert(items, {
+            label = label,
+            rank = entry.rank,
+            candidate = candidate,
+        })
+
+        if type(entry.rank) == "number" and entry.rank <= 3 then
+            has_exact_or_full_match = true
+        end
+    end
+
+    local allow_create = not has_exact_or_full_match
+
+    local picker_result = picker_open({
+        query = query,
+        items = items,
+        allow_create = allow_create,
+        allow_force_create = input.allow_force_create and allow_create,
+    })
+
+    if type(picker_result) ~= "table" or picker_result.action == nil or picker_result.action == "cancel" then
+        return {
+            ok = true,
+            action = "cancelled",
+            path = nil,
+            error = nil,
+        }
+    end
+
+    local function run_ensure(title_or_token, create_if_missing)
+        local out = ensure_open_note.execute(ctx, {
+            title_or_token = title_or_token,
+            create_if_missing = create_if_missing,
+            origin = "omni",
+        })
+
+        if not out.ok then
+            return {
+                ok = false,
+                action = "cancelled",
+                path = out.path,
+                error = out.error,
+            }
+        end
+
+        return {
+            ok = true,
+            action = out.created and "created" or "opened",
+            path = out.path,
+            error = nil,
+        }
+    end
+
+    if picker_result.action == "open" then
+        local selected = picker_result.item
+        if type(selected) ~= "table" and #items > 0 then
+            selected = items[1]
+        end
+
+        if type(selected) ~= "table" or type(selected.candidate) ~= "table" then
+            return {
+                ok = true,
+                action = "cancelled",
+                path = nil,
+                error = nil,
+            }
+        end
+
+        local token = tostring(selected.candidate.path or selected.candidate.title or "")
+        if token == "" then
+            return {
+                ok = false,
+                action = "cancelled",
+                path = nil,
+                error = errors.new(errors.codes.INVALID_INPUT, "selected candidate is missing path/title"),
+            }
+        end
+
+        return run_ensure(token, false)
+    end
+
+    if picker_result.action == "create" then
+        if not allow_create then
+            return {
+                ok = false,
+                action = "cancelled",
+                path = nil,
+                error = errors.new(errors.codes.INVALID_INPUT, "create is not allowed when exact/full match exists"),
+            }
+        end
+
+        local create_query = tostring(picker_result.query or query)
+        create_query = create_query:gsub("^%s+", ""):gsub("%s+$", "")
+        if create_query == "" then
+            return {
+                ok = true,
+                action = "cancelled",
+                path = nil,
+                error = nil,
+            }
+        end
+
+        return run_ensure(create_query, true)
+    end
+
+    return {
+        ok = true,
+        action = "cancelled",
+        path = nil,
+        error = nil,
+    }
 end
 
 return M
