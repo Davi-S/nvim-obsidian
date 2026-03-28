@@ -43,7 +43,7 @@ Policy authority: Product rules are canonical in docs/PRODUCT_CONTRACT.md.
 | -------------------------- | -------------------------------- | --------------------------------------------------------------- |
 | Wikilink parsing           | Wiki Link Domain                 | [[Title]], anchors, block IDs                                   |
 | Link resolution            | Wiki Link Domain + Vault Catalog | Uses target token only (left side), case-sensitive              |
-| Display alias handling     | Wiki Link Domain                 | [[target                                                        | alias]] alias is non-resolving display text |
+| Display alias handling     | Wiki Link Domain                 | [[target \| alias]] alias is non-resolving display text         |
 | Ambiguity detection        | Wiki Link Domain                 | Multiple canonical matches for same case-sensitive target token |
 | Follow command dispatch    | Neovim Adapter                   | Cursor extraction and jump/open                                 |
 | Missing note on valid link | Note Lifecycle Service           | Create and open target note                                     |
