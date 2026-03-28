@@ -141,12 +141,18 @@ local function register_obsidian_follow(ctx)
         if not result.ok then
             local error_code = result.error and result.error.code
             if error_code == "invalid_input" then
-                ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn("Cursor not on a valid wikilink")
+                if ctx.adapters and ctx.adapters.notifications then
+                    ctx.adapters.notifications.warn("Cursor not on a valid wikilink")
+                end
             elseif error_code == "ambiguous_target" then
                 -- Picker should have been shown by use case; no-op here
-                ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn("Multiple matches for link. Use picker or be more specific.")
+                if ctx.adapters and ctx.adapters.notifications then
+                    ctx.adapters.notifications.warn("Multiple matches for link. Use picker or be more specific.")
+                end
             elseif error_code == "missing_anchor" then
-                ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn("Target note exists but heading/anchor not found")
+                if ctx.adapters and ctx.adapters.notifications then
+                    ctx.adapters.notifications.warn("Target note exists but heading/anchor not found")
+                end
             else
                 error_to_notification(ctx, result.error)
             end
@@ -222,7 +228,9 @@ local function register_obsidian_render_dataview(ctx)
 
         if not result.ok then
             if result.error and result.error.code == "parse_failure" then
-                ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn("Parse error in dataview block: " .. result.error.message)
+                if ctx.adapters and ctx.adapters.notifications then
+                    ctx.adapters.notifications.warn("Parse error in dataview block: " .. result.error.message)
+                end
             else
                 error_to_notification(ctx, result.error)
             end

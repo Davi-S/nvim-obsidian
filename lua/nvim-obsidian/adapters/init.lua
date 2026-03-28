@@ -7,5 +7,6 @@
 local M = {}
 
 M.picker = require("nvim_obsidian.adapters.picker")
+M.completion = require("nvim_obsidian.adapters.completion")
 
 return M

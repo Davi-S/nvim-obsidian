@@ -66,8 +66,18 @@ function M.create_source(ctx)
         return true, query
     end
 
+    local function extract_anchor_context(query)
+        -- Check if query contains anchor reference [[foo#bar]]
+        local anchor_idx = query:find("#", 1, true)
+        if not anchor_idx then
+            return nil, ""
+        end
+        local note_ref = query:sub(1, anchor_idx - 1)
+        local anchor_query = query:sub(anchor_idx + 1)
+        return note_ref, anchor_query
+    end
+
     local function filter_candidates(notes, query)
-        -- If no query is provided, return all notes
         if not query or query == "" then
             return notes
         end
@@ -77,11 +87,10 @@ function M.create_source(ctx)
 
         for _, note in ipairs(notes or {}) do
             local title_lower = (note.title or ""):lower()
-            -- Match against title first (primary match)
             if string.find(title_lower, query_lower, 1, true) then
                 table.insert(filtered, note)
             else
-                -- Fall back to alias matching
+                -- Check aliases
                 local has_match = false
                 for _, alias in ipairs(note.aliases or {}) do
                     if string.find(alias:lower(), query_lower, 1, true) then
@@ -99,13 +108,10 @@ function M.create_source(ctx)
     end
 
     local function format_completion_item(note, score_data)
-        -- Normalize score to 0-9999 range for cmp sorting (higher score = better match)
-        -- Sort text format: "{score}_{label}" allows cmp to sort by score then alphabetically
-        local score = score_data and score_data.score or 0
         return {
             label = note.title or note.path,
-            kind = "Variable", -- Controls icon and sorting in completion menu
-            sortText = string.format("%05d_%s", 9999 - score, note.title or note.path),
+            kind = "Variable",
+            sortText = string.format("%05d_%s", 9999 - (score_data and score_data.score or 0), note.title or note.path),
             filterText = note.title or note.path,
             detail = note.path,
             data = { path = note.path, note = note },
@@ -113,19 +119,14 @@ function M.create_source(ctx)
     end
 
     --- Complete function for nvim-cmp
-    ---@param completion_ctx table Completion context from cmp with before_line, cur_line, col
-    ---@param callback fun(result: {items: table}) Callback invoked with completion result
+    ---@param completion_ctx table Completion context from cmp
+    ---@param callback fun(result: {items: table}) Callback with items
     function source.complete(completion_ctx, callback)
         local result = { items = {} }
 
-        -- All callback invocations are wrapped in pcall to gracefully handle callback errors
-        -- This allows the completion pipeline to continue even if user-provided callbacks fail
-
         if not completion_ctx or type(completion_ctx) ~= "table" then
             if callback then
-                pcall(function()
-                    callback(result)
-                end)
+                callback(result)
             end
             return
         end
@@ -133,14 +134,11 @@ function M.create_source(ctx)
         local before_line = completion_ctx.before_line or completion_ctx.cur_line or ""
         local col = completion_ctx.col or 0
 
-        -- Detect wiki link context (e.g., "[[note_query")
         local is_wiki, query = is_wiki_link_context(before_line, col)
 
         if not is_wiki then
             if callback then
-                pcall(function()
-                    callback(result)
-                end)
+                callback(result)
             end
             return
         end
@@ -155,17 +153,15 @@ function M.create_source(ctx)
 
         if #notes == 0 then
             if callback then
-                pcall(function()
-                    callback(result)
-                end)
+                callback(result)
             end
             return
         end
 
-        -- Filter notes by query string (title and alias matching)
+        -- Filter by query
         local filtered = filter_candidates(notes, query)
 
-        -- Rank candidates by relevance score
+        -- Rank candidates
         local ranked = filtered
         pcall(function()
             if ctx.search_ranking and ctx.search_ranking.score_candidates then
@@ -173,7 +169,7 @@ function M.create_source(ctx)
             end
         end)
 
-        -- Convert ranked results to completion items
+        -- Convert to completion items
         for _, score_data in ipairs(ranked) do
             local note = score_data.note or score_data
             local item = format_completion_item(note, score_data)
