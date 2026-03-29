@@ -67,4 +67,17 @@ describe("vault catalog domain implementation", function()
         assert.are.equal("a/alpha.md", ci.matches[1].path)
         assert.are.equal("z/alpha.md", ci.matches[2].path)
     end)
+
+    it("matches relpath/path tokens for omni selection", function()
+        catalog.upsert_note({ path = "notes/foo.md", title = "Foo", aliases = {} })
+        catalog.upsert_note({ path = "notes/bar.md", title = "Bar", aliases = {} })
+
+        local exact_path = catalog.find_by_title_or_alias("notes/foo.md")
+        assert.are.equal(1, #exact_path.matches)
+        assert.are.equal("notes/foo.md", exact_path.matches[1].path)
+
+        local ci_path = catalog.find_by_title_or_alias("NOTES/FOO.MD")
+        assert.are.equal(1, #ci_path.matches)
+        assert.are.equal("notes/foo.md", ci_path.matches[1].path)
+    end)
 end)

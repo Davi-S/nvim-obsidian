@@ -14,6 +14,34 @@ local function has_select()
     return vim and vim.ui and type(vim.ui.select) == "function"
 end
 
+local function load_telescope_for_custom_picker()
+    local ok_pickers, pickers = pcall(require, "telescope.pickers")
+    local ok_finders, finders = pcall(require, "telescope.finders")
+    local ok_config, config = pcall(require, "telescope.config")
+    local ok_actions, actions = pcall(require, "telescope.actions")
+    local ok_state, action_state = pcall(require, "telescope.actions.state")
+
+    if not (ok_pickers and ok_finders and ok_config and ok_actions and ok_state) then
+        return nil
+    end
+
+    return {
+        pickers = pickers,
+        finders = finders,
+        config = config,
+        actions = actions,
+        action_state = action_state,
+    }
+end
+
+local function load_telescope_builtin()
+    local ok, builtin = pcall(require, "telescope.builtin")
+    if not ok then
+        return nil
+    end
+    return builtin
+end
+
 local function safe_call(fn, ...)
     if type(fn) ~= "function" then
         report_error("adapter boundary error: expected callable function")
@@ -108,57 +136,111 @@ end
 function M.open_omni(ctx)
     -- Use-case payload mode: items already prepared by search_open_create.
     if type(ctx) == "table" and type(ctx.items) == "table" then
-        if not has_select() then
+        local telescope = load_telescope_for_custom_picker()
+        if not telescope then
+            report_error("ObsidianOmni requires telescope.nvim to be available")
             return { action = "cancel" }
         end
 
-        local display_items = {}
+        local entries = {}
         local item_map = {}
         for _, item in ipairs(ctx.items) do
             local label = (type(item) == "table" and tostring(item.label or "")) or ""
             if label ~= "" then
-                table.insert(display_items, label)
-                table.insert(item_map, item)
+                local idx = #item_map + 1
+                table.insert(entries, {
+                    kind = "item",
+                    idx = idx,
+                    label = label,
+                    ordinal = string.lower(label),
+                })
+                item_map[idx] = item
             end
         end
 
-        local create_idx = nil
         if ctx.allow_create then
-            table.insert(display_items, "+ Create: " .. tostring(ctx.query or ""))
-            create_idx = #display_items
+            local create_label = "+ Create: " .. tostring(ctx.query or "")
+            table.insert(entries, {
+                kind = "create",
+                label = create_label,
+                ordinal = string.lower(create_label),
+            })
         end
 
-        if #display_items == 0 then
+        if #entries == 0 then
             return { action = "cancel" }
         end
 
-        local picked_idx = nil
-        safe_call(vim.ui.select, display_items, { prompt = "Obsidian Omni" }, function(choice, idx)
-            if choice and idx then
-                picked_idx = idx
-            end
-        end)
+        local prompt_title = "Obsidian Omni"
+        local query = tostring(ctx.query or "")
 
-        if not picked_idx then
-            return { action = "cancel" }
-        end
+        telescope.pickers.new({}, {
+            prompt_title = prompt_title,
+            finder = telescope.finders.new_table({
+                results = entries,
+                entry_maker = function(entry)
+                    return {
+                        value = entry,
+                        display = entry.label,
+                        ordinal = entry.ordinal,
+                    }
+                end,
+            }),
+            sorter = telescope.config.values.generic_sorter({}),
+            attach_mappings = function(prompt_bufnr, map)
+                local function trigger_open(item)
+                    telescope.actions.close(prompt_bufnr)
+                    if type(ctx.on_open) == "function" then
+                        pcall(ctx.on_open, item)
+                    end
+                end
 
-        if create_idx and picked_idx == create_idx then
-            return {
-                action = "create",
-                query = tostring(ctx.query or ""),
-            }
-        end
+                local function trigger_create()
+                    telescope.actions.close(prompt_bufnr)
+                    if type(ctx.on_create) == "function" then
+                        pcall(ctx.on_create, query)
+                    end
+                end
 
-        local selected = item_map[picked_idx]
-        if not selected then
-            return { action = "cancel" }
-        end
+                telescope.actions.select_default:replace(function()
+                    local selected = telescope.action_state.get_selected_entry()
+                    local value = selected and selected.value or nil
+                    if type(value) ~= "table" then
+                        telescope.actions.close(prompt_bufnr)
+                        return
+                    end
 
-        return {
-            action = "open",
-            item = selected,
-        }
+                    if value.kind == "create" then
+                        trigger_create()
+                        return
+                    end
+
+                    if value.kind == "item" and type(value.idx) == "number" then
+                        local item = item_map[value.idx]
+                        if item then
+                            trigger_open(item)
+                            return
+                        end
+                    end
+
+                    telescope.actions.close(prompt_bufnr)
+                end)
+
+                if ctx.allow_force_create then
+                    local force_key = tostring(((ctx.config or {}).force_create_key) or "<C-x>")
+                    map("i", force_key, function()
+                        trigger_create()
+                    end)
+                    map("n", force_key, function()
+                        trigger_create()
+                    end)
+                end
+
+                return true
+            end,
+        }):find()
+
+        return { action = "deferred" }
     end
 
     -- Legacy/simple mode used by existing unit tests.
@@ -235,7 +317,9 @@ end
 
 function M.open_search(opts)
     opts = opts or {}
-    if not has_select() then
+    local builtin = load_telescope_builtin()
+    if not builtin then
+        report_error("ObsidianSearch requires telescope.nvim to be available")
         return false
     end
 
@@ -245,49 +329,15 @@ function M.open_search(opts)
         return false
     end
     local query = tostring(opts.query or "")
-    if query == "" and vim and vim.fn and type(vim.fn.input) == "function" then
-        query = tostring(vim.fn.input("Search vault: "))
+    local live_grep_opts = { cwd = root }
+    if query ~= "" then
+        live_grep_opts.default_text = query
     end
-    if query == "" then
+
+    local ok = pcall(builtin.live_grep, live_grep_opts)
+    if not ok then
+        report_error("ObsidianSearch adapter: failed to open Telescope live_grep")
         return false
-    end
-
-    local escaped_root = tostring(root):gsub("'", "'\\''")
-    local escaped_query = tostring(query):gsub("'", "'\\''")
-    local cmd = "rg --line-number --no-heading --color=never '" .. escaped_query .. "' '" .. escaped_root .. "'"
-    local proc = io.popen(cmd)
-    if not proc then
-        return false
-    end
-
-    local lines = {}
-    for line in proc:lines() do
-        if line ~= "" then
-            table.insert(lines, line)
-        end
-    end
-    proc:close()
-
-    if #lines == 0 then
-        return false
-    end
-
-    local selected = nil
-    safe_call(vim.ui.select, lines, { prompt = "Search results" }, function(choice)
-        selected = choice
-    end)
-
-    if not selected then
-        return false
-    end
-
-    local path = selected:match("^([^:]+):")
-    local line_no = tonumber(selected:match("^[^:]+:(%d+):"))
-    if path and opts.navigation and type(opts.navigation.open_path) == "function" then
-        opts.navigation.open_path(path)
-        if line_no and vim and vim.api and type(vim.api.nvim_win_set_cursor) == "function" then
-            pcall(vim.api.nvim_win_set_cursor, 0, { line_no, 0 })
-        end
     end
 
     return true

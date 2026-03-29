@@ -119,12 +119,15 @@ function M.find_by_title_or_alias(token)
     if q == "" then
         return { matches = {} }
     end
+    local q_path = normalize_path(q)
 
     local notes = collect_notes_sorted()
 
     local exact = {}
     for _, note in ipairs(notes) do
         if note.title == q then
+            table.insert(exact, note)
+        elseif note.path == q_path then
             table.insert(exact, note)
         else
             for _, alias in ipairs(note.aliases) do
@@ -141,9 +144,12 @@ function M.find_by_title_or_alias(token)
     end
 
     local ql = string.lower(q)
+    local qpl = string.lower(q_path)
     local ci = {}
     for _, note in ipairs(notes) do
         if string.lower(note.title) == ql then
+            table.insert(ci, note)
+        elseif string.lower(note.path) == qpl then
             table.insert(ci, note)
         else
             for _, alias in ipairs(note.aliases) do

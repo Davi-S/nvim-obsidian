@@ -181,9 +181,9 @@ function M.execute(_ctx, _input)
                 error = errors.new(errors.codes.INTERNAL, "search_ranking.select_display returned invalid result"),
             }
         end
-        local label = display.label
+
         table.insert(items, {
-            label = label,
+            label = display.label,
             rank = entry.rank,
             candidate = candidate,
         })
@@ -194,22 +194,6 @@ function M.execute(_ctx, _input)
     end
 
     local allow_create = not has_exact_or_full_match
-
-    local picker_result = picker_open({
-        query = query,
-        items = items,
-        allow_create = allow_create,
-        allow_force_create = input.allow_force_create and allow_create,
-    })
-
-    if type(picker_result) ~= "table" or picker_result.action == nil or picker_result.action == "cancel" then
-        return {
-            ok = true,
-            action = "cancelled",
-            path = nil,
-            error = nil,
-        }
-    end
 
     local function run_ensure(title_or_token, create_if_missing, origin)
         local out = ensure_open_note.execute(ctx, {
@@ -235,8 +219,7 @@ function M.execute(_ctx, _input)
         }
     end
 
-    if picker_result.action == "open" then
-        local selected = picker_result.item
+    local function run_open_flow(selected)
         if type(selected) ~= "table" or type(selected.candidate) ~= "table" then
             return {
                 ok = false,
@@ -259,7 +242,7 @@ function M.execute(_ctx, _input)
         return run_ensure(token, false, "omni")
     end
 
-    if picker_result.action == "create" then
+    local function run_create_flow(raw_query)
         if not allow_create then
             return {
                 ok = false,
@@ -269,7 +252,7 @@ function M.execute(_ctx, _input)
             }
         end
 
-        local create_query = picker_result.query
+        local create_query = raw_query
         if create_query == nil then
             create_query = query
         end
@@ -294,6 +277,61 @@ function M.execute(_ctx, _input)
         end
 
         return run_ensure(create_query, true, create_origin)
+    end
+
+    local function notify_async_error(out, fallback)
+        if out and out.ok then
+            return
+        end
+        if type(ctx.notifications) ~= "table" or type(ctx.notifications.error) ~= "function" then
+            return
+        end
+        local message = fallback
+        if out and out.error and out.error.message then
+            message = out.error.message
+        end
+        pcall(ctx.notifications.error, message)
+    end
+
+    local picker_result = picker_open({
+        query = query,
+        items = items,
+        allow_create = allow_create,
+        allow_force_create = input.allow_force_create and allow_create,
+        on_open = function(selected)
+            local out = run_open_flow(selected)
+            notify_async_error(out, "ObsidianOmni open failed")
+        end,
+        on_create = function(create_query)
+            local out = run_create_flow(create_query)
+            notify_async_error(out, "ObsidianOmni create failed")
+        end,
+    })
+
+    if type(picker_result) ~= "table" or picker_result.action == nil or picker_result.action == "cancel" then
+        return {
+            ok = true,
+            action = "cancelled",
+            path = nil,
+            error = nil,
+        }
+    end
+
+    if picker_result.action == "deferred" then
+        return {
+            ok = true,
+            action = "cancelled",
+            path = nil,
+            error = nil,
+        }
+    end
+
+    if picker_result.action == "open" then
+        return run_open_flow(picker_result.item)
+    end
+
+    if picker_result.action == "create" then
+        return run_create_flow(picker_result.query)
     end
 
     return {

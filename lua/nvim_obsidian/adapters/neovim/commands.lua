@@ -408,11 +408,11 @@ local function register_obsidian_omni(ctx)
             return
         end
 
-        if ctx.adapters and ctx.adapters.navigation then
+        if type(result.path) == "string" and result.path ~= "" and ctx.adapters and ctx.adapters.navigation then
             ctx.adapters.navigation.open_path(result.path)
         end
 
-        if result.created and ctx.adapters and ctx.adapters.notifications then
+        if result.created and type(result.path) == "string" and result.path ~= "" and ctx.adapters and ctx.adapters.notifications then
             ctx.adapters.notifications.info("Created note: " .. result.path)
         end
     end, { desc = "Open note via Omni search/create" })
