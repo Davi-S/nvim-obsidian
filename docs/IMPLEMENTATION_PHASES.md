@@ -250,11 +250,12 @@ Status notes (March 2026):
 - Validation functions: validate_enum(), validate_string_list(), validate_dataview(), validate_journal().
 - Verification: 11 new unit test cases in config_schema_spec.lua covering all invalid enum/shape scenarios. All unit, integration, and e2e suites remain green. See docs/PHASE_8_CONFIG_SCHEMA.md for full contract.
 
-**Part 3: Pending** ⏳
-- User-facing API documentation (README update with config examples).
-- Full command set documentation (all 10 commands defined).
-- Config error recovery hints.
-- API reference for setup() contract and returned container shape.
+ **Part 3: User-Facing Documentation** ✅ Complete
+ - Created docs/PHASE_8_API_REFERENCE.md with complete API documentation: setup() function contract, return container shape, all 11 commands (ObsidianOmni, ObsidianToday, ObsidianNext, ObsidianPrev, ObsidianFollow, ObsidianBacklinks, ObsidianSearch, ObsidianReindex, ObsidianInsertTemplate, ObsidianRenderDataview, ObsidianHealth).
+ - Created docs/USER_GUIDE.md with installation, quick-start, configuration guide with examples, workflow scenarios (daily journaling, project research, template writing), and troubleshooting section.
+ - Documented all configuration fields with locale support, journal format placeholders, dataview options, and custom template placeholder registration.
+ - Included example configurations (minimal, standard, advanced) and common error diagnostics.
+ - Verification: All documentation complete and links validated.
 
 ---
 
