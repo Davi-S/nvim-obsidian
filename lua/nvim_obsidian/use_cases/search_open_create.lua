@@ -25,8 +25,25 @@ M.contract = {
 }
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
-    local input = _input or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if type(_input) ~= "table" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table"),
+        }
+    end
+
+    local ctx = _ctx
+    local input = _input
 
     if type(input.query) ~= "string" then
         return {
@@ -95,17 +112,23 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local notes = {}
-    if type(vault_catalog.list_notes) == "function" then
-        local listed = vault_catalog.list_notes()
-        if type(listed) == "table" then
-            notes = listed
-        end
-    elseif type(vault_catalog._all_notes_for_tests) == "function" then
-        local listed = vault_catalog._all_notes_for_tests()
-        if type(listed) == "table" then
-            notes = listed
-        end
+    if type(vault_catalog.list_notes) ~= "function" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.vault_catalog.list_notes is required"),
+        }
+    end
+
+    local notes = vault_catalog.list_notes()
+    if type(notes) ~= "table" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INTERNAL, "vault_catalog.list_notes returned invalid result"),
+        }
     end
 
     local candidates = {}
@@ -120,15 +143,45 @@ function M.execute(_ctx, _input)
         end
     end
 
-    local ranked = (search_ranking.score_candidates(query, candidates) or {}).ranked or {}
-    local display_separator = tostring((((ctx.config or {}).omni or {}).display_separator) or "->")
+    local scored = search_ranking.score_candidates(query, candidates)
+    if type(scored) ~= "table" or type(scored.ranked) ~= "table" then
+        return {
+            ok = false,
+            action = "cancelled",
+            path = nil,
+            error = errors.new(errors.codes.INTERNAL, "search_ranking.score_candidates returned invalid result"),
+        }
+    end
+
+    local ranked = scored.ranked
+    local display_separator = "->"
+    if type(ctx.config) == "table" and type(ctx.config.omni) == "table" and type(ctx.config.omni.display_separator) == "string" then
+        display_separator = ctx.config.omni.display_separator
+    end
 
     local items = {}
     local has_exact_or_full_match = false
     for _, entry in ipairs(ranked) do
-        local candidate = entry.candidate or {}
-        local label = (search_ranking.select_display(query, candidate, display_separator) or {}).label or
-            tostring(candidate.title or "")
+        if type(entry) ~= "table" or type(entry.candidate) ~= "table" then
+            return {
+                ok = false,
+                action = "cancelled",
+                path = nil,
+                error = errors.new(errors.codes.INTERNAL, "ranked entry is invalid"),
+            }
+        end
+
+        local candidate = entry.candidate
+        local display = search_ranking.select_display(query, candidate, display_separator)
+        if type(display) ~= "table" or type(display.label) ~= "string" then
+            return {
+                ok = false,
+                action = "cancelled",
+                path = nil,
+                error = errors.new(errors.codes.INTERNAL, "search_ranking.select_display returned invalid result"),
+            }
+        end
+        local label = display.label
         table.insert(items, {
             label = label,
             rank = entry.rank,
@@ -184,16 +237,12 @@ function M.execute(_ctx, _input)
 
     if picker_result.action == "open" then
         local selected = picker_result.item
-        if type(selected) ~= "table" and #items > 0 then
-            selected = items[1]
-        end
-
         if type(selected) ~= "table" or type(selected.candidate) ~= "table" then
             return {
-                ok = true,
+                ok = false,
                 action = "cancelled",
                 path = nil,
-                error = nil,
+                error = errors.new(errors.codes.INVALID_INPUT, "picker returned invalid selection"),
             }
         end
 
@@ -220,7 +269,11 @@ function M.execute(_ctx, _input)
             }
         end
 
-        local create_query = tostring(picker_result.query or query)
+        local create_query = picker_result.query
+        if create_query == nil then
+            create_query = query
+        end
+        create_query = tostring(create_query)
         create_query = create_query:gsub("^%s+", ""):gsub("%s+$", "")
         if create_query == "" then
             return {

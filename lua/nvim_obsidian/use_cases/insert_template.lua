@@ -29,7 +29,22 @@ local function trim(s)
 end
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            inserted = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if _input ~= nil and type(_input) ~= "table" then
+        return {
+            ok = false,
+            inserted = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table when provided"),
+        }
+    end
+
+    local ctx = _ctx
     local input = _input or {}
 
     local navigation = ctx.navigation
@@ -81,8 +96,12 @@ function M.execute(_ctx, _input)
         })
         if type(out) == "table" and type(out.rendered) == "string" then
             rendered = out.rendered
-        elseif type(out) == "string" then
-            rendered = out
+        else
+            return {
+                ok = false,
+                inserted = nil,
+                error = errors.new(errors.codes.INTERNAL, "template.render returned invalid result"),
+            }
         end
     end
 

@@ -26,8 +26,23 @@ M.contract = {
 }
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
-    local input = _input or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            status = "invalid",
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if type(_input) ~= "table" then
+        return {
+            ok = false,
+            status = "invalid",
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table"),
+        }
+    end
+
+    local ctx = _ctx
+    local input = _input
 
     if type(input.line) ~= "string" then
         return {
@@ -124,13 +139,22 @@ function M.execute(_ctx, _input)
             ambiguous_matches = nil,
         }
     else
-        local candidate_notes
+        local candidate_notes = nil
         if type(vault_catalog.list_notes) == "function" then
             candidate_notes = vault_catalog.list_notes()
-        elseif type(vault_catalog._all_notes_for_tests) == "function" then
-            candidate_notes = vault_catalog._all_notes_for_tests()
         else
-            candidate_notes = (vault_catalog.find_by_title_or_alias(token) or {}).matches or {}
+            local lookup = vault_catalog.find_by_title_or_alias(token)
+            if type(lookup) == "table" then
+                candidate_notes = lookup.matches
+            end
+        end
+
+        if type(candidate_notes) ~= "table" then
+            return {
+                ok = false,
+                status = "invalid",
+                error = errors.new(errors.codes.INTERNAL, "failed to gather candidate notes for target resolution"),
+            }
         end
 
         resolved = wiki_link.resolve_target(target, candidate_notes)
@@ -155,7 +179,7 @@ function M.execute(_ctx, _input)
 
         local picked = pick_ambiguous({
             target = target,
-            matches = resolved.ambiguous_matches or {},
+            matches = type(resolved.ambiguous_matches) == "table" and resolved.ambiguous_matches or {},
             buffer_path = input.buffer_path,
         })
 
@@ -166,8 +190,11 @@ function M.execute(_ctx, _input)
             if picked.action == "cancel" then
                 picked_path = nil
             else
-                picked_path = tostring(picked.path or ((picked.item or {}).path or ""))
-                if picked_path == "" and type((picked.item or {}).candidate) == "table" then
+                local from_path = type(picked.path) == "string" and picked.path or ""
+                local item = type(picked.item) == "table" and picked.item or nil
+                local from_item_path = item and type(item.path) == "string" and item.path or ""
+                picked_path = tostring(from_path ~= "" and from_path or from_item_path)
+                if picked_path == "" and type(item) == "table" and type(item.candidate) == "table" then
                     picked_path = tostring(picked.item.candidate.path or "")
                 end
                 if picked_path == "" then
@@ -226,7 +253,14 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local path = tostring(resolved.resolved_path or "")
+    local path = resolved.resolved_path
+    if type(path) ~= "string" or path == "" then
+        return {
+            ok = false,
+            status = "invalid",
+            error = errors.new(errors.codes.INTERNAL, "resolved target is missing a valid path"),
+        }
+    end
     local opened, open_err = navigation.open_path(path)
     if not opened then
         return {

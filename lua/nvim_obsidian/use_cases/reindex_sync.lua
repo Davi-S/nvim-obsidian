@@ -24,8 +24,23 @@ M.contract = {
 }
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
-    local input = _input or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            stats = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if type(_input) ~= "table" then
+        return {
+            ok = false,
+            stats = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table"),
+        }
+    end
+
+    local ctx = _ctx
+    local input = _input
 
     local mode = input.mode
     if mode ~= "startup" and mode ~= "manual" and mode ~= "event" then
@@ -105,10 +120,19 @@ function M.execute(_ctx, _input)
 
         local meta, parse_err = frontmatter.parse(markdown)
         if parse_err then
-            warn("Reindex: frontmatter parse fallback for " .. tostring(path))
+            return nil, errors.new(errors.codes.PARSE_FAILURE, "failed to parse frontmatter", {
+                path = path,
+                reason = parse_err,
+            })
         end
 
-        local metadata = type(meta) == "table" and meta or {}
+        if type(meta) ~= "table" then
+            return nil, errors.new(errors.codes.INTERNAL, "frontmatter.parse returned invalid metadata", {
+                path = path,
+            })
+        end
+
+        local metadata = meta
         local title = tostring(metadata.title or "")
         if title == "" then
             title = title_from_path(path)
@@ -182,8 +206,8 @@ function M.execute(_ctx, _input)
         if mode == "startup" and type(watcher) == "table" and type(watcher.start) == "function" then
             local started, start_err = watcher.start(ctx)
             if not started then
-                warn("Watcher start skipped: " ..
-                tostring(start_err and start_err.message or start_err or "failed to start watcher"))
+                warn("Watcher start failed: " ..
+                tostring(start_err and start_err.message or start_err or "unknown error"))
             end
         end
 
@@ -216,6 +240,7 @@ function M.execute(_ctx, _input)
 
         local function remove_path(p)
             if p == "" then
+                stats.errors = stats.errors + 1
                 return
             end
             local removed = vault_catalog.remove_note(p)
@@ -253,8 +278,16 @@ function M.execute(_ctx, _input)
         elseif kind == "create" or kind == "modify" then
             upsert_path(path)
         elseif kind == "rename" then
-            remove_path(tostring(event.old_path or ""))
-            upsert_path(tostring(event.new_path or ""))
+            if type(event.old_path) ~= "string" or event.old_path == "" or type(event.new_path) ~= "string" or event.new_path == "" then
+                return {
+                    ok = false,
+                    stats = nil,
+                    error = errors.new(errors.codes.INVALID_INPUT,
+                        "rename event requires non-empty old_path and new_path"),
+                }
+            end
+            remove_path(event.old_path)
+            upsert_path(event.new_path)
         else
             return {
                 ok = false,

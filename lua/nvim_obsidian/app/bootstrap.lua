@@ -11,8 +11,17 @@ local function run_startup_reindex(c)
 
     local ok, result = pcall(reindex.execute, c, { mode = "startup" })
     if not ok then
+        local message = "nvim-obsidian: startup reindex failed: " .. tostring(result)
         if c.notifications and c.notifications.error then
-            c.notifications.error("nvim-obsidian: startup reindex failed")
+            c.notifications.error(message)
+        end
+        return
+    end
+
+    if type(result) ~= "table" then
+        local message = "nvim-obsidian: startup reindex returned invalid result"
+        if c.notifications and c.notifications.error then
+            c.notifications.error(message)
         end
         return
     end

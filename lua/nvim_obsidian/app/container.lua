@@ -111,8 +111,11 @@ function M.build(user_opts)
         insert_template = insert_template,
 
         scan_markdown_files = function()
-            local files, _ = adapter_set.fs_io.list_markdown_files(opts.vault_root)
-            return files or {}
+            local files, list_err = adapter_set.fs_io.list_markdown_files(opts.vault_root)
+            if type(files) ~= "table" then
+                error("nvim-obsidian setup: failed to scan markdown files: " .. tostring(list_err or "unknown error"))
+            end
+            return files
         end,
         replace_catalog = function(notes)
             if type(vault_catalog._replace_all) ~= "function" then
@@ -121,11 +124,18 @@ function M.build(user_opts)
             return vault_catalog._replace_all(notes)
         end,
         resolve_journal_title = function(kind, date)
-            local section = (((opts.journal or {})[kind]) or {})
-            local format = section.title_format
+            if type(kind) ~= "string" or kind == "" then
+                error("nvim-obsidian setup: resolve_journal_title requires a non-empty kind")
+            end
+
+            local section = type(opts.journal) == "table" and opts.journal[kind] or nil
+            local format = type(section) == "table" and section.title_format or nil
             if type(format) ~= "string" or format == "" then
                 local built = journal.build_title(kind, date, opts.locale)
-                return tostring((built and built.title) or "")
+                if type(built) ~= "table" or type(built.title) ~= "string" or built.title == "" then
+                    error("nvim-obsidian setup: journal.build_title returned invalid title")
+                end
+                return built.title
             end
             return journal_placeholders.render_title_format(format, {
                 config = opts,
@@ -155,18 +165,20 @@ function M.build(user_opts)
             end
 
             if query == "standard" then
-                add_candidate((((opts.templates or {}).standard)))
+                add_candidate(type(opts.templates) == "table" and opts.templates.standard or nil)
             elseif query == "daily" or query == "weekly" or query == "monthly" or query == "yearly" then
-                add_candidate(((((opts.journal or {})[query]) or {}).template))
+                local section = type(opts.journal) == "table" and opts.journal[query] or nil
+                add_candidate(type(section) == "table" and section.template or nil)
             elseif query then
                 add_candidate(query)
             end
 
             if not query then
                 if request.origin == "journal" and (kind == "daily" or kind == "weekly" or kind == "monthly" or kind == "yearly") then
-                    add_candidate(((((opts.journal or {})[kind]) or {}).template))
+                    local section = type(opts.journal) == "table" and opts.journal[kind] or nil
+                    add_candidate(type(section) == "table" and section.template or nil)
                 else
-                    add_candidate((((opts.templates or {}).standard)))
+                    add_candidate(type(opts.templates) == "table" and opts.templates.standard or nil)
                 end
             end
 

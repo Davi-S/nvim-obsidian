@@ -20,7 +20,22 @@ M.contract = {
 }
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            selected = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if _input ~= nil and type(_input) ~= "table" then
+        return {
+            ok = false,
+            selected = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table when provided"),
+        }
+    end
+
+    local ctx = _ctx
     local input = _input or {}
 
     local telescope = ctx.telescope
@@ -33,7 +48,14 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local root = (ctx.config and ctx.config.vault_root) or (vim and vim.fn and vim.fn.getcwd and vim.fn.getcwd())
+    local root = type(ctx.config) == "table" and ctx.config.vault_root or nil
+    if type(root) ~= "string" or root == "" then
+        return {
+            ok = false,
+            selected = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.config.vault_root is required"),
+        }
+    end
     local selected = telescope.open_search({
         root = root,
         query = input.query,

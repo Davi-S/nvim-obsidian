@@ -30,8 +30,25 @@ local function basename(path)
 end
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
-    local input = _input or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            opened = nil,
+            match_count = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if type(_input) ~= "table" then
+        return {
+            ok = false,
+            opened = nil,
+            match_count = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table"),
+        }
+    end
+
+    local ctx = _ctx
+    local input = _input
 
     if type(input.buffer_path) ~= "string" or input.buffer_path == "" then
         return {
@@ -93,7 +110,15 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local notes = vault_catalog.list_notes() or {}
+    local notes = vault_catalog.list_notes()
+    if type(notes) ~= "table" then
+        return {
+            ok = false,
+            opened = nil,
+            match_count = nil,
+            error = errors.new(errors.codes.INTERNAL, "vault_catalog.list_notes returned invalid result"),
+        }
+    end
     local by_path = {}
     local current_note = nil
     for _, note in ipairs(notes) do
@@ -117,13 +142,48 @@ function M.execute(_ctx, _input)
     end
 
     local token_map = {}
-    token_map[tostring(current_note.title or "")] = true
+    if type(current_note.title) ~= "string" then
+        return {
+            ok = false,
+            opened = nil,
+            match_count = nil,
+            error = errors.new(errors.codes.INTERNAL, "current indexed note has invalid title"),
+        }
+    end
+    token_map[current_note.title] = true
+
+    if current_note.aliases ~= nil and type(current_note.aliases) ~= "table" then
+        return {
+            ok = false,
+            opened = nil,
+            match_count = nil,
+            error = errors.new(errors.codes.INTERNAL, "current indexed note has invalid aliases"),
+        }
+    end
+
     for _, alias in ipairs(current_note.aliases or {}) do
         token_map[tostring(alias)] = true
     end
 
-    local root = (ctx.config and ctx.config.vault_root) or (vim and vim.fn and vim.fn.getcwd and vim.fn.getcwd())
-    local files = fs_io.list_markdown_files(root) or {}
+    local root = type(ctx.config) == "table" and ctx.config.vault_root or nil
+    if type(root) ~= "string" or root == "" then
+        return {
+            ok = false,
+            opened = nil,
+            match_count = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.config.vault_root is required"),
+        }
+    end
+
+    local files = fs_io.list_markdown_files(root)
+    if type(files) ~= "table" then
+        return {
+            ok = false,
+            opened = nil,
+            match_count = nil,
+            error = errors.new(errors.codes.INTERNAL, "fs_io.list_markdown_files returned invalid result"),
+        }
+    end
     local matches = {}
     local seen = {}
 
@@ -131,8 +191,18 @@ function M.execute(_ctx, _input)
         if path ~= input.buffer_path then
             local content = fs_io.read_file(path)
             if type(content) == "string" then
-                for _, link in ipairs(markdown.extract_wikilinks(content) or {}) do
-                    local ref = tostring(link.note_ref or "")
+                local links = markdown.extract_wikilinks(content)
+                if type(links) ~= "table" then
+                    return {
+                        ok = false,
+                        opened = nil,
+                        match_count = nil,
+                        error = errors.new(errors.codes.INTERNAL, "markdown.extract_wikilinks returned invalid result"),
+                    }
+                end
+
+                for _, link in ipairs(links) do
+                    local ref = type(link) == "table" and tostring(link.note_ref or "") or ""
                     if token_map[ref] and not seen[path] then
                         seen[path] = true
                         local n = by_path[path] or {

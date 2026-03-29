@@ -24,8 +24,23 @@ M.contract = {
 }
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
-    local input = _input or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            rendered_blocks = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if type(_input) ~= "table" then
+        return {
+            ok = false,
+            rendered_blocks = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table"),
+        }
+    end
+
+    local ctx = _ctx
+    local input = _input
 
     local function invalid(message)
         return {
@@ -73,25 +88,40 @@ function M.execute(_ctx, _input)
         return invalid("render patch applier is required")
     end
 
-    local function trigger_enabled(cfg_trigger)
+    local function trigger_enabled(cfg_when)
         if trigger == "manual" then
             return true
         end
 
-        if type(cfg_trigger) ~= "table" then
-            return true
+        if type(cfg_when) ~= "table" then
+            return false
         end
 
-        local key = trigger:gsub("^on_", "")
-        local value = cfg_trigger[key]
-        if value == nil then
-            return true
+        for _, configured in ipairs(cfg_when) do
+            if configured == trigger then
+                return true
+            end
         end
-        return value == true
+
+        -- Backward-compatible explicit map shape: { open = true, save = false }
+        local mapped = trigger:gsub("^on_", "")
+        if cfg_when[mapped] ~= nil then
+            return cfg_when[mapped] == true
+        end
+
+        return false
     end
 
-    local dataview_cfg = (((ctx.config or {}).dataview or {}).render or {})
-    if not trigger_enabled(dataview_cfg.when) then
+    if type(ctx.config) ~= "table" or type(ctx.config.dataview) ~= "table" then
+        return invalid("ctx.config.dataview is required")
+    end
+
+    local dataview_cfg = ctx.config.dataview
+    if type(dataview_cfg.render) ~= "table" or type(dataview_cfg.render.when) ~= "table" then
+        return invalid("ctx.config.dataview.render.when is required")
+    end
+
+    if not trigger_enabled(dataview_cfg.render.when) then
         return {
             ok = true,
             rendered_blocks = 0,
@@ -109,29 +139,55 @@ function M.execute(_ctx, _input)
     end
 
     local parsed = dataview.parse_blocks(markdown)
-    local blocks = (parsed and parsed.blocks) or {}
-
-    local function collect_notes()
-        if type(vault_catalog.list_notes) == "function" then
-            local notes = vault_catalog.list_notes()
-            if type(notes) == "table" then
-                return notes
-            end
-        end
-        if type(vault_catalog._all_notes_for_tests) == "function" then
-            local notes = vault_catalog._all_notes_for_tests()
-            if type(notes) == "table" then
-                return notes
-            end
-        end
-        return {}
+    local blocks = {}
+    if type(parsed) == "table" and type(parsed.blocks) == "table" then
+        blocks = parsed.blocks
+    elseif parsed ~= nil then
+        return {
+            ok = false,
+            rendered_blocks = nil,
+            error = errors.new(errors.codes.INTERNAL, "dataview.parse_blocks returned invalid result"),
+        }
     end
 
-    local notes = collect_notes()
+    local function collect_notes()
+        if type(vault_catalog.list_notes) ~= "function" then
+            return nil, "ctx.vault_catalog.list_notes is required"
+        end
+        local notes = vault_catalog.list_notes()
+        if type(notes) ~= "table" then
+            return nil, "vault_catalog.list_notes returned invalid result"
+        end
+        return notes, nil
+    end
 
-    local no_results_cfg = (((dataview_cfg.messages or {}).task_no_results) or {})
-    local no_results_enabled = no_results_cfg.enabled ~= false
-    local no_results_text = tostring(no_results_cfg.text or "Dataview: No results to show for task query.")
+    local notes, notes_err = collect_notes()
+    if not notes then
+        return {
+            ok = false,
+            rendered_blocks = nil,
+            error = errors.new(errors.codes.INTERNAL, notes_err),
+        }
+    end
+
+    local msg_holder = dataview_cfg.messages
+    if type(msg_holder) ~= "table" and type(dataview_cfg.render) == "table" then
+        msg_holder = dataview_cfg.render.messages
+    end
+
+    local no_results_cfg = type(msg_holder) == "table" and msg_holder.task_no_results or nil
+    if type(no_results_cfg) ~= "table" then
+        return invalid("ctx.config.dataview.messages.task_no_results is required")
+    end
+    if type(no_results_cfg.enabled) ~= "boolean" then
+        return invalid("ctx.config.dataview.messages.task_no_results.enabled must be boolean")
+    end
+    if type(no_results_cfg.text) ~= "string" or no_results_cfg.text == "" then
+        return invalid("ctx.config.dataview.messages.task_no_results.text must be non-empty string")
+    end
+
+    local no_results_enabled = no_results_cfg.enabled
+    local no_results_text = no_results_cfg.text
 
     local patches = {}
 
@@ -142,10 +198,26 @@ function M.execute(_ctx, _input)
         }
 
         if exec and exec.error then
-            table.insert(lines, "Dataview: " .. tostring(exec.error.message or "query execution failed"))
+            local message = type(exec.error.message) == "string" and exec.error.message or "query execution failed"
+            table.insert(lines, "Dataview: " .. message)
         else
-            local result = (exec and exec.result) or {}
-            local rendered = type(result.rendered_lines) == "table" and result.rendered_lines or {}
+            local result = type(exec) == "table" and exec.result or nil
+            if type(result) ~= "table" then
+                return {
+                    ok = false,
+                    rendered_blocks = nil,
+                    error = errors.new(errors.codes.INTERNAL, "dataview.execute_query returned invalid result"),
+                }
+            end
+
+            local rendered = result.rendered_lines
+            if type(rendered) ~= "table" then
+                return {
+                    ok = false,
+                    rendered_blocks = nil,
+                    error = errors.new(errors.codes.INTERNAL, "dataview query result missing rendered_lines table"),
+                }
+            end
 
             if result.kind == "task" and #rendered == 0 and no_results_enabled then
                 table.insert(lines, no_results_text)
@@ -176,8 +248,9 @@ function M.execute(_ctx, _input)
         }
     end
 
-    if parsed and parsed.error and type(ctx.notifications) == "table" and type(ctx.notifications.warn) == "function" then
-        ctx.notifications.warn("Dataview parse warning: " .. tostring(parsed.error.message or "parse failed"))
+    if type(parsed) == "table" and parsed.error and type(ctx.notifications) == "table" and type(ctx.notifications.warn) == "function" then
+        local message = type(parsed.error.message) == "string" and parsed.error.message or "parse failed"
+        ctx.notifications.warn("Dataview parse warning: " .. message)
     end
 
     return {

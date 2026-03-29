@@ -27,8 +27,25 @@ M.contract = {
 }
 
 function M.execute(_ctx, _input)
-    local ctx = _ctx or {}
-    local input = _input or {}
+    if type(_ctx) ~= "table" then
+        return {
+            ok = false,
+            path = nil,
+            created = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
+        }
+    end
+    if type(_input) ~= "table" then
+        return {
+            ok = false,
+            path = nil,
+            created = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "input must be a table"),
+        }
+    end
+
+    local ctx = _ctx
+    local input = _input
 
     if type(input.title_or_token) ~= "string" then
         return {
@@ -98,8 +115,17 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local lookup = vault_catalog.find_by_title_or_alias(token) or { matches = {} }
-    local matches = lookup.matches or {}
+    local lookup = vault_catalog.find_by_title_or_alias(token)
+    if type(lookup) ~= "table" or type(lookup.matches) ~= "table" then
+        return {
+            ok = false,
+            path = nil,
+            created = nil,
+            error = errors.new(errors.codes.INTERNAL, "vault catalog returned invalid lookup result"),
+        }
+    end
+
+    local matches = lookup.matches
 
     if #matches > 1 then
         return {
@@ -114,7 +140,15 @@ function M.execute(_ctx, _input)
     end
 
     if #matches == 1 then
-        local existing_path = tostring(matches[1].path or "")
+        local existing_path = type(matches[1]) == "table" and matches[1].path or nil
+        if type(existing_path) ~= "string" or existing_path == "" then
+            return {
+                ok = false,
+                path = nil,
+                created = nil,
+                error = errors.new(errors.codes.INTERNAL, "matched note is missing path"),
+            }
+        end
         local opened, open_err = navigation.open_path(existing_path)
         if not opened then
             return {
@@ -159,12 +193,27 @@ function M.execute(_ctx, _input)
 
     if note_kind == "none" and type(journal) == "table" and type(journal.classify_input) == "function" then
         local classified = journal.classify_input(token, input.now)
-        note_kind = tostring((classified and classified.kind) or "none")
+        if type(classified) == "table" and type(classified.kind) == "string" then
+            note_kind = classified.kind
+        elseif classified ~= nil then
+            return {
+                ok = false,
+                path = nil,
+                created = nil,
+                error = errors.new(errors.codes.INTERNAL, "journal.classify_input returned invalid result"),
+            }
+        end
     end
 
     local function join_path(base, leaf)
-        local b = tostring(base or ""):gsub("\\", "/"):gsub("//+", "/")
-        local l = tostring(leaf or ""):gsub("\\", "/"):gsub("^/+", "")
+        if type(base) ~= "string" then
+            error("join_path base must be a string")
+        end
+        if type(leaf) ~= "string" then
+            error("join_path leaf must be a string")
+        end
+        local b = base:gsub("\\", "/"):gsub("//+", "/")
+        local l = leaf:gsub("\\", "/"):gsub("^/+", "")
         if b == "" then
             return l
         end
@@ -197,19 +246,41 @@ function M.execute(_ctx, _input)
         return s
     end
 
-    local cfg = ctx.config or {}
+    local cfg = ctx.config
+    if type(cfg) ~= "table" then
+        return {
+            ok = false,
+            path = nil,
+            created = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.config is required"),
+        }
+    end
     local note_title = token
-    local base_subdir = tostring(cfg.new_notes_subdir or "")
+    local base_subdir = cfg.new_notes_subdir
+    if type(base_subdir) ~= "string" or base_subdir == "" then
+        return {
+            ok = false,
+            path = nil,
+            created = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "config.new_notes_subdir must be a non-empty string"),
+        }
+    end
 
     if input.origin == "journal" and note_kind ~= "none" then
-        local journal_cfg = (((cfg.journal or {})[note_kind]) or {})
+        local journal_cfg = type(cfg.journal) == "table" and cfg.journal[note_kind] or nil
         if type(ctx.resolve_journal_title) == "function" then
             local resolved_title = ctx.resolve_journal_title(note_kind, input.now or os.time())
-            if type(resolved_title) == "string" and resolved_title ~= "" then
-                note_title = resolved_title
+            if type(resolved_title) ~= "string" or resolved_title == "" then
+                return {
+                    ok = false,
+                    path = nil,
+                    created = nil,
+                    error = errors.new(errors.codes.INTERNAL, "resolve_journal_title returned invalid title"),
+                }
             end
+            note_title = resolved_title
         end
-        if type(journal_cfg.subdir) == "string" and journal_cfg.subdir ~= "" then
+        if type(journal_cfg) == "table" and type(journal_cfg.subdir) == "string" and journal_cfg.subdir ~= "" then
             base_subdir = journal_cfg.subdir
         end
     end
@@ -230,13 +301,31 @@ function M.execute(_ctx, _input)
             title = note_title,
             token = token,
         })
-        if type(template_content) == "string" and template_content ~= "" then
-            local rendered = ctx.template.render(template_content, {
-                title = note_title,
-                origin = input.origin,
-                kind = note_kind,
-            })
-            content = tostring((rendered and rendered.rendered) or "")
+        if template_content ~= nil then
+            if type(template_content) ~= "string" then
+                return {
+                    ok = false,
+                    path = nil,
+                    created = nil,
+                    error = errors.new(errors.codes.INTERNAL, "resolve_template_content returned non-string content"),
+                }
+            end
+            if template_content ~= "" then
+                local rendered = ctx.template.render(template_content, {
+                    title = note_title,
+                    origin = input.origin,
+                    kind = note_kind,
+                })
+                if type(rendered) ~= "table" or type(rendered.rendered) ~= "string" then
+                    return {
+                        ok = false,
+                        path = nil,
+                        created = nil,
+                        error = errors.new(errors.codes.INTERNAL, "template.render returned invalid result"),
+                    }
+                end
+                content = rendered.rendered
+            end
         end
     end
 
