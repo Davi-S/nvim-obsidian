@@ -69,6 +69,38 @@ local function numeric_keys(tbl)
     return keys
 end
 
+local function build_omni_ordinal(item, label)
+    local candidate = type(item) == "table" and item.candidate or nil
+    local aliases = {}
+    local title = ""
+    local relpath = ""
+    local path = ""
+
+    if type(candidate) == "table" then
+        title = tostring(candidate.title or "")
+        relpath = tostring(candidate.relpath or "")
+        path = tostring(candidate.path or "")
+        if type(candidate.aliases) == "table" then
+            for _, alias in ipairs(candidate.aliases) do
+                if type(alias) == "string" and alias ~= "" then
+                    table.insert(aliases, alias)
+                end
+            end
+        end
+    end
+
+    -- Keep aliases first in ordinal so exact alias typing is strongly favored by fuzzy sort.
+    local parts = {
+        table.concat(aliases, " "),
+        title,
+        relpath,
+        path,
+        tostring(label or ""),
+    }
+
+    return table.concat(parts, " ")
+end
+
 function M._prepare_candidates(ctx, notes)
     if type(notes) ~= "table" then
         report_error("telescope _prepare_candidates received invalid notes payload")
@@ -152,7 +184,7 @@ function M.open_omni(ctx)
                     kind = "item",
                     idx = idx,
                     label = label,
-                    ordinal = string.lower(label),
+                    ordinal = build_omni_ordinal(item, label),
                 })
                 item_map[idx] = item
             end
@@ -163,7 +195,7 @@ function M.open_omni(ctx)
             table.insert(entries, {
                 kind = "create",
                 label = create_label,
-                ordinal = string.lower(create_label),
+                ordinal = create_label,
             })
         end
 

@@ -508,4 +508,220 @@ describe("telescope picker adapter", function()
             assert.equal(match_map[2].custom, "data_b")
         end)
     end)
+
+    describe("omni payload regressions", function()
+        it("preserves original-case ordinals for Telescope filtering", function()
+            local captured = {
+                finder = nil,
+                select_handler = nil,
+            }
+
+            local original_preload = {}
+            local original_loaded = {}
+            local module_names = {
+                "telescope.pickers",
+                "telescope.finders",
+                "telescope.config",
+                "telescope.actions",
+                "telescope.actions.state",
+                "nvim_obsidian.adapters.picker.telescope",
+            }
+
+            for _, name in ipairs(module_names) do
+                original_preload[name] = package.preload[name]
+                original_loaded[name] = package.loaded[name]
+            end
+
+            package.preload["telescope.pickers"] = function()
+                return {
+                    new = function(_, spec)
+                        captured.finder = spec.finder
+                        spec.attach_mappings(1, function() end)
+                        return {
+                            find = function() end,
+                        }
+                    end,
+                }
+            end
+
+            package.preload["telescope.finders"] = function()
+                return {
+                    new_table = function(opts)
+                        return opts
+                    end,
+                }
+            end
+
+            package.preload["telescope.config"] = function()
+                return {
+                    values = {
+                        generic_sorter = function()
+                            return function() end
+                        end,
+                        file_previewer = function()
+                            return function() end
+                        end,
+                    },
+                }
+            end
+
+            package.preload["telescope.actions"] = function()
+                return {
+                    close = function() end,
+                    select_default = {
+                        replace = function(fn)
+                            captured.select_handler = fn
+                        end,
+                    },
+                }
+            end
+
+            package.preload["telescope.actions.state"] = function()
+                return {
+                    get_selected_entry = function()
+                        return nil
+                    end,
+                }
+            end
+
+            package.loaded["nvim_obsidian.adapters.picker.telescope"] = nil
+            local adapter = require("nvim_obsidian.adapters.picker.telescope")
+
+            local out = adapter.open_omni({
+                query = "ABC",
+                items = {
+                    {
+                        label = "ABC -> notes/Alpha.md",
+                        candidate = {
+                            path = "/vault/notes/Alpha.md",
+                        },
+                    },
+                },
+                allow_create = true,
+            })
+
+            assert.is_table(out)
+            assert.equals("deferred", out.action)
+            assert.is_table(captured.finder)
+            assert.is_table(captured.finder.results)
+
+            local first = captured.finder.entry_maker(captured.finder.results[1])
+            local create = captured.finder.entry_maker(captured.finder.results[2])
+
+            assert.equals("ABC -> notes/Alpha.md", first.ordinal)
+            assert.equals("+ Create: ABC", create.ordinal)
+
+            for _, name in ipairs(module_names) do
+                package.preload[name] = original_preload[name]
+                package.loaded[name] = original_loaded[name]
+            end
+        end)
+
+        it("includes aliases in ordinal with alias-first weighting", function()
+            local captured = {
+                finder = nil,
+            }
+
+            local original_preload = {}
+            local original_loaded = {}
+            local module_names = {
+                "telescope.pickers",
+                "telescope.finders",
+                "telescope.config",
+                "telescope.actions",
+                "telescope.actions.state",
+                "nvim_obsidian.adapters.picker.telescope",
+            }
+
+            for _, name in ipairs(module_names) do
+                original_preload[name] = package.preload[name]
+                original_loaded[name] = package.loaded[name]
+            end
+
+            package.preload["telescope.pickers"] = function()
+                return {
+                    new = function(_, spec)
+                        captured.finder = spec.finder
+                        spec.attach_mappings(1, function() end)
+                        return {
+                            find = function() end,
+                        }
+                    end,
+                }
+            end
+
+            package.preload["telescope.finders"] = function()
+                return {
+                    new_table = function(opts)
+                        return opts
+                    end,
+                }
+            end
+
+            package.preload["telescope.config"] = function()
+                return {
+                    values = {
+                        generic_sorter = function()
+                            return function() end
+                        end,
+                        file_previewer = function()
+                            return function() end
+                        end,
+                    },
+                }
+            end
+
+            package.preload["telescope.actions"] = function()
+                return {
+                    close = function() end,
+                    select_default = {
+                        replace = function() end,
+                    },
+                }
+            end
+
+            package.preload["telescope.actions.state"] = function()
+                return {
+                    get_selected_entry = function()
+                        return nil
+                    end,
+                }
+            end
+
+            package.loaded["nvim_obsidian.adapters.picker.telescope"] = nil
+            local adapter = require("nvim_obsidian.adapters.picker.telescope")
+
+            local out = adapter.open_omni({
+                query = "",
+                items = {
+                    {
+                        label = "Introducao -> notas/calc.md",
+                        candidate = {
+                            title = "Introducao a Geometria",
+                            aliases = { "GAAL" },
+                            relpath = "notas/calc.md",
+                            path = "/vault/notas/calc.md",
+                        },
+                    },
+                },
+                allow_create = false,
+            })
+
+            assert.is_table(out)
+            assert.equals("deferred", out.action)
+            assert.is_table(captured.finder)
+            assert.is_table(captured.finder.results)
+
+            local first = captured.finder.entry_maker(captured.finder.results[1])
+
+            assert.is_true(first.ordinal:find("GAAL", 1, true) == 1)
+            assert.truthy(first.ordinal:find("Introducao a Geometria", 1, true))
+            assert.truthy(first.ordinal:find("/vault/notas/calc.md", 1, true))
+
+            for _, name in ipairs(module_names) do
+                package.preload[name] = original_preload[name]
+                package.loaded[name] = original_loaded[name]
+            end
+        end)
+    end)
 end)
