@@ -4,9 +4,11 @@ local commands = require("nvim_obsidian.adapters.neovim.commands")
 
 describe("neovim command adapter", function()
     local command_registry = {}
+    local autocmd_registry = {}
 
     before_each(function()
         command_registry = {}
+        autocmd_registry = {}
         _G.vim = _G.vim or {}
         _G.vim.api = _G.vim.api or {}
         _G.vim.tbl_deep_extend = _G.vim.tbl_deep_extend or function(_mode, base, ext)
@@ -21,6 +23,16 @@ describe("neovim command adapter", function()
         end
         _G.vim.api.nvim_create_user_command = function(name, fn)
             command_registry[name] = fn
+        end
+        _G.vim.api.nvim_create_augroup = function(_name, _opts)
+            return 1
+        end
+        _G.vim.api.nvim_create_autocmd = function(events, opts)
+            table.insert(autocmd_registry, {
+                events = events,
+                opts = opts,
+            })
+            return #autocmd_registry
         end
         _G.vim.api.nvim_buf_get_name = function()
             return "/vault/journal/daily/2026-03-10.md"
@@ -411,6 +423,42 @@ describe("neovim command adapter", function()
             })
 
             assert.is_function(commands.register)
+        end)
+
+        it("registers dataview autocmds for configured triggers", function()
+            local calls = {}
+            local container = base_container({
+                config = {
+                    dataview = {
+                        enabled = true,
+                        render = {
+                            when = { "on_open", "on_save" },
+                            patterns = { "*.md" },
+                        },
+                    },
+                },
+                use_cases = {
+                    render_query_blocks = {
+                        execute = function(_ctx, input)
+                            table.insert(calls, input)
+                            return { ok = true, processed_blocks = 1, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            assert.equals(1, #autocmd_registry)
+
+            local callback = autocmd_registry[1].opts.callback
+            assert.is_function(callback)
+
+            callback({ event = "BufReadPost", buf = 7 })
+            callback({ event = "BufWritePost", buf = 7 })
+
+            assert.equals(2, #calls)
+            assert.equals("on_open", calls[1].trigger)
+            assert.equals("on_save", calls[2].trigger)
         end)
     end)
 

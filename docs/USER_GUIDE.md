@@ -577,6 +577,7 @@ require("nvim_obsidian").setup({
   vault_root = vim.fn.expand("~/ObsidianVault"),
   dataview = {
     enabled = true,
+    placement = "below_block", -- or "above_block"
     render = {
       when = { "on_open", "on_save" },
       scope = "event",

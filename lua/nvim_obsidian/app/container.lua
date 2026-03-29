@@ -31,6 +31,7 @@ end
 
 function M.build(user_opts)
     local opts = config.normalize(user_opts)
+    local dataview_namespace = nil
 
     local vault_catalog = require("nvim_obsidian.core.domains.vault_catalog.impl")
     local journal = require("nvim_obsidian.core.domains.journal.impl")
@@ -122,33 +123,56 @@ function M.build(user_opts)
 
             return table.concat(lines, "\n")
         end,
-        apply_rendered_blocks = function(buffer, patches)
-            if not vim or not vim.api or type(vim.api.nvim_buf_set_lines) ~= "function" then
-                return false, "nvim buffer write API is unavailable"
+        apply_rendered_blocks = function(buffer, overlays)
+            if not vim or not vim.api then
+                return false, "nvim API is unavailable"
             end
 
-            if type(patches) ~= "table" then
-                return false, "patches must be a table"
+            if type(vim.api.nvim_buf_clear_namespace) ~= "function" or type(vim.api.nvim_buf_set_extmark) ~= "function" then
+                return false, "nvim extmark API is unavailable"
             end
 
-            -- Apply from bottom to top so line numbers remain stable.
-            table.sort(patches, function(a, b)
-                return (a.start_line or 0) > (b.start_line or 0)
-            end)
+            if dataview_namespace == nil then
+                if type(vim.api.nvim_create_namespace) ~= "function" then
+                    return false, "nvim namespace API is unavailable"
+                end
+                dataview_namespace = vim.api.nvim_create_namespace("nvim-obsidian-dataview")
+            end
 
-            for _, patch in ipairs(patches) do
-                local start_line = tonumber(patch.start_line)
-                local end_line = tonumber(patch.end_line)
-                local lines = patch.lines
+            if type(overlays) ~= "table" then
+                return false, "overlays must be a table"
+            end
 
-                if not start_line or not end_line or start_line < 1 or end_line < start_line then
-                    return false, "invalid patch range"
+            local clear_ok, clear_err = pcall(vim.api.nvim_buf_clear_namespace, buffer, dataview_namespace, 0, -1)
+            if not clear_ok then
+                return false, tostring(clear_err)
+            end
+
+            for _, overlay in ipairs(overlays) do
+                local anchor_line = tonumber(overlay.anchor_line)
+                local lines = overlay.lines
+                local placement = tostring(overlay.placement or "below_block")
+
+                if not anchor_line or anchor_line < 1 then
+                    return false, "invalid overlay anchor_line"
                 end
                 if type(lines) ~= "table" then
-                    return false, "invalid patch lines"
+                    return false, "invalid overlay lines"
                 end
 
-                local ok, err = pcall(vim.api.nvim_buf_set_lines, buffer, start_line - 1, end_line, false, lines)
+                local virt_lines = {}
+                for _, line in ipairs(lines) do
+                    table.insert(virt_lines, {
+                        { tostring(line), "Comment" },
+                    })
+                end
+
+                local virt_lines_above = (placement == "above_block")
+                local ok, err = pcall(vim.api.nvim_buf_set_extmark, buffer, dataview_namespace, anchor_line - 1, 0, {
+                    virt_lines = virt_lines,
+                    virt_lines_above = virt_lines_above,
+                    hl_mode = "combine",
+                })
                 if not ok then
                     return false, tostring(err)
                 end

@@ -635,6 +635,81 @@ local function register_obsidian_render_dataview(ctx)
     end, { desc = "Render dataview blocks in current buffer" })
 end
 
+local function register_dataview_autocmds(ctx)
+    if not ctx or not ctx.config or not ctx.config.dataview or ctx.config.dataview.enabled ~= true then
+        return
+    end
+    if not ctx.use_cases or not ctx.use_cases.render_query_blocks or type(ctx.use_cases.render_query_blocks.execute) ~= "function" then
+        return
+    end
+    if not vim or not vim.api or type(vim.api.nvim_create_autocmd) ~= "function" then
+        return
+    end
+
+    local render_cfg = ctx.config.dataview.render or {}
+    local when = type(render_cfg.when) == "table" and render_cfg.when or {}
+    local patterns = type(render_cfg.patterns) == "table" and render_cfg.patterns or { "*.md" }
+
+    local trigger_for_event = {
+        BufReadPost = "on_open",
+        BufWritePost = "on_save",
+    }
+
+    local selected_events = {}
+    local function has_trigger(name)
+        for _, configured in ipairs(when) do
+            if configured == name then
+                return true
+            end
+        end
+        return false
+    end
+
+    if has_trigger("on_open") then
+        table.insert(selected_events, "BufReadPost")
+    end
+    if has_trigger("on_save") then
+        table.insert(selected_events, "BufWritePost")
+    end
+    if #selected_events == 0 then
+        return
+    end
+
+    local group = nil
+    if type(vim.api.nvim_create_augroup) == "function" then
+        group = vim.api.nvim_create_augroup("NvimObsidianDataview", { clear = true })
+    end
+
+    vim.api.nvim_create_autocmd(selected_events, {
+        group = group,
+        pattern = patterns,
+        callback = function(args)
+            local trigger = trigger_for_event[args.event]
+            if not trigger then
+                return
+            end
+
+            local result = ctx.use_cases.render_query_blocks.execute(ctx, {
+                buffer = args.buf,
+                trigger = trigger,
+            })
+
+            if not result or result.ok ~= true then
+                if result and result.error and result.error.code == "parse_failure" then
+                    if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn then
+                        ctx.adapters.notifications.warn("Parse error in dataview block: " ..
+                        tostring(result.error.message or "parse failed"))
+                    end
+                    return
+                end
+                if result and result.error then
+                    error_to_notification(ctx, result.error)
+                end
+            end
+        end,
+    })
+end
+
 local function register_obsidian_health(ctx)
     create_user_command("ObsidianHealth", function()
         if ctx and ctx.adapters and ctx.adapters.notifications then
@@ -658,6 +733,7 @@ function M.register(container)
     register_obsidian_reindex(container)
     register_obsidian_insert_template(container)
     register_obsidian_render_dataview(container)
+    register_dataview_autocmds(container)
     register_obsidian_health(container)
 end
 

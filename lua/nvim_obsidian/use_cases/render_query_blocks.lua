@@ -377,7 +377,12 @@ function M.execute(_ctx, _input)
     local no_results_enabled = no_results_cfg.enabled
     local no_results_text = no_results_cfg.text
 
-    local patches = {}
+    local overlays = {}
+
+    local placement = dataview_cfg.placement
+    if placement ~= "below_block" and placement ~= "above_block" then
+        return invalid("ctx.config.dataview.placement must be below_block|above_block")
+    end
 
     for _, block in ipairs(blocks) do
         local source_rows = notes
@@ -387,9 +392,7 @@ function M.execute(_ctx, _input)
         end
 
         local exec = dataview.execute_query(block, source_rows)
-        local lines = {
-            "<!-- nvim-obsidian:dataview:start -->",
-        }
+        local lines = {}
 
         if exec and exec.error then
             local message = type(exec.error.message) == "string" and exec.error.message or "query execution failed"
@@ -422,16 +425,14 @@ function M.execute(_ctx, _input)
             end
         end
 
-        table.insert(lines, "<!-- nvim-obsidian:dataview:end -->")
-
-        table.insert(patches, {
-            start_line = block.start_line,
-            end_line = block.end_line,
+        table.insert(overlays, {
+            anchor_line = block.end_line,
+            placement = placement,
             lines = lines,
         })
     end
 
-    local applied, apply_err = apply_rendered_blocks(input.buffer, patches)
+    local applied, apply_err = apply_rendered_blocks(input.buffer, overlays)
     if not applied then
         return {
             ok = false,
@@ -449,7 +450,7 @@ function M.execute(_ctx, _input)
 
     return {
         ok = true,
-        rendered_blocks = #patches,
+        rendered_blocks = #overlays,
         error = nil,
     }
 end

@@ -10,6 +10,7 @@ describe("render_query_blocks use case", function()
         local ctx = {
             config = {
                 dataview = {
+                    placement = "below_block",
                     render = {
                         when = {
                             open = true,
@@ -27,8 +28,8 @@ describe("render_query_blocks use case", function()
             get_buffer_markdown = function(_buffer)
                 return "# note\n```dataview\nTASK\nFROM \"notes\"\n```"
             end,
-            apply_rendered_blocks = function(_buffer, patches)
-                applied = patches
+            apply_rendered_blocks = function(_buffer, overlays)
+                applied = overlays
                 return true
             end,
             dataview = {
@@ -90,25 +91,25 @@ describe("render_query_blocks use case", function()
         })
     end
 
-    it("renders parsed blocks and applies patches", function()
+    it("renders parsed blocks and applies virtual overlays", function()
         local ctx = base_ctx()
 
         local out = run(ctx)
         assert.is_true(out.ok)
         assert.equals(1, out.rendered_blocks)
 
-        local patches = ctx._applied()
-        assert.equals(1, #patches)
-        assert.equals(2, patches[1].start_line)
-        assert.equals("<!-- nvim-obsidian:dataview:start -->", patches[1].lines[1])
-        assert.equals("- [ ] [[A]]", patches[1].lines[2])
-        assert.equals("<!-- nvim-obsidian:dataview:end -->", patches[1].lines[3])
+        local overlays = ctx._applied()
+        assert.equals(1, #overlays)
+        assert.equals(5, overlays[1].anchor_line)
+        assert.equals("below_block", overlays[1].placement)
+        assert.equals("- [ ] [[A]]", overlays[1].lines[1])
     end)
 
     it("returns zero rendered blocks when trigger is disabled by config", function()
         local ctx = base_ctx({
             config = {
                 dataview = {
+                    placement = "below_block",
                     render = {
                         when = {
                             open = false,
@@ -161,7 +162,7 @@ describe("render_query_blocks use case", function()
         assert.is_true(out.ok)
 
         local lines = ctx._applied()[1].lines
-        assert.equals("Dataview: No results to show for task query.", lines[2])
+        assert.equals("Dataview: No results to show for task query.", lines[1])
     end)
 
     it("renders execution errors inside block output without failing whole operation", function()
@@ -192,7 +193,7 @@ describe("render_query_blocks use case", function()
         assert.is_true(out.ok)
 
         local lines = ctx._applied()[1].lines
-        assert.equals("Dataview: invalid dataview clause", lines[2])
+        assert.equals("Dataview: invalid dataview clause", lines[1])
     end)
 
     it("returns internal when patch application fails", function()
@@ -211,7 +212,7 @@ describe("render_query_blocks use case", function()
         local ctx = base_ctx()
         local out = run(ctx, {
             buffer = 1,
-            trigger = "on_buf_enter",
+            trigger = "on_write",
         })
 
         assert.is_false(out.ok)

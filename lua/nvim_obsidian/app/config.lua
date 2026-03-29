@@ -83,7 +83,6 @@ local function validate_dataview(opts)
     local allowed_when = {
         on_open = true,
         on_save = true,
-        on_buf_enter = true,
     }
     for _, trigger in ipairs(dv.render.when) do
         validate_enum(trigger, allowed_when, "dataview.render.when")

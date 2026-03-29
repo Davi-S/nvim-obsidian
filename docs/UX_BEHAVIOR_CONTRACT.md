@@ -116,7 +116,7 @@ Purpose: Render dataview blocks in current buffer.
 Behavior:
 1. Detect dataview blocks.
 2. Parse and execute TASK/TABLE queries.
-3. Insert/replace rendered blocks with markers.
+3. Render query results as extmarks with virtual lines (non-mutating).
 4. Respect configured placement/scope/patterns.
 
 ---

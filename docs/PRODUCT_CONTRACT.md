@@ -130,8 +130,9 @@ Clarification on wikilink resolution and ambiguity:
 ### 8. Dataview Integration
 - [ ] Parse and execute TASK and TABLE dataview blocks.
 - [ ] Render placement, trigger events, scope, patterns, and messages are configurable.
+- [ ] Rendering is non-mutating: query text remains intact and results are shown via extmarks/virtual lines.
 - [ ] Command: :ObsidianRenderDataview for explicit re-render.
-- [ ] On-open/on-save/on-buf-enter hooks are configurable.
+- [ ] On-open/on-save hooks are configurable.
 - [ ] Parse and execution errors are rendered clearly without crashing UI.
 
 ### 9. Completion (nvim-cmp)
