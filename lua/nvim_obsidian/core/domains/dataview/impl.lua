@@ -737,6 +737,42 @@ local function table_cell(note, expr)
     return tostring(resolved)
 end
 
+local function pad_cell(text, width, align_right)
+    local value = tostring(text or "")
+    local function display_width(s)
+        if type(vim) == "table" and type(vim.fn) == "table" and type(vim.fn.strdisplaywidth) == "function" then
+            local ok, w = pcall(vim.fn.strdisplaywidth, s)
+            if ok and type(w) == "number" then
+                return w
+            end
+        end
+        return #s
+    end
+
+    local value_width = display_width(value)
+    local cell_width = tonumber(width) or value_width
+    if cell_width < value_width then
+        cell_width = value_width
+    end
+
+    local pad = cell_width - value_width
+    if pad < 0 then
+        pad = 0
+    end
+
+    if align_right then
+        return string.rep(" ", pad) .. value
+    end
+    return value .. string.rep(" ", pad)
+end
+
+local function is_numeric_text(value)
+    if value == nil then
+        return false
+    end
+    return tonumber(tostring(value)) ~= nil
+end
+
 function M.execute_query(block, notes)
     if type(block) ~= "table" then
         return {
@@ -913,30 +949,64 @@ function M.execute_query(block, notes)
         local rows = {}
         local rendered_lines = {}
         local headers = {}
-
-        for _, projection in ipairs(query.projections or {}) do
-            table.insert(headers, projection.label)
+        local widths = {}
+        local right_align = {}
+        local function display_width(s)
+            local text = tostring(s or "")
+            if type(vim) == "table" and type(vim.fn) == "table" and type(vim.fn.strdisplaywidth) == "function" then
+                local ok, w = pcall(vim.fn.strdisplaywidth, text)
+                if ok and type(w) == "number" then
+                    return w
+                end
+            end
+            return #text
         end
 
-        if #headers > 0 then
-            table.insert(rendered_lines, {
-                text = table.concat(headers, " | "),
-                highlight = "table_header",
-            })
-            table.insert(rendered_lines, {
-                text = string.rep("-", 40),
-                highlight = "table_header",
-            })
+        for _, projection in ipairs(query.projections or {}) do
+            local label = tostring(projection.label or "")
+            table.insert(headers, label)
+            table.insert(widths, display_width(label))
+            table.insert(right_align, true)
         end
 
         for _, note in ipairs(where_rows) do
             local row = {}
-            for _, projection in ipairs(query.projections or {}) do
-                table.insert(row, table_cell(note, projection.expr))
+            for col, projection in ipairs(query.projections or {}) do
+                local cell = table_cell(note, projection.expr)
+                table.insert(row, cell)
+                widths[col] = math.max(widths[col] or 0, display_width(cell))
+                if right_align[col] and not is_numeric_text(cell) then
+                    right_align[col] = false
+                end
             end
             table.insert(rows, row)
+        end
+
+        if #headers > 0 then
+            local formatted_header = {}
+            for col, label in ipairs(headers) do
+                table.insert(formatted_header, pad_cell(label, widths[col], false))
+            end
+
+            local delimiter = "  "
+            local header_text = table.concat(formatted_header, delimiter)
             table.insert(rendered_lines, {
-                text = table.concat(row, " | "),
+                text = header_text,
+                highlight = "table_header",
+            })
+            table.insert(rendered_lines, {
+                text = string.rep("-", display_width(header_text)),
+                highlight = "table_header",
+            })
+        end
+
+        for _, row in ipairs(rows) do
+            local formatted = {}
+            for col, cell in ipairs(row) do
+                table.insert(formatted, pad_cell(cell, widths[col], right_align[col] == true))
+            end
+            table.insert(rendered_lines, {
+                text = table.concat(formatted, "  "),
                 highlight = "table_link",
             })
         end
