@@ -69,6 +69,63 @@ local function numeric_keys(tbl)
     return keys
 end
 
+local function trim(text)
+    return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function lower(text)
+    return string.lower(trim(text))
+end
+
+local function path_for_display(candidate)
+    if type(candidate) ~= "table" then
+        return ""
+    end
+    local relpath = tostring(candidate.relpath or "")
+    if relpath ~= "" then
+        return relpath
+    end
+    return tostring(candidate.path or "")
+end
+
+local function alias_exact_match(candidate, query)
+    if type(candidate) ~= "table" or type(candidate.aliases) ~= "table" then
+        return nil
+    end
+
+    local q = lower(query)
+    if q == "" then
+        return nil
+    end
+
+    for _, alias in ipairs(candidate.aliases) do
+        if type(alias) == "string" and lower(alias) == q then
+            return alias
+        end
+    end
+
+    return nil
+end
+
+local function label_for_item(item, base_label, query)
+    if type(item) ~= "table" then
+        return tostring(base_label or "")
+    end
+
+    local candidate = item.candidate
+    local alias = alias_exact_match(candidate, query)
+    if not alias then
+        return tostring(base_label or "")
+    end
+
+    local path = path_for_display(candidate)
+    if path == "" then
+        return alias
+    end
+
+    return alias .. " -> " .. path
+end
+
 local function build_omni_ordinal(item, label)
     local candidate = type(item) == "table" and item.candidate or nil
     local aliases = {}
@@ -222,7 +279,22 @@ function M.open_omni(ctx)
                     end
                     return {
                         value = entry,
-                        display = entry.label,
+                        display = function()
+                            if entry.kind ~= "item" or type(entry.idx) ~= "number" then
+                                return entry.label
+                            end
+
+                            local mapped = item_map[entry.idx]
+                            local prompt_query = query
+                            if telescope.action_state and type(telescope.action_state.get_current_line) == "function" then
+                                local current_line = telescope.action_state.get_current_line()
+                                if type(current_line) == "string" then
+                                    prompt_query = current_line
+                                end
+                            end
+
+                            return label_for_item(mapped, entry.label, prompt_query)
+                        end,
                         ordinal = entry.ordinal,
                         filename = filename,
                         path = filename,
