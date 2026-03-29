@@ -324,10 +324,6 @@ local function register_obsidian_today(ctx)
             return
         end
 
-        if ctx.adapters and ctx.adapters.navigation then
-            ctx.adapters.navigation.open_path(result.path)
-        end
-
         if result.created and ctx.adapters and ctx.adapters.notifications then
             ctx.adapters.notifications.info("Created today's note: " .. result.path)
         end
@@ -354,10 +350,6 @@ local function register_obsidian_next(ctx)
             error_to_notification(ctx, result.error)
             return
         end
-
-        if ctx.adapters and ctx.adapters.navigation then
-            ctx.adapters.navigation.open_path(result.path)
-        end
     end, { desc = "Open or create next journal note in current context" })
 end
 
@@ -380,10 +372,6 @@ local function register_obsidian_prev(ctx)
         if not result.ok then
             error_to_notification(ctx, result.error)
             return
-        end
-
-        if ctx.adapters and ctx.adapters.navigation then
-            ctx.adapters.navigation.open_path(result.path)
         end
     end, { desc = "Open or create previous journal note in current context" })
 end
