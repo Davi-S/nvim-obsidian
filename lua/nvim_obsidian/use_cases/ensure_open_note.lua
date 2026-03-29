@@ -88,12 +88,12 @@ function M.execute(_ctx, _input)
     local navigation = ctx.navigation
     local fs_io = ctx.fs_io
 
-    if type(vault_catalog) ~= "table" or type(vault_catalog.find_by_title_or_alias) ~= "function" then
+    if type(vault_catalog) ~= "table" or type(vault_catalog.find_by_identity_token) ~= "function" then
         return {
             ok = false,
             path = nil,
             created = nil,
-            error = errors.new(errors.codes.INVALID_INPUT, "ctx.vault_catalog.find_by_title_or_alias is required"),
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.vault_catalog.find_by_identity_token is required"),
         }
     end
 
@@ -115,7 +115,7 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local lookup = vault_catalog.find_by_title_or_alias(token)
+    local lookup = vault_catalog.find_by_identity_token(token)
     if type(lookup) ~= "table" or type(lookup.matches) ~= "table" then
         return {
             ok = false,

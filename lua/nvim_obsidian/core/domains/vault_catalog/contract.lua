@@ -27,7 +27,7 @@ local M = {
                 error = "domain_error|nil",
             },
         },
-        find_by_title_or_alias = {
+        find_by_identity_token = {
             input = {
                 token = "string",
             },

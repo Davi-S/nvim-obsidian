@@ -179,14 +179,26 @@ function M.open_omni(ctx)
             finder = telescope.finders.new_table({
                 results = entries,
                 entry_maker = function(entry)
+                    local filename = nil
+                    if entry.kind == "item" and type(entry.idx) == "number" then
+                        local mapped = item_map[entry.idx]
+                        local candidate = mapped and mapped.candidate or nil
+                        local path = candidate and candidate.path or nil
+                        if type(path) == "string" and path ~= "" then
+                            filename = path
+                        end
+                    end
                     return {
                         value = entry,
                         display = entry.label,
                         ordinal = entry.ordinal,
+                        filename = filename,
+                        path = filename,
                     }
                 end,
             }),
             sorter = telescope.config.values.generic_sorter({}),
+            previewer = telescope.config.values.file_previewer({}),
             attach_mappings = function(prompt_bufnr, map)
                 local function trigger_open(item)
                     telescope.actions.close(prompt_bufnr)

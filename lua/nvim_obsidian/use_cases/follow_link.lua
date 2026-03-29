@@ -81,11 +81,11 @@ function M.execute(_ctx, _input)
         }
     end
 
-    if type(vault_catalog) ~= "table" or type(vault_catalog.find_by_title_or_alias) ~= "function" then
+    if type(vault_catalog) ~= "table" or type(vault_catalog.find_by_identity_token) ~= "function" then
         return {
             ok = false,
             status = "invalid",
-            error = errors.new(errors.codes.INVALID_INPUT, "ctx.vault_catalog.find_by_title_or_alias is required"),
+            error = errors.new(errors.codes.INVALID_INPUT, "ctx.vault_catalog.find_by_identity_token is required"),
         }
     end
 
@@ -143,7 +143,7 @@ function M.execute(_ctx, _input)
         if type(vault_catalog.list_notes) == "function" then
             candidate_notes = vault_catalog.list_notes()
         else
-            local lookup = vault_catalog.find_by_title_or_alias(token)
+            local lookup = vault_catalog.find_by_identity_token(token)
             if type(lookup) == "table" then
                 candidate_notes = lookup.matches
             end
@@ -195,7 +195,7 @@ function M.execute(_ctx, _input)
                 local from_item_path = item and type(item.path) == "string" and item.path or ""
                 picked_path = tostring(from_path ~= "" and from_path or from_item_path)
                 if picked_path == "" and type(item) == "table" and type(item.candidate) == "table" then
-                    picked_path = tostring(picked.item.candidate.path or "")
+                    picked_path = tostring(item.candidate.path or "")
                 end
                 if picked_path == "" then
                     picked_path = nil
@@ -261,6 +261,7 @@ function M.execute(_ctx, _input)
             error = errors.new(errors.codes.INTERNAL, "resolved target is missing a valid path"),
         }
     end
+
     local opened, open_err = navigation.open_path(path)
     if not opened then
         return {

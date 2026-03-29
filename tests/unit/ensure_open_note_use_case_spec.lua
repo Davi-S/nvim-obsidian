@@ -31,7 +31,7 @@ describe("ensure_open_note use case", function()
                 return nil
             end,
             vault_catalog = {
-                find_by_title_or_alias = function(_token)
+                find_by_identity_token = function(_token)
                     return { matches = {} }
                 end,
                 upsert_note = function(_note)
@@ -66,7 +66,7 @@ describe("ensure_open_note use case", function()
     it("opens existing note when single match is found", function()
         local ctx = base_ctx({
             vault_catalog = {
-                find_by_title_or_alias = function()
+                find_by_identity_token = function()
                     return {
                         matches = {
                             { path = "notes/existing.md", title = "existing", aliases = {} },
@@ -92,7 +92,7 @@ describe("ensure_open_note use case", function()
     it("returns ambiguous_target when multiple matches are found", function()
         local ctx = base_ctx({
             vault_catalog = {
-                find_by_title_or_alias = function()
+                find_by_identity_token = function()
                     return {
                         matches = {
                             { path = "a/foo.md" },

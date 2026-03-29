@@ -31,7 +31,7 @@ describe("follow_link use case", function()
                 end,
             },
             vault_catalog = {
-                find_by_title_or_alias = function()
+                find_by_identity_token = function()
                     return {
                         matches = {
                             { path = "notes/target.md", title = "Target", aliases = {} },

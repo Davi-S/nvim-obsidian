@@ -114,7 +114,7 @@ function M.remove_note(path)
     return { ok = true, error = nil }
 end
 
-function M.find_by_title_or_alias(token)
+function M.find_by_identity_token(token)
     local q = tostring(token or "")
     if q == "" then
         return { matches = {} }
@@ -163,6 +163,9 @@ function M.find_by_title_or_alias(token)
 
     return { matches = dedup_by_path(ci) }
 end
+
+-- Backward-compatible alias; callers should migrate to find_by_identity_token.
+M.find_by_title_or_alias = M.find_by_identity_token
 
 function M.list_notes()
     return collect_notes_sorted()

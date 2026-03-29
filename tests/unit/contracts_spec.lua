@@ -8,7 +8,7 @@ describe("domain contracts", function()
         assertions.assert_contract_shape(contract, "vault_catalog")
         assertions.assert_api_operation(contract, "upsert_note")
         assertions.assert_api_operation(contract, "remove_note")
-        assertions.assert_api_operation(contract, "find_by_title_or_alias")
+        assertions.assert_api_operation(contract, "find_by_identity_token")
     end)
 
     it("journal contract exposes stable operations", function()
