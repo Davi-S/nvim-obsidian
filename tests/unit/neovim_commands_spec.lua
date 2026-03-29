@@ -9,6 +9,7 @@ describe("neovim command adapter", function()
     before_each(function()
         command_registry = {}
         autocmd_registry = {}
+        local scheduled_queue = {}
         _G.vim = _G.vim or {}
         _G.vim.api = _G.vim.api or {}
         _G.vim.tbl_deep_extend = _G.vim.tbl_deep_extend or function(_mode, base, ext)
@@ -34,6 +35,15 @@ describe("neovim command adapter", function()
             })
             return #autocmd_registry
         end
+        _G.vim.schedule = function(fn)
+            table.insert(scheduled_queue, fn)
+        end
+        _G.vim._drain_scheduled = function()
+            while #scheduled_queue > 0 do
+                local fn = table.remove(scheduled_queue, 1)
+                fn()
+            end
+        end
         _G.vim.api.nvim_buf_get_name = function()
             return "/vault/journal/daily/2026-03-10.md"
         end
@@ -42,6 +52,12 @@ describe("neovim command adapter", function()
         end
         _G.vim.api.nvim_win_get_cursor = function()
             return { 1, 0 }
+        end
+        _G.vim.api.nvim_buf_is_valid = function()
+            return true
+        end
+        _G.vim.api.nvim_buf_is_loaded = function()
+            return true
         end
     end)
 
@@ -454,6 +470,8 @@ describe("neovim command adapter", function()
             assert.is_function(callback)
 
             callback({ event = "BufReadPost", buf = 7 })
+            assert.equals(0, #calls)
+            _G.vim._drain_scheduled()
             callback({ event = "BufWritePost", buf = 7 })
 
             assert.equals(2, #calls)

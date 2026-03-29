@@ -677,23 +677,44 @@ local function register_dataview_autocmds(ctx)
                 return
             end
 
-            local result = ctx.use_cases.render_query_blocks.execute(ctx, {
-                buffer = args.buf,
-                trigger = trigger,
-            })
-
-            if not result or result.ok ~= true then
-                if result and result.error and result.error.code == "parse_failure" then
-                    if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn then
-                        ctx.adapters.notifications.warn("Parse error in dataview block: " ..
-                            tostring(result.error.message or "parse failed"))
+            local function run_render(buffer, render_trigger)
+                if type(vim) == "table" and type(vim.api) == "table" then
+                    if type(vim.api.nvim_buf_is_valid) == "function" and not vim.api.nvim_buf_is_valid(buffer) then
+                        return
                     end
-                    return
+                    if type(vim.api.nvim_buf_is_loaded) == "function" and not vim.api.nvim_buf_is_loaded(buffer) then
+                        return
+                    end
                 end
-                if result and result.error then
-                    error_to_notification(ctx, result.error)
+
+                local result = ctx.use_cases.render_query_blocks.execute(ctx, {
+                    buffer = buffer,
+                    trigger = render_trigger,
+                })
+
+                if not result or result.ok ~= true then
+                    if result and result.error and result.error.code == "parse_failure" then
+                        if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn then
+                            ctx.adapters.notifications.warn("Parse error in dataview block: " ..
+                                tostring(result.error.message or "parse failed"))
+                        end
+                        return
+                    end
+                    if result and result.error then
+                        error_to_notification(ctx, result.error)
+                    end
                 end
             end
+
+            if trigger == "on_open" and type(vim) == "table" and type(vim.schedule) == "function" then
+                local buffer = args.buf
+                vim.schedule(function()
+                    run_render(buffer, trigger)
+                end)
+                return
+            end
+
+            run_render(args.buf, trigger)
         end,
     })
 end
