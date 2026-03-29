@@ -3,6 +3,36 @@
 local commands = require("nvim_obsidian.adapters.neovim.commands")
 
 describe("neovim command adapter", function()
+    local command_registry = {}
+
+    before_each(function()
+        command_registry = {}
+        _G.vim = _G.vim or {}
+        _G.vim.api = _G.vim.api or {}
+        _G.vim.tbl_deep_extend = _G.vim.tbl_deep_extend or function(_mode, base, ext)
+            local out = {}
+            for k, v in pairs(base or {}) do
+                out[k] = v
+            end
+            for k, v in pairs(ext or {}) do
+                out[k] = v
+            end
+            return out
+        end
+        _G.vim.api.nvim_create_user_command = function(name, fn)
+            command_registry[name] = fn
+        end
+        _G.vim.api.nvim_buf_get_name = function()
+            return "/vault/journal/daily/2026-03-10.md"
+        end
+        _G.vim.api.nvim_get_current_line = function()
+            return ""
+        end
+        _G.vim.api.nvim_win_get_cursor = function()
+            return { 1, 0 }
+        end
+    end)
+
     local function base_container(overrides)
         local ctx = {
             config = {
@@ -146,6 +176,44 @@ describe("neovim command adapter", function()
             })
 
             assert.is_function(commands.register)
+        end)
+    end)
+
+    describe(":ObsidianNext", function()
+        it("should compute target relative to currently opened note", function()
+            local observed = nil
+            local container = base_container({
+                journal = {
+                    classify_input = function()
+                        return { kind = "daily" }
+                    end,
+                    compute_adjacent = function(_kind, date, direction)
+                        assert.equals("next", direction)
+                        observed = date
+                        return { target_date = { year = 2026, month = 3, day = 11 } }
+                    end,
+                },
+                resolve_journal_title = function(_kind, date)
+                    return string.format("%04d-%02d-%02d", date.year, date.month, date.day)
+                end,
+                use_cases = {
+                    ensure_open_note = {
+                        execute = function(_ctx, input)
+                            assert.equals("2026-03-11", input.title_or_token)
+                            return { ok = true, path = "journal/daily/2026-03-11.md", created = false, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            assert.is_function(command_registry["ObsidianNext"])
+
+            command_registry["ObsidianNext"]()
+            assert.is_not_nil(observed)
+            assert.equals(2026, observed.year)
+            assert.equals(3, observed.month)
+            assert.equals(10, observed.day)
         end)
     end)
 

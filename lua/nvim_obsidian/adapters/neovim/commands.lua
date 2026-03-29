@@ -57,6 +57,136 @@ local function trim(s)
     return out
 end
 
+local function strip_accents(text)
+    local s = tostring(text or "")
+    local replacements = {
+        ["á"] = "a",
+        ["à"] = "a",
+        ["ã"] = "a",
+        ["â"] = "a",
+        ["ä"] = "a",
+        ["é"] = "e",
+        ["è"] = "e",
+        ["ê"] = "e",
+        ["ë"] = "e",
+        ["í"] = "i",
+        ["ì"] = "i",
+        ["î"] = "i",
+        ["ï"] = "i",
+        ["ó"] = "o",
+        ["ò"] = "o",
+        ["õ"] = "o",
+        ["ô"] = "o",
+        ["ö"] = "o",
+        ["ú"] = "u",
+        ["ù"] = "u",
+        ["û"] = "u",
+        ["ü"] = "u",
+        ["ç"] = "c",
+    }
+    for accented, base in pairs(replacements) do
+        s = s:gsub(accented, base)
+    end
+    return s
+end
+
+local MONTH_INDEX = {
+    january = 1,
+    fevereiro = 2,
+    february = 2,
+    march = 3,
+    marco = 3,
+    april = 4,
+    abril = 4,
+    may = 5,
+    maio = 5,
+    june = 6,
+    junho = 6,
+    july = 7,
+    julho = 7,
+    august = 8,
+    agosto = 8,
+    september = 9,
+    setembro = 9,
+    october = 10,
+    outubro = 10,
+    november = 11,
+    novembro = 11,
+    december = 12,
+    dezembro = 12,
+    janeiro = 1,
+}
+
+local function iso_week_start(iso_year, iso_week)
+    local jan4 = os.time({ year = iso_year, month = 1, day = 4, hour = 12 })
+    local jan4_wday = tonumber(os.date("%u", jan4)) or 1
+    local week1_monday = jan4 - ((jan4_wday - 1) * 86400)
+    local target = week1_monday + ((iso_week - 1) * 7 * 86400)
+    local dt = os.date("*t", target)
+    return { year = dt.year, month = dt.month, day = dt.day }
+end
+
+local function parse_date_from_note_token(token, kind)
+    local raw = tostring(token or "")
+    if raw == "" then
+        return nil
+    end
+
+    local lower = strip_accents(raw:lower())
+
+    if kind == "daily" then
+        local y, m, d = raw:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+        if y and m and d then
+            return { year = tonumber(y), month = tonumber(m), day = tonumber(d) }
+        end
+
+        local y2, month_name, d2 = lower:match("^(%d%d%d%d)%s+(%S+)%s+(%d%d?)")
+        local month = month_name and MONTH_INDEX[month_name]
+        if y2 and month and d2 then
+            return { year = tonumber(y2), month = month, day = tonumber(d2) }
+        end
+    end
+
+    if kind == "weekly" then
+        local y, w = raw:match("^(%d%d%d%d)%-[Ww](%d%d)$")
+        if y and w then
+            return iso_week_start(tonumber(y), tonumber(w))
+        end
+
+        local y2, w2 = lower:match("^(%d%d%d%d)%s+[Ww]eek%s+(%d%d?)$")
+        if y2 and w2 then
+            return iso_week_start(tonumber(y2), tonumber(w2))
+        end
+
+        local y3, w3 = lower:match("^(%d%d%d%d)%s+semana%s+(%d%d?)$")
+        if y3 and w3 then
+            return iso_week_start(tonumber(y3), tonumber(w3))
+        end
+    end
+
+    if kind == "monthly" then
+        local y, m = raw:match("^(%d%d%d%d)%-(%d%d)$")
+        if y and m then
+            return { year = tonumber(y), month = tonumber(m), day = 1 }
+        end
+
+        local y2, month_name = lower:match("^(%d%d%d%d)%s+(%S+)$")
+        local month = month_name and MONTH_INDEX[month_name]
+        if y2 and month then
+            return { year = tonumber(y2), month = month, day = 1 }
+        end
+    end
+
+    if kind == "yearly" then
+        local y = raw:match("^(%d%d%d%d)$")
+        if y then
+            return { year = tonumber(y), month = 1, day = 1 }
+        end
+    end
+
+    return nil
+end
+
 local function split_lines(text)
     local out = {}
     for line in (tostring(text or "") .. "\n"):gmatch("(.-)\n") do
@@ -99,13 +229,28 @@ local function resolve_journal_kind(ctx)
     return kind
 end
 
+local function current_note_anchor_date(kind)
+    local token = current_note_token()
+    if not token then
+        return os.date("*t")
+    end
+
+    local parsed = parse_date_from_note_token(token, kind)
+    if type(parsed) == "table" then
+        return parsed
+    end
+
+    return os.date("*t")
+end
+
 local function journal_token_for(ctx, kind, direction)
     local journal = ctx.journal
     if type(journal) ~= "table" or type(journal.compute_adjacent) ~= "function" then
         return os.date("%Y-%m-%d", os.time())
     end
 
-    local adjacent = journal.compute_adjacent(kind, os.time(), direction)
+    local anchor_date = current_note_anchor_date(kind)
+    local adjacent = journal.compute_adjacent(kind, anchor_date, direction)
     local target_date = (adjacent and adjacent.target_date) or os.date("*t")
 
     if type(ctx.resolve_journal_title) == "function" then
