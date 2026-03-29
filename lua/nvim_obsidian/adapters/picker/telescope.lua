@@ -1,15 +1,27 @@
 local M = {}
 
+local function report_error(message)
+    if vim and type(vim.notify) == "function" then
+        local level = nil
+        if vim.log and vim.log.levels then
+            level = vim.log.levels.WARN
+        end
+        pcall(vim.notify, tostring(message), level, { title = "nvim-obsidian" })
+    end
+end
+
 local function has_select()
     return vim and vim.ui and type(vim.ui.select) == "function"
 end
 
 local function safe_call(fn, ...)
     if type(fn) ~= "function" then
+        report_error("adapter boundary error: expected callable function")
         return nil
     end
     local ok, a, b = pcall(fn, ...)
     if not ok then
+        report_error("adapter boundary error: callback failed: " .. tostring(a))
         return nil
     end
     return a, b
@@ -30,6 +42,11 @@ local function numeric_keys(tbl)
 end
 
 function M._prepare_candidates(ctx, notes)
+    if type(notes) ~= "table" then
+        report_error("telescope _prepare_candidates received invalid notes payload")
+        return {}, {}
+    end
+
     local valid_notes = {}
     for _, i in ipairs(numeric_keys(notes)) do
         local note = notes[i]
@@ -147,10 +164,15 @@ function M.open_omni(ctx)
     -- Legacy/simple mode used by existing unit tests.
     local notes_fn = ctx and ctx.vault_catalog and ctx.vault_catalog.list_notes
     if type(notes_fn) ~= "function" then
+        report_error("ObsidianOmni adapter: vault_catalog.list_notes is required")
         return false
     end
 
-    local notes = safe_call(notes_fn) or {}
+    local notes = safe_call(notes_fn)
+    if type(notes) ~= "table" then
+        report_error("ObsidianOmni adapter: list_notes returned invalid result")
+        return false
+    end
     local items, note_map = M._prepare_candidates(ctx or {}, notes)
     if #items == 0 then
         return false
@@ -217,7 +239,11 @@ function M.open_search(opts)
         return false
     end
 
-    local root = opts.root or (vim and vim.fn and vim.fn.getcwd and vim.fn.getcwd()) or "."
+    local root = opts.root
+    if type(root) ~= "string" or root == "" then
+        report_error("ObsidianSearch adapter: root must be a non-empty string")
+        return false
+    end
     local query = tostring(opts.query or "")
     if query == "" and vim and vim.fn and type(vim.fn.input) == "function" then
         query = tostring(vim.fn.input("Search vault: "))

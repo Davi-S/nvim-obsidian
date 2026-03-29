@@ -10,6 +10,28 @@ local function create_user_command(name, fn, opts)
     vim.api.nvim_create_user_command(name, fn, merged)
 end
 
+local function get_current_line_and_col()
+    if not vim or not vim.api then
+        return nil, nil
+    end
+    if type(vim.api.nvim_get_current_line) ~= "function" or type(vim.api.nvim_win_get_cursor) ~= "function" then
+        return nil, nil
+    end
+
+    local ok_line, line = pcall(vim.api.nvim_get_current_line)
+    local ok_cur, cur = pcall(vim.api.nvim_win_get_cursor, 0)
+    if not ok_line or not ok_cur or type(line) ~= "string" or type(cur) ~= "table" then
+        return nil, nil
+    end
+
+    local col = tonumber(cur[2])
+    if col == nil then
+        return nil, nil
+    end
+
+    return line, col
+end
+
 local function error_to_notification(ctx, error_obj)
     if not ctx or not ctx.adapters or not ctx.adapters.notifications then
         return
@@ -206,7 +228,10 @@ local function register_obsidian_omni(ctx)
             return
         end
 
-        local result = ctx.use_cases.search_open_create.execute(ctx, {})
+        local result = ctx.use_cases.search_open_create.execute(ctx, {
+            query = "",
+            allow_force_create = true,
+        })
 
         if not result.ok then
             if result.error and result.error.code == "cancelled" then
@@ -233,7 +258,21 @@ local function register_obsidian_follow(ctx)
             return
         end
 
-        local result = ctx.use_cases.follow_link.execute(ctx, {})
+        local buffer_path = get_current_buffer_path()
+        local line, col = get_current_line_and_col()
+
+        if not buffer_path or not line or col == nil then
+            if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn then
+                ctx.adapters.notifications.warn("ObsidianFollow unavailable: missing current buffer context")
+            end
+            return
+        end
+
+        local result = ctx.use_cases.follow_link.execute(ctx, {
+            line = line,
+            col = col,
+            buffer_path = buffer_path,
+        })
 
         if not result.ok then
             local error_code = result.error and result.error.code
@@ -335,7 +374,13 @@ local function register_obsidian_reindex(ctx)
         end
 
         if ctx.adapters and ctx.adapters.notifications then
-            ctx.adapters.notifications.info("Reindex complete: " .. tostring(result.reindexed_count) .. " notes indexed")
+            local count = nil
+            if type(result.stats) == "table" then
+                count = result.stats.upserted or result.stats.scanned
+            else
+                count = result.reindexed_count
+            end
+            ctx.adapters.notifications.info("Reindex complete: " .. tostring(count or "unknown") .. " notes indexed")
         end
     end, { desc = "Explicitly rebuild vault index (full rescan)" })
 end
@@ -383,7 +428,25 @@ local function register_obsidian_render_dataview(ctx)
             return
         end
 
-        local result = ctx.use_cases.render_query_blocks.execute(ctx, {})
+        if not vim or not vim.api or type(vim.api.nvim_get_current_buf) ~= "function" then
+            if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.error then
+                ctx.adapters.notifications.error("ObsidianRenderDataview unavailable: nvim buffer API is missing")
+            end
+            return
+        end
+
+        local ok_buf, buffer = pcall(vim.api.nvim_get_current_buf)
+        if not ok_buf or type(buffer) ~= "number" then
+            if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.error then
+                ctx.adapters.notifications.error("ObsidianRenderDataview unavailable: failed to resolve current buffer")
+            end
+            return
+        end
+
+        local result = ctx.use_cases.render_query_blocks.execute(ctx, {
+            buffer = buffer,
+            trigger = "manual",
+        })
 
         if not result.ok then
             if result.error and result.error.code == "parse_failure" then
@@ -397,7 +460,11 @@ local function register_obsidian_render_dataview(ctx)
         end
 
         if ctx.adapters and ctx.adapters.notifications then
-            ctx.adapters.notifications.info("Rendered " .. tostring(result.processed_blocks) .. " dataview blocks")
+            local count = result.processed_blocks
+            if count == nil then
+                count = result.rendered_blocks
+            end
+            ctx.adapters.notifications.info("Rendered " .. tostring(count or 0) .. " dataview blocks")
         end
     end, { desc = "Render dataview blocks in current buffer" })
 end

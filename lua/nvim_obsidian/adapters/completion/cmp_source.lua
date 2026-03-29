@@ -6,6 +6,16 @@
 
 local M = {}
 
+local function report_error(message)
+    if vim and type(vim.notify) == "function" then
+        local level = nil
+        if vim.log and vim.log.levels then
+            level = vim.log.levels.WARN
+        end
+        pcall(vim.notify, tostring(message), level, { title = "nvim-obsidian" })
+    end
+end
+
 --- Get trigger characters for completion source
 ---@return string[]
 function M.get_trigger_characters()
@@ -147,11 +157,36 @@ function M.create_source(ctx)
 
         -- Get vault notes
         local notes = {}
-        pcall(function()
-            if ctx.vault_catalog and ctx.vault_catalog.list_notes then
-                notes = ctx.vault_catalog.list_notes() or {}
+        if not (ctx.vault_catalog and type(ctx.vault_catalog.list_notes) == "function") then
+            report_error("cmp source: vault_catalog.list_notes is unavailable")
+            if callback then
+                pcall(function()
+                    callback(result)
+                end)
             end
-        end)
+            return
+        end
+
+        local ok_notes, listed = pcall(ctx.vault_catalog.list_notes)
+        if not ok_notes then
+            report_error("cmp source: list_notes failed: " .. tostring(listed))
+            if callback then
+                pcall(function()
+                    callback(result)
+                end)
+            end
+            return
+        end
+        if type(listed) ~= "table" then
+            report_error("cmp source: list_notes returned invalid result")
+            if callback then
+                pcall(function()
+                    callback(result)
+                end)
+            end
+            return
+        end
+        notes = listed
 
         if #notes == 0 then
             if callback then
@@ -167,11 +202,16 @@ function M.create_source(ctx)
 
         -- Rank candidates by relevance score
         local ranked = filtered
-        pcall(function()
-            if ctx.search_ranking and ctx.search_ranking.score_candidates then
-                ranked = ctx.search_ranking.score_candidates(query, filtered) or filtered
+        if ctx.search_ranking and type(ctx.search_ranking.score_candidates) == "function" then
+            local ok_ranked, scored = pcall(ctx.search_ranking.score_candidates, query, filtered)
+            if not ok_ranked then
+                report_error("cmp source: ranking failed: " .. tostring(scored))
+            elseif type(scored) == "table" then
+                ranked = scored
+            else
+                report_error("cmp source: ranking returned invalid result")
             end
-        end)
+        end
 
         -- Convert ranked results to completion items
         for _, score_data in ipairs(ranked) do
