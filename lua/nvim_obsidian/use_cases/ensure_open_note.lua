@@ -268,18 +268,9 @@ function M.execute(_ctx, _input)
 
     if input.origin == "journal" and note_kind ~= "none" then
         local journal_cfg = type(cfg.journal) == "table" and cfg.journal[note_kind] or nil
-        if type(ctx.resolve_journal_title) == "function" then
-            local resolved_title = ctx.resolve_journal_title(note_kind, input.now or os.time())
-            if type(resolved_title) ~= "string" or resolved_title == "" then
-                return {
-                    ok = false,
-                    path = nil,
-                    created = nil,
-                    error = errors.new(errors.codes.INTERNAL, "resolve_journal_title returned invalid title"),
-                }
-            end
-            note_title = resolved_title
-        end
+        -- For journal navigation commands (Today/Next/Prev), title_or_token already
+        -- represents the exact target note title and must not be recomputed from "now".
+        note_title = token
         if type(journal_cfg) == "table" and type(journal_cfg.subdir) == "string" and journal_cfg.subdir ~= "" then
             base_subdir = journal_cfg.subdir
         end

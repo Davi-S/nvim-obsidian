@@ -172,6 +172,33 @@ describe("ensure_open_note use case", function()
         assert.equals("journal/daily/2026 março 29, domingo.md", ctx._opened[1])
     end)
 
+    it("preserves provided journal token for adjacent navigation targets", function()
+        local ctx = base_ctx({
+            journal = {
+                classify_input = function()
+                    return { kind = "none" }
+                end,
+            },
+            resolve_journal_title = function()
+                return "today-title"
+            end,
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "tomorrow-title",
+            create_if_missing = true,
+            origin = "journal",
+            journal_kind = "daily",
+            now = os.time(),
+        })
+
+        assert.is_true(out.ok)
+        assert.is_true(out.created)
+        assert.equals("journal/daily/tomorrow-title.md", out.path)
+        assert.equals("journal/daily/tomorrow-title.md", ctx._writes[1].path)
+        assert.equals("journal/daily/tomorrow-title.md", ctx._opened[1])
+    end)
+
     it("creates in default subdir for non-journal origin", function()
         local ctx = base_ctx({
             journal = {
