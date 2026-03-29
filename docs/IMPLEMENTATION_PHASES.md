@@ -15,7 +15,8 @@ This document is the execution roadmap for V2. It captures phase goals, delivera
 - Phase 5: Completed
 - Phase 6: Completed
 - Phase 7: Completed
-- Phase 8: In progress (final checkup and validation)
+- Phase 8: Completed
+- Phase 9: In progress (hardening and quality gates)
 
 ---
 
@@ -257,6 +258,12 @@ Status notes (March 2026):
  - Included example configurations (minimal, standard, advanced) and common error diagnostics.
  - Verification: All documentation complete and links validated.
 
+**Phase 8 Final Checkup** ✅ Complete
+- Public API alignment implemented for placeholder registration and command behavior.
+- setup remains deterministic/idempotent while startup reindex now runs non-blocking via scheduled execution.
+- Dependency checks are enforced at setup time with clear failure messages.
+- Verification: full test pyramid passes (unit, integration, e2e).
+
 ---
 
 ## Phase 9: Hardening and Quality Gates
@@ -280,6 +287,14 @@ Verification:
 1. Quality gate checklist all green.
 2. E2E critical workflows pass consistently.
 3. No flaky tests accepted.
+
+Status notes (March 2026):
+1. Phase 9 started.
+2. Hardening checklist created in docs/PHASE_9_HARDENING_PLAN.md.
+3. Next execution focus:
+   - Performance baselines for cold index/incremental updates/dataview rendering.
+   - Reliability stress scenarios for watcher bursts and rename/delete/create churn.
+   - Failure-mode validation for corrupt frontmatter, broken links, and missing dependencies.
 
 ---
 
