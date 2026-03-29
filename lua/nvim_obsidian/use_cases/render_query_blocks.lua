@@ -4,6 +4,10 @@ local M = {}
 
 local TASK_PATTERN = "^(%s*)%- %[(.)%]%s*(.*)$"
 
+local task_cache = {
+    by_path = {},
+}
+
 local function split_lines(text)
     local src = tostring(text or "")
     if src == "" then
@@ -124,11 +128,76 @@ local function note_date_timestamp(path, title, frontmatter)
     return nil
 end
 
-local function collect_task_rows(ctx, query)
-    if type(query) ~= "table" or query.kind ~= "task" then
+local function is_absolute_path(path)
+    local p = tostring(path or "")
+    if p:match("^/") then
+        return true
+    end
+    if p:match("^%a:[/\\]") then
+        return true
+    end
+    return false
+end
+
+local function join_path(base, leaf)
+    local b = tostring(base or ""):gsub("\\", "/"):gsub("//+", "/"):gsub("/+$", "")
+    local l = tostring(leaf or ""):gsub("\\", "/"):gsub("^/", "")
+    if b == "" then
+        return l
+    end
+    if l == "" then
+        return b
+    end
+    return b .. "/" .. l
+end
+
+local function file_stat(path)
+    if type(path) ~= "string" or path == "" then
         return nil
     end
 
+    if vim and type(vim.uv) == "table" and type(vim.uv.fs_stat) == "function" then
+        local ok, stat = pcall(vim.uv.fs_stat, path)
+        if ok and type(stat) == "table" then
+            local mtime = nil
+            if type(stat.mtime) == "number" then
+                mtime = stat.mtime
+            elseif type(stat.mtime) == "table" then
+                mtime = tonumber(stat.mtime.sec)
+            end
+            local size = tonumber(stat.size)
+            if mtime ~= nil or size ~= nil then
+                return {
+                    mtime = mtime,
+                    size = size,
+                }
+            end
+        end
+    end
+
+    if vim and type(vim.loop) == "table" and type(vim.loop.fs_stat) == "function" then
+        local ok, stat = pcall(vim.loop.fs_stat, path)
+        if ok and type(stat) == "table" then
+            local mtime = nil
+            if type(stat.mtime) == "number" then
+                mtime = stat.mtime
+            elseif type(stat.mtime) == "table" then
+                mtime = tonumber(stat.mtime.sec)
+            end
+            local size = tonumber(stat.size)
+            if mtime ~= nil or size ~= nil then
+                return {
+                    mtime = mtime,
+                    size = size,
+                }
+            end
+        end
+    end
+
+    return nil
+end
+
+local function collect_markdown_paths(ctx)
     local paths = nil
     if type(ctx.scan_markdown_files) == "function" then
         paths = ctx.scan_markdown_files()
@@ -140,50 +209,120 @@ local function collect_task_rows(ctx, query)
         return nil
     end
 
+    local vault_root = type(ctx.config) == "table" and ctx.config.vault_root or nil
+    local dedup = {}
+    local out = {}
+    for _, p in ipairs(paths) do
+        if type(p) == "string" and p ~= "" then
+            local candidate = p
+            if not is_absolute_path(candidate) and type(vault_root) == "string" and vault_root ~= "" then
+                candidate = join_path(vault_root, candidate)
+            end
+            if not dedup[candidate] then
+                dedup[candidate] = true
+                table.insert(out, candidate)
+            end
+        end
+    end
+
+    table.sort(out)
+    return out
+end
+
+local function parse_task_rows_for_file(ctx, abs_path)
+    local content = ctx.fs_io.read_file(abs_path)
+    if type(content) ~= "string" then
+        return {}
+    end
+
+    local vault_root = type(ctx.config) == "table" and ctx.config.vault_root or nil
+    local relpath = relpath_from_root(abs_path, vault_root)
+    local title = stem(abs_path)
+
+    local meta = nil
+    if type(ctx.frontmatter) == "table" and type(ctx.frontmatter.parse) == "function" then
+        local parsed = ctx.frontmatter.parse(content)
+        if type(parsed) == "table" then
+            meta = parsed
+        end
+    end
+
+    local ts = note_date_timestamp(relpath, title, meta)
+    local rows = {}
+    for line_no, line in ipairs(split_lines(content)) do
+        local _, mark, text = line:match(TASK_PATTERN)
+        if mark then
+            table.insert(rows, {
+                checked = mark ~= " ",
+                text = tostring(text or ""),
+                raw = line,
+                line = line_no,
+                file = {
+                    path = relpath,
+                    title = title,
+                    name = title,
+                    link = {
+                        date = ts,
+                    },
+                },
+            })
+        end
+    end
+
+    return rows
+end
+
+local function collect_task_rows(ctx, query)
+    if type(query) ~= "table" or query.kind ~= "task" then
+        return nil
+    end
+
+    local paths = collect_markdown_paths(ctx)
+
+    if type(paths) ~= "table" then
+        return nil
+    end
+
     if type(ctx.fs_io) ~= "table" or type(ctx.fs_io.read_file) ~= "function" then
         return nil
     end
 
-    local vault_root = type(ctx.config) == "table" and ctx.config.vault_root or nil
     local task_rows = {}
+    local seen = {}
 
     for _, abs_path in ipairs(paths) do
-        if type(abs_path) == "string" and abs_path ~= "" then
-            local content = ctx.fs_io.read_file(abs_path)
-            if type(content) == "string" then
-                local relpath = relpath_from_root(abs_path, vault_root)
-                local title = stem(abs_path)
+        seen[abs_path] = true
+        local stat = file_stat(abs_path)
+        local cached = task_cache.by_path[abs_path]
 
-                local meta = nil
-                if type(ctx.frontmatter) == "table" and type(ctx.frontmatter.parse) == "function" then
-                    local parsed = ctx.frontmatter.parse(content)
-                    if type(parsed) == "table" then
-                        meta = parsed
-                    end
-                end
+        local should_reparse = true
+        if cached and stat and cached.mtime == stat.mtime and cached.size == stat.size then
+            should_reparse = false
+        elseif cached and not stat and type(cached.rows) == "table" then
+            -- No stat support available; keep behavior correct by reparsing.
+            should_reparse = true
+        end
 
-                local ts = note_date_timestamp(relpath, title, meta)
+        if should_reparse then
+            local rows = parse_task_rows_for_file(ctx, abs_path)
+            task_cache.by_path[abs_path] = {
+                mtime = stat and stat.mtime or nil,
+                size = stat and stat.size or nil,
+                rows = rows,
+            }
+            cached = task_cache.by_path[abs_path]
+        end
 
-                for line_no, line in ipairs(split_lines(content)) do
-                    local _, mark, text = line:match(TASK_PATTERN)
-                    if mark then
-                        table.insert(task_rows, {
-                            checked = mark ~= " ",
-                            text = tostring(text or ""),
-                            raw = line,
-                            line = line_no,
-                            file = {
-                                path = relpath,
-                                title = title,
-                                name = title,
-                                link = {
-                                    date = ts,
-                                },
-                            },
-                        })
-                    end
-                end
+        if cached and type(cached.rows) == "table" then
+            for _, row in ipairs(cached.rows) do
+                table.insert(task_rows, row)
             end
+        end
+    end
+
+    for cached_path, _ in pairs(task_cache.by_path) do
+        if not seen[cached_path] then
+            task_cache.by_path[cached_path] = nil
         end
     end
 
