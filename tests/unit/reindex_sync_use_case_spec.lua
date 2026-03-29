@@ -200,4 +200,49 @@ describe("reindex_sync use case", function()
         assert.is_false(out.ok)
         assert.equals("internal", out.error.code)
     end)
+
+    it("invalidates render task cache on full reindex", function()
+        local invalidation_calls = 0
+        local invalidation_arg = "unset"
+        local ctx = base_ctx({
+            render_query_blocks = {
+                invalidate_task_cache = function(paths)
+                    invalidation_calls = invalidation_calls + 1
+                    invalidation_arg = paths
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, { mode = "manual", event = nil })
+        assert.is_true(out.ok)
+        assert.equals(1, invalidation_calls)
+        assert.is_nil(invalidation_arg)
+    end)
+
+    it("invalidates render task cache for changed paths on event sync", function()
+        local invalidations = {}
+        local ctx = base_ctx({
+            replace_catalog = nil,
+            scan_markdown_files = nil,
+            render_query_blocks = {
+                invalidate_task_cache = function(paths)
+                    table.insert(invalidations, paths)
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            mode = "event",
+            event = {
+                kind = "rename",
+                old_path = "vault/old.md",
+                new_path = "vault/new.md",
+            },
+        })
+
+        assert.is_true(out.ok)
+        assert.equals(2, #invalidations)
+        assert.equals("vault/old.md", invalidations[1])
+        assert.equals("vault/new.md", invalidations[2])
+    end)
 end)

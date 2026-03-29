@@ -3,6 +3,12 @@
 local use_case = require("nvim_obsidian.use_cases.render_query_blocks")
 
 describe("render_query_blocks use case", function()
+    before_each(function()
+        if type(use_case.invalidate_task_cache) == "function" then
+            use_case.invalidate_task_cache(nil)
+        end
+    end)
+
     local function base_ctx(overrides)
         local applied = nil
         local warned = {}
@@ -255,27 +261,50 @@ describe("render_query_blocks use case", function()
         assert.equals(1, #ctx._warned)
     end)
 
-    it("reuses cached task rows when file stat is unchanged", function()
-        local original_vim = _G.vim
-        local stats = {
-            ["/vault/notes/a.md"] = { mtime = { sec = 100 }, size = 42 },
-        }
-        _G.vim = {
-            uv = {
-                fs_stat = function(path)
-                    return stats[path]
+    it("returns early with zero blocks without collecting vault notes", function()
+        local applied = nil
+        local ctx = base_ctx({
+            dataview = {
+                parse_blocks = function()
+                    return {
+                        blocks = {},
+                        error = nil,
+                    }
+                end,
+                execute_query = function()
+                    error("execute_query should not be called for empty blocks")
                 end,
             },
-        }
+            vault_catalog = {
+                list_notes = function()
+                    error("list_notes should not be called for empty blocks")
+                end,
+            },
+            apply_rendered_blocks = function(_buffer, overlays)
+                applied = overlays
+                return true
+            end,
+        })
 
-        local reads = 0
+        local out = run(ctx)
+        assert.is_true(out.ok)
+        assert.equals(0, out.rendered_blocks)
+        assert.is_table(applied)
+        assert.equals(0, #applied)
+    end)
+
+    it("reuses cached task extraction when file signature is unchanged", function()
+        local read_count = 0
         local ctx = base_ctx({
             config = {
                 vault_root = "/vault",
                 dataview = {
                     placement = "below_block",
                     render = {
-                        when = { open = true, save = true },
+                        when = {
+                            open = true,
+                            save = true,
+                        },
                         messages = {
                             task_no_results = {
                                 enabled = true,
@@ -285,153 +314,57 @@ describe("render_query_blocks use case", function()
                     },
                 },
             },
-            scan_markdown_files = function()
-                return { "/vault/notes/a.md" }
-            end,
             fs_io = {
-                read_file = function(path)
-                    if path == "/vault/notes/a.md" then
-                        reads = reads + 1
-                        return "- [ ] Task A"
-                    end
-                    return nil
+                list_markdown_files = function()
+                    return { "/vault/notes/a.md" }
                 end,
-            },
-        })
-
-        local first = run(ctx)
-        local second = run(ctx)
-
-        _G.vim = original_vim
-
-        assert.is_true(first.ok)
-        assert.is_true(second.ok)
-        assert.equals(1, reads)
-    end)
-
-    it("reparses task file when file stat changes", function()
-        local original_vim = _G.vim
-        local stat_version = 1
-        _G.vim = {
-            uv = {
-                fs_stat = function(path)
-                    if path ~= "/vault/notes/a.md" then
-                        return nil
-                    end
+                read_file = function()
+                    read_count = read_count + 1
+                    return "- [ ] cached task"
+                end,
+                stat_file = function()
                     return {
-                        mtime = { sec = 200 + stat_version },
-                        size = 50,
+                        size = 128,
+                        mtime = { sec = 1234 },
                     }
                 end,
             },
-        }
-
-        local reads = 0
-        local ctx = base_ctx({
-            config = {
-                vault_root = "/vault",
-                dataview = {
-                    placement = "below_block",
-                    render = {
-                        when = { open = true, save = true },
-                        messages = {
-                            task_no_results = {
-                                enabled = true,
-                                text = "Dataview: No results to show for task query.",
+            frontmatter = {
+                parse = function()
+                    return {}
+                end,
+            },
+            dataview = {
+                parse_blocks = function()
+                    return {
+                        blocks = {
+                            {
+                                start_line = 2,
+                                end_line = 5,
+                                query = { kind = "task" },
                             },
                         },
-                    },
-                },
-            },
-            scan_markdown_files = function()
-                return { "/vault/notes/a.md" }
-            end,
-            fs_io = {
-                read_file = function(path)
-                    if path == "/vault/notes/a.md" then
-                        reads = reads + 1
-                        return "- [ ] Task A"
-                    end
-                    return nil
+                        error = nil,
+                    }
+                end,
+                execute_query = function(_block, notes)
+                    return {
+                        result = {
+                            kind = "task",
+                            rows = notes,
+                            rendered_lines = {},
+                        },
+                        error = nil,
+                    }
                 end,
             },
         })
 
         local first = run(ctx)
-        stat_version = 2
         local second = run(ctx)
-
-        _G.vim = original_vim
 
         assert.is_true(first.ok)
         assert.is_true(second.ok)
-        assert.equals(2, reads)
-    end)
-
-    it("evicts removed paths from cache so reintroduced files reparse", function()
-        local original_vim = _G.vim
-        local current_paths = { "/vault/notes/a.md" }
-        _G.vim = {
-            uv = {
-                fs_stat = function(path)
-                    if path == "/vault/notes/a.md" then
-                        return { mtime = { sec = 300 }, size = 20 }
-                    end
-                    if path == "/vault/notes/b.md" then
-                        return { mtime = { sec = 301 }, size = 21 }
-                    end
-                    return nil
-                end,
-            },
-        }
-
-        local read_counts = { a = 0, b = 0 }
-        local ctx = base_ctx({
-            config = {
-                vault_root = "/vault",
-                dataview = {
-                    placement = "below_block",
-                    render = {
-                        when = { open = true, save = true },
-                        messages = {
-                            task_no_results = {
-                                enabled = true,
-                                text = "Dataview: No results to show for task query.",
-                            },
-                        },
-                    },
-                },
-            },
-            scan_markdown_files = function()
-                return current_paths
-            end,
-            fs_io = {
-                read_file = function(path)
-                    if path == "/vault/notes/a.md" then
-                        read_counts.a = read_counts.a + 1
-                        return "- [ ] Task A"
-                    end
-                    if path == "/vault/notes/b.md" then
-                        read_counts.b = read_counts.b + 1
-                        return "- [ ] Task B"
-                    end
-                    return nil
-                end,
-            },
-        })
-
-        local first = run(ctx)
-        current_paths = { "/vault/notes/b.md" }
-        local second = run(ctx)
-        current_paths = { "/vault/notes/a.md" }
-        local third = run(ctx)
-
-        _G.vim = original_vim
-
-        assert.is_true(first.ok)
-        assert.is_true(second.ok)
-        assert.is_true(third.ok)
-        assert.equals(2, read_counts.a)
-        assert.equals(1, read_counts.b)
+        assert.equals(1, read_count)
     end)
 end)

@@ -86,6 +86,12 @@ function M.execute(_ctx, _input)
         end
     end
 
+    local function invalidate_task_cache(paths)
+        if type(ctx.render_query_blocks) == "table" and type(ctx.render_query_blocks.invalidate_task_cache) == "function" then
+            ctx.render_query_blocks.invalidate_task_cache(paths)
+        end
+    end
+
     local function basename(path)
         local p = tostring(path or ""):gsub("\\", "/")
         return p:match("[^/]+$") or p
@@ -202,12 +208,13 @@ function M.execute(_ctx, _input)
             }
         end
         stats.upserted = #rebuilt
+        invalidate_task_cache(nil)
 
         if mode == "startup" and type(watcher) == "table" and type(watcher.start) == "function" then
             local started, start_err = watcher.start(ctx)
             if not started then
                 warn("Watcher start failed: " ..
-                tostring(start_err and start_err.message or start_err or "unknown error"))
+                    tostring(start_err and start_err.message or start_err or "unknown error"))
             end
         end
 
@@ -244,6 +251,7 @@ function M.execute(_ctx, _input)
                 return
             end
             local removed = vault_catalog.remove_note(p)
+            invalidate_task_cache(p)
             if removed and removed.ok then
                 stats.removed = stats.removed + 1
             elseif removed and removed.error and removed.error.code == errors.codes.NOT_FOUND then
@@ -268,6 +276,7 @@ function M.execute(_ctx, _input)
             local upsert = vault_catalog.upsert_note(note)
             if upsert and upsert.ok then
                 stats.upserted = stats.upserted + 1
+                invalidate_task_cache(p)
             else
                 stats.errors = stats.errors + 1
             end
