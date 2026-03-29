@@ -396,7 +396,10 @@ function M.execute(_ctx, _input)
 
         if exec and exec.error then
             local message = type(exec.error.message) == "string" and exec.error.message or "query execution failed"
-            table.insert(lines, "Dataview: " .. message)
+            table.insert(lines, {
+                text = "Dataview: " .. message,
+                highlight = "error",
+            })
         else
             local result = type(exec) == "table" and exec.result or nil
             if type(result) ~= "table" then
@@ -417,10 +420,20 @@ function M.execute(_ctx, _input)
             end
 
             if result.kind == "task" and #rendered == 0 and no_results_enabled then
-                table.insert(lines, no_results_text)
+                table.insert(lines, {
+                    text = no_results_text,
+                    highlight = "task_no_results",
+                })
             else
                 for _, line in ipairs(rendered) do
-                    table.insert(lines, tostring(line))
+                    if type(line) == "table" and type(line.text) == "string" then
+                        table.insert(lines, line)
+                    else
+                        table.insert(lines, {
+                            text = tostring(line),
+                            highlight = "task_text",
+                        })
+                    end
                 end
             end
         end
@@ -432,7 +445,7 @@ function M.execute(_ctx, _input)
         })
     end
 
-    local applied, apply_err = apply_rendered_blocks(input.buffer, overlays)
+    local applied, apply_err = apply_rendered_blocks(input.buffer, overlays, dataview_cfg.highlights)
     if not applied then
         return {
             ok = false,

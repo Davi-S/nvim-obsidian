@@ -777,13 +777,27 @@ function M.execute_query(block, notes)
             sort_groups(ordered, query)
             for _, group in ipairs(ordered) do
                 sort_rows(group.rows, { sort_field = nil, sort_dir = "ASC" })
+                -- Add file name as header
+                local display_name = tostring(group.key or "")
+                -- Extract just the filename from the path if it's a path
+                if display_name:find("/") then
+                    display_name = display_name:match("([^/]+)$") or display_name
+                end
+                display_name = display_name:gsub("%.md$", "")
+                table.insert(rendered_lines, {
+                    text = display_name,
+                    highlight = "header",
+                })
                 for _, row in ipairs(group.rows) do
                     local mark = row.checked and "x" or " "
                     local task_text = tostring(row.text or "")
                     if task_text == "" then
                         task_text = tostring((row.file and row.file.title) or "")
                     end
-                    table.insert(rendered_lines, "- [" .. mark .. "] " .. task_text)
+                    table.insert(rendered_lines, {
+                        text = "- [" .. mark .. "] " .. task_text,
+                        highlight = "task_text",
+                    })
                 end
             end
         else
@@ -794,7 +808,10 @@ function M.execute_query(block, notes)
                 if task_text == "" then
                     task_text = tostring((row.file and row.file.title) or "")
                 end
-                table.insert(rendered_lines, "- [" .. mark .. "] " .. task_text)
+                table.insert(rendered_lines, {
+                    text = "- [" .. mark .. "] " .. task_text,
+                    highlight = "task_text",
+                })
             end
         end
 
@@ -849,8 +866,14 @@ function M.execute_query(block, notes)
         end
 
         if #headers > 0 then
-            table.insert(rendered_lines, table.concat(headers, " | "))
-            table.insert(rendered_lines, string.rep("-", #rendered_lines[1]))
+            table.insert(rendered_lines, {
+                text = table.concat(headers, " | "),
+                highlight = "table_header",
+            })
+            table.insert(rendered_lines, {
+                text = string.rep("-", 40),
+                highlight = "table_header",
+            })
         end
 
         for _, note in ipairs(where_rows) do
@@ -859,7 +882,10 @@ function M.execute_query(block, notes)
                 table.insert(row, table_cell(note, projection.expr))
             end
             table.insert(rows, row)
-            table.insert(rendered_lines, table.concat(row, " | "))
+            table.insert(rendered_lines, {
+                text = table.concat(row, " | "),
+                highlight = "table_link",
+            })
         end
 
         return {

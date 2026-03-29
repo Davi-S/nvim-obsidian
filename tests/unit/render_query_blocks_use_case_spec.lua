@@ -102,7 +102,8 @@ describe("render_query_blocks use case", function()
         assert.equals(1, #overlays)
         assert.equals(5, overlays[1].anchor_line)
         assert.equals("below_block", overlays[1].placement)
-        assert.equals("- [ ] [[A]]", overlays[1].lines[1])
+        assert.equals("- [ ] [[A]]", overlays[1].lines[1].text)
+        assert.is_true(overlays[1].lines[1].highlight == "task_text" or overlays[1].lines[1].highlight == nil)
     end)
 
     it("returns zero rendered blocks when trigger is disabled by config", function()
@@ -162,7 +163,8 @@ describe("render_query_blocks use case", function()
         assert.is_true(out.ok)
 
         local lines = ctx._applied()[1].lines
-        assert.equals("Dataview: No results to show for task query.", lines[1])
+        assert.equals("Dataview: No results to show for task query.", lines[1].text)
+        assert.equals("task_no_results", lines[1].highlight)
     end)
 
     it("renders execution errors inside block output without failing whole operation", function()
@@ -193,7 +195,8 @@ describe("render_query_blocks use case", function()
         assert.is_true(out.ok)
 
         local lines = ctx._applied()[1].lines
-        assert.equals("Dataview: invalid dataview clause", lines[1])
+        assert.equals("Dataview: invalid dataview clause", lines[1].text)
+        assert.equals("error", lines[1].highlight)
     end)
 
     it("returns internal when patch application fails", function()

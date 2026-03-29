@@ -123,7 +123,7 @@ function M.build(user_opts)
 
             return table.concat(lines, "\n")
         end,
-        apply_rendered_blocks = function(buffer, overlays)
+        apply_rendered_blocks = function(buffer, overlays, highlight_config)
             if not vim or not vim.api then
                 return false, "nvim API is unavailable"
             end
@@ -141,6 +141,18 @@ function M.build(user_opts)
 
             if type(overlays) ~= "table" then
                 return false, "overlays must be a table"
+            end
+
+            -- Default highlight config if not provided
+            if type(highlight_config) ~= "table" then
+                highlight_config = {
+                    header = "Comment",
+                    task_text = "Normal",
+                    task_no_results = "Comment",
+                    table_header = "Comment",
+                    table_link = "Comment",
+                    error = "WarningMsg",
+                }
             end
 
             local clear_ok, clear_err = pcall(vim.api.nvim_buf_clear_namespace, buffer, dataview_namespace, 0, -1)
@@ -161,9 +173,17 @@ function M.build(user_opts)
                 end
 
                 local virt_lines = {}
-                for _, line in ipairs(lines) do
+                for _, line_obj in ipairs(lines) do
+                    local text = tostring(line_obj)
+                    local hl = "Comment"
+
+                    if type(line_obj) == "table" then
+                        text = tostring(line_obj.text or "")
+                        hl = highlight_config[line_obj.highlight] or "Comment"
+                    end
+
                     table.insert(virt_lines, {
-                        { tostring(line), "Comment" },
+                        { text, hl },
                     })
                 end
 

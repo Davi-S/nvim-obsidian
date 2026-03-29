@@ -14,6 +14,14 @@ M.defaults = {
             patterns = { "*.md" },
         },
         placement = "below_block",
+        highlights = {
+            header = "Comment",
+            task_text = "Normal",
+            task_no_results = "Comment",
+            table_header = "Comment",
+            table_link = "Comment",
+            error = "WarningMsg",
+        },
         messages = {
             task_no_results = {
                 enabled = true,
