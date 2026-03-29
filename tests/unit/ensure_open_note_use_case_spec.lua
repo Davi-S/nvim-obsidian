@@ -149,6 +149,29 @@ describe("ensure_open_note use case", function()
         assert.equals("journal/daily/2026-03-28.md", ctx._opened[1])
     end)
 
+    it("uses explicit journal_kind when localized title cannot be classified", function()
+        local ctx = base_ctx({
+            journal = {
+                classify_input = function()
+                    return { kind = "none" }
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "2026 março 29, domingo",
+            create_if_missing = true,
+            origin = "journal",
+            journal_kind = "daily",
+        })
+
+        assert.is_true(out.ok)
+        assert.is_true(out.created)
+        assert.equals("journal/daily/2026 março 29, domingo.md", out.path)
+        assert.equals("journal/daily/2026 março 29, domingo.md", ctx._writes[1].path)
+        assert.equals("journal/daily/2026 março 29, domingo.md", ctx._opened[1])
+    end)
+
     it("creates in default subdir for non-journal origin", function()
         local ctx = base_ctx({
             journal = {

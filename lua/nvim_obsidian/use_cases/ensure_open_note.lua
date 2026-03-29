@@ -16,6 +16,7 @@ M.contract = {
         title_or_token = "string",
         create_if_missing = "boolean",
         origin = "omni|journal|link",
+        journal_kind = "daily|weekly|monthly|yearly|nil",
     },
     output = {
         ok = "boolean",
@@ -148,7 +149,15 @@ function M.execute(_ctx, _input)
 
     local note_kind = "none"
     local journal = ctx.journal
-    if type(journal) == "table" and type(journal.classify_input) == "function" then
+
+    if input.origin == "journal" and type(input.journal_kind) == "string" then
+        local requested_kind = tostring(input.journal_kind)
+        if requested_kind == "daily" or requested_kind == "weekly" or requested_kind == "monthly" or requested_kind == "yearly" then
+            note_kind = requested_kind
+        end
+    end
+
+    if note_kind == "none" and type(journal) == "table" and type(journal.classify_input) == "function" then
         local classified = journal.classify_input(token, input.now)
         note_kind = tostring((classified and classified.kind) or "none")
     end
@@ -178,6 +187,16 @@ function M.execute(_ctx, _input)
         return s
     end
 
+    local function preserve_title_filename(title)
+        local s = tostring(title or "")
+        s = s:gsub("^%s+", ""):gsub("%s+$", "")
+        s = s:gsub('[\\/:*?"<>|]', "-")
+        if s == "" then
+            s = "untitled"
+        end
+        return s
+    end
+
     local cfg = ctx.config or {}
     local note_title = token
     local base_subdir = tostring(cfg.new_notes_subdir or "")
@@ -195,7 +214,12 @@ function M.execute(_ctx, _input)
         end
     end
 
-    local filename = slugify_title(note_title) .. ".md"
+    local filename_base = slugify_title(note_title)
+    if input.origin == "journal" then
+        filename_base = preserve_title_filename(note_title)
+    end
+
+    local filename = filename_base .. ".md"
     local path = join_path(base_subdir, filename)
 
     local content = ""

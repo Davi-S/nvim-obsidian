@@ -127,6 +127,7 @@ local function register_obsidian_today(ctx)
             title_or_token = token,
             create_if_missing = true,
             origin = "journal",
+            journal_kind = kind,
             now = os.time(),
         })
 
@@ -157,6 +158,7 @@ local function register_obsidian_next(ctx)
             title_or_token = token,
             create_if_missing = true,
             origin = "journal",
+            journal_kind = kind,
             now = os.time(),
         })
 
@@ -183,6 +185,7 @@ local function register_obsidian_prev(ctx)
             title_or_token = token,
             create_if_missing = true,
             origin = "journal",
+            journal_kind = kind,
             now = os.time(),
         })
 
