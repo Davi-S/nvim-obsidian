@@ -30,12 +30,31 @@ local function normalize_aliases(aliases)
     return out
 end
 
+local function normalize_tags(tags)
+    local out = {}
+    if type(tags) ~= "table" then
+        return out
+    end
+
+    for _, tag in ipairs(tags) do
+        if type(tag) == "string" and tag ~= "" then
+            table.insert(out, tag)
+        end
+    end
+    return out
+end
+
 local function copy_note(note)
-    return {
-        path = normalize_path(note.path),
-        title = tostring(note.title),
-        aliases = normalize_aliases(note.aliases),
-    }
+    local out = {}
+    for key, value in pairs(note) do
+        out[key] = value
+    end
+
+    out.path = normalize_path(note.path)
+    out.title = tostring(note.title)
+    out.aliases = normalize_aliases(note.aliases)
+    out.tags = normalize_tags(note.tags)
+    return out
 end
 
 local function validate_note(note)
@@ -53,6 +72,10 @@ local function validate_note(note)
 
     if note.aliases ~= nil and type(note.aliases) ~= "table" then
         return false, errors.new(errors.codes.INVALID_INPUT, "note.aliases must be an array when provided")
+    end
+
+    if note.tags ~= nil and type(note.tags) ~= "table" then
+        return false, errors.new(errors.codes.INVALID_INPUT, "note.tags must be an array when provided")
     end
 
     return true, nil

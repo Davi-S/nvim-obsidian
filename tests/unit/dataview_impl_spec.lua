@@ -92,6 +92,62 @@ describe("dataview domain impl", function()
         assert.same({ "Alpha", "notes/a.md" }, out.result.rows[1])
     end)
 
+    it("executes TABLE query with nested frontmatter fields and unary not over unicode key", function()
+        local block = {
+            query = {
+                kind = "table",
+                from_kind = "tag",
+                from_value = "pessoa",
+                projections = {
+                    { expr = "file.link",              label = "Pessoa" },
+                    { expr = "nascimento.day",         label = "Dia" },
+                    { expr = "2026 - nascimento.year", label = "Idade" },
+                },
+                where_expr = "nascimento.month = 03 AND !óbito",
+                sort_field = "nascimento.day",
+                sort_dir = "ASC",
+            },
+        }
+
+        local notes = {
+            {
+                path = "people/carlos.md",
+                title = "Carlos Daniel de Almeida Leite",
+                tags = { "#pessoa" },
+                nascimento = { day = 4, month = 3, year = 2005 },
+                ["óbito"] = false,
+            },
+            {
+                path = "people/higor.md",
+                title = "Higor Lourenco Alves",
+                tags = { "#pessoa" },
+                nascimento = { day = 23, month = 3, year = 2003 },
+                ["óbito"] = false,
+            },
+            {
+                path = "people/next-month.md",
+                title = "Gabriel Campus de Albuquerque",
+                tags = { "#pessoa" },
+                nascimento = { day = 10, month = 4, year = 2001 },
+                ["óbito"] = false,
+            },
+            {
+                path = "people/deceased.md",
+                title = "Pessoa Falecida",
+                tags = { "#pessoa" },
+                nascimento = { day = 15, month = 3, year = 1980 },
+                ["óbito"] = true,
+            },
+        }
+
+        local out = dataview.execute_query(block, notes)
+        assert.is_nil(out.error)
+        assert.equals("table", out.result.kind)
+        assert.equals(2, #out.result.rows)
+        assert.same({ "Carlos Daniel de Almeida Leite", "4", "21" }, out.result.rows[1])
+        assert.same({ "Higor Lourenco Alves", "23", "23" }, out.result.rows[2])
+    end)
+
     it("validates execute_query input", function()
         local out = dataview.execute_query("bad", {})
         assert.is_not_nil(out.error)

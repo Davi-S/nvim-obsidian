@@ -115,6 +115,63 @@ function M.execute(_ctx, _input)
         return out
     end
 
+    local function normalize_tag(tag)
+        local t = tostring(tag or "")
+        t = t:gsub("^%s+", ""):gsub("%s+$", "")
+        if t == "" then
+            return nil
+        end
+        if t:sub(1, 1) ~= "#" then
+            t = "#" .. t
+        end
+        return t
+    end
+
+    local function normalize_tags(value)
+        local out = {}
+        local seen = {}
+
+        local function add(raw)
+            local t = normalize_tag(raw)
+            if not t then
+                return
+            end
+            local key = t:lower()
+            if seen[key] then
+                return
+            end
+            seen[key] = true
+            table.insert(out, t)
+        end
+
+        if type(value) == "string" then
+            add(value)
+        elseif type(value) == "table" then
+            for _, tag in ipairs(value) do
+                add(tag)
+            end
+        end
+
+        return out
+    end
+
+    local function extract_markdown_tags(markdown)
+        local out = {}
+        local seen = {}
+        for raw in tostring(markdown or ""):gmatch("#([^%s#]+)") do
+            local cleaned = tostring(raw):gsub("[%,%.;:!%?%)%]}>]+$", "")
+            local tag = normalize_tag(cleaned)
+            if tag then
+                local key = tag:lower()
+                if not seen[key] then
+                    seen[key] = true
+                    table.insert(out, tag)
+                end
+            end
+        end
+        return out
+    end
+
     local function build_note(path)
         local markdown, read_err = fs_io.read_file(path)
         if markdown == nil then
@@ -144,11 +201,42 @@ function M.execute(_ctx, _input)
             title = title_from_path(path)
         end
 
-        return {
+        local merged_tags = {}
+        local tag_seen = {}
+        local function add_tag(raw)
+            local t = normalize_tag(raw)
+            if not t then
+                return
+            end
+            local key = t:lower()
+            if tag_seen[key] then
+                return
+            end
+            tag_seen[key] = true
+            table.insert(merged_tags, t)
+        end
+
+        for _, t in ipairs(normalize_tags(metadata.tags)) do
+            add_tag(t)
+        end
+        for _, t in ipairs(extract_markdown_tags(markdown)) do
+            add_tag(t)
+        end
+
+        local note = {
             path = tostring(path),
             title = title,
             aliases = normalize_aliases(metadata.aliases),
-        }, nil
+            tags = merged_tags,
+        }
+
+        for key, value in pairs(metadata) do
+            if key ~= "title" and key ~= "aliases" and key ~= "tags" then
+                note[key] = value
+            end
+        end
+
+        return note, nil
     end
 
     local function full_rescan()

@@ -340,10 +340,26 @@ local function resolve_value(row, ident)
 
     local current = row
     for part in ident:gmatch("[^%.]+") do
-        if type(current) ~= "table" then
+        if type(current) == "string" then
+            local y, m, d = current:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+            if y and m and d then
+                if part == "year" then
+                    current = tonumber(y)
+                elseif part == "month" then
+                    current = tonumber(m)
+                elseif part == "day" then
+                    current = tonumber(d)
+                else
+                    return nil
+                end
+            else
+                return nil
+            end
+        elseif type(current) ~= "table" then
             return nil
+        else
+            current = current[part]
         end
-        current = current[part]
     end
     return current
 end
@@ -686,19 +702,39 @@ local function apply_where_rows(rows, query)
 end
 
 local function table_cell(note, expr)
-    if expr == "file.link" then
+    local trimmed = trim(expr)
+    if trimmed == "" then
+        return ""
+    end
+
+    if trimmed == "file.link" then
         return tostring(note.title or "")
     end
-    if expr == "title" then
+    if trimmed == "title" then
         return tostring(note.title or "")
     end
-    if expr == "file.path" then
+    if trimmed == "file.path" then
         return tostring(note.path or "")
     end
-    if expr == "aliases.count" then
+    if trimmed == "aliases.count" then
         return tostring(type(note.aliases) == "table" and #note.aliases or 0)
     end
-    return ""
+
+    local lhs, rhs = trimmed:match("^(%-?%d+)%s*%-%s*([%w_%.-]+)$")
+    if lhs and rhs then
+        local right_value = resolve_value(note, rhs)
+        local left_num = tonumber(lhs)
+        local right_num = tonumber(right_value)
+        if left_num ~= nil and right_num ~= nil then
+            return tostring(left_num - right_num)
+        end
+    end
+
+    local resolved = resolve_value(note, trimmed)
+    if resolved == nil then
+        return ""
+    end
+    return tostring(resolved)
 end
 
 function M.execute_query(block, notes)
@@ -721,16 +757,21 @@ function M.execute_query(block, notes)
     if type(notes) == "table" then
         for _, n in ipairs(notes) do
             if type(n) == "table" then
-                table.insert(source_notes, {
-                    path = tostring(n.path or ""),
-                    title = tostring(n.title or ""),
-                    text = n.text,
-                    raw = n.raw,
-                    checked = n.checked,
-                    file = type(n.file) == "table" and n.file or nil,
-                    aliases = type(n.aliases) == "table" and n.aliases or {},
-                    tags = type(n.tags) == "table" and n.tags or {},
-                })
+                local normalized = {}
+                for key, value in pairs(n) do
+                    normalized[key] = value
+                end
+
+                normalized.path = tostring(n.path or "")
+                normalized.title = tostring(n.title or "")
+                normalized.text = n.text
+                normalized.raw = n.raw
+                normalized.checked = n.checked
+                normalized.file = type(n.file) == "table" and n.file or nil
+                normalized.aliases = type(n.aliases) == "table" and n.aliases or {}
+                normalized.tags = type(n.tags) == "table" and n.tags or {}
+
+                table.insert(source_notes, normalized)
             end
         end
     end

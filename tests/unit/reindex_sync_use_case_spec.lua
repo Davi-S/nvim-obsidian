@@ -245,4 +245,47 @@ describe("reindex_sync use case", function()
         assert.equals("vault/old.md", invalidations[1])
         assert.equals("vault/new.md", invalidations[2])
     end)
+
+    it("preserves frontmatter metadata and tags on full reindex", function()
+        local replaced = nil
+        local ctx = base_ctx({
+            scan_markdown_files = function()
+                return { "vault/pessoa.md" }
+            end,
+            fs_io = {
+                read_file = function(path)
+                    if path ~= "vault/pessoa.md" then
+                        return nil, "missing"
+                    end
+                    return table.concat({
+                        "---",
+                        "title: Pessoa",
+                        "tags: [pessoa]",
+                        "nascimento:",
+                        "  day: 4",
+                        "  month: 3",
+                        "  year: 2005",
+                        "óbito: false",
+                        "---",
+                        "# pessoa",
+                    }, "\n")
+                end,
+            },
+            frontmatter = require("nvim_obsidian.adapters.parser.frontmatter"),
+            replace_catalog = function(notes)
+                replaced = notes
+                return true
+            end,
+        })
+
+        local out = use_case.execute(ctx, { mode = "manual", event = nil })
+        assert.is_true(out.ok)
+        assert.is_not_nil(replaced)
+        assert.equals(1, #replaced)
+        assert.equals("Pessoa", replaced[1].title)
+        assert.same({ "#pessoa" }, replaced[1].tags)
+        assert.is_table(replaced[1].nascimento)
+        assert.equals(3, replaced[1].nascimento.month)
+        assert.is_false(replaced[1]["óbito"])
+    end)
 end)
