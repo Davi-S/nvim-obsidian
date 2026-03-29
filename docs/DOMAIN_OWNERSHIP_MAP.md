@@ -29,7 +29,7 @@ Policy authority: Product rules are canonical in docs/PRODUCT_CONTRACT.md.
 
 | Feature                            | Owner                                   | Notes                                |
 | ---------------------------------- | --------------------------------------- | ------------------------------------ |
-| Date classification                | Journal Domain                          | daily/weekly/monthly/yearly          |
+| Date classification                | Journal Domain         1                 | daily/weekly/monthly/yearly          |
 | Title generation from placeholders | Journal Domain                          | Uses registered journal placeholders |
 | Journal directory routing          | Journal Domain + App Config             | One subdir per note type             |
 | Time travel calc (next/prev/today) | Journal Domain                          | Pure date logic                      |

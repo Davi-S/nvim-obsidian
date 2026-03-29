@@ -2,6 +2,194 @@ local errors = require("nvim_obsidian.core.shared.errors")
 
 local M = {}
 
+local TASK_PATTERN = "^(%s*)%- %[(.)%]%s*(.*)$"
+
+local function split_lines(text)
+    local src = tostring(text or "")
+    if src == "" then
+        return {}
+    end
+
+    local out = {}
+    local start = 1
+    while true do
+        local nl = src:find("\n", start, true)
+        if not nl then
+            table.insert(out, src:sub(start))
+            break
+        end
+        table.insert(out, src:sub(start, nl - 1))
+        start = nl + 1
+    end
+    return out
+end
+
+local function normalize_path(path)
+    local p = tostring(path or "")
+    p = p:gsub("\\", "/")
+    p = p:gsub("//+", "/")
+    return p
+end
+
+local function relpath_from_root(path, root)
+    local p = normalize_path(path)
+    local r = normalize_path(root):gsub("/+$", "")
+    if p == "" or r == "" then
+        return p
+    end
+    local prefix = r .. "/"
+    if p:sub(1, #prefix) == prefix then
+        return p:sub(#prefix + 1)
+    end
+    return p
+end
+
+local function stem(path)
+    local p = normalize_path(path)
+    local name = p:match("[^/]+$") or p
+    return (name:gsub("%.md$", ""))
+end
+
+local function parse_iso_date_to_ts(text)
+    local y, m, d = tostring(text or ""):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+    if not y then
+        return nil
+    end
+    return os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
+end
+
+local MONTH_INDEX = {
+    january = 1,
+    february = 2,
+    march = 3,
+    april = 4,
+    may = 5,
+    june = 6,
+    july = 7,
+    august = 8,
+    september = 9,
+    october = 10,
+    november = 11,
+    december = 12,
+    janeiro = 1,
+    fevereiro = 2,
+    marco = 3,
+    ["março"] = 3,
+    abril = 4,
+    maio = 5,
+    junho = 6,
+    julho = 7,
+    agosto = 8,
+    setembro = 9,
+    outubro = 10,
+    novembro = 11,
+    dezembro = 12,
+}
+
+local function parse_flexible_date_to_ts(text)
+    local ts = parse_iso_date_to_ts(text)
+    if ts then
+        return ts
+    end
+
+    local s = tostring(text or "")
+    local y, month_name, d = s:match("(%d%d%d%d)%s+([^%s,]+)%s+(%d%d?)")
+    if not y then
+        return nil
+    end
+
+    local month = MONTH_INDEX[string.lower(month_name)]
+    if not month then
+        return nil
+    end
+
+    return os.time({ year = tonumber(y), month = month, day = tonumber(d), hour = 12 })
+end
+
+local function note_date_timestamp(path, title, frontmatter)
+    local by_path = parse_flexible_date_to_ts(path)
+    if by_path then
+        return by_path
+    end
+
+    local by_title = parse_flexible_date_to_ts(title)
+    if by_title then
+        return by_title
+    end
+
+    if type(frontmatter) == "table" and type(frontmatter.date) == "string" then
+        return parse_flexible_date_to_ts(frontmatter.date)
+    end
+
+    return nil
+end
+
+local function collect_task_rows(ctx, query)
+    if type(query) ~= "table" or query.kind ~= "task" then
+        return nil
+    end
+
+    local paths = nil
+    if type(ctx.scan_markdown_files) == "function" then
+        paths = ctx.scan_markdown_files()
+    elseif type(ctx.fs_io) == "table" and type(ctx.fs_io.list_markdown_files) == "function" then
+        paths = ctx.fs_io.list_markdown_files(ctx.config and ctx.config.vault_root)
+    end
+
+    if type(paths) ~= "table" then
+        return nil
+    end
+
+    if type(ctx.fs_io) ~= "table" or type(ctx.fs_io.read_file) ~= "function" then
+        return nil
+    end
+
+    local vault_root = type(ctx.config) == "table" and ctx.config.vault_root or nil
+    local task_rows = {}
+
+    for _, abs_path in ipairs(paths) do
+        if type(abs_path) == "string" and abs_path ~= "" then
+            local content = ctx.fs_io.read_file(abs_path)
+            if type(content) == "string" then
+                local relpath = relpath_from_root(abs_path, vault_root)
+                local title = stem(abs_path)
+
+                local meta = nil
+                if type(ctx.frontmatter) == "table" and type(ctx.frontmatter.parse) == "function" then
+                    local parsed = ctx.frontmatter.parse(content)
+                    if type(parsed) == "table" then
+                        meta = parsed
+                    end
+                end
+
+                local ts = note_date_timestamp(relpath, title, meta)
+
+                for line_no, line in ipairs(split_lines(content)) do
+                    local _, mark, text = line:match(TASK_PATTERN)
+                    if mark then
+                        table.insert(task_rows, {
+                            checked = mark ~= " ",
+                            text = tostring(text or ""),
+                            raw = line,
+                            line = line_no,
+                            file = {
+                                path = relpath,
+                                title = title,
+                                name = title,
+                                link = {
+                                    date = ts,
+                                },
+                            },
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    return task_rows
+end
+
 M.contract = {
     name = "render_query_blocks",
     version = "phase3-contract",
@@ -192,7 +380,13 @@ function M.execute(_ctx, _input)
     local patches = {}
 
     for _, block in ipairs(blocks) do
-        local exec = dataview.execute_query(block, notes)
+        local source_rows = notes
+        local task_rows = collect_task_rows(ctx, block.query)
+        if type(task_rows) == "table" then
+            source_rows = task_rows
+        end
+
+        local exec = dataview.execute_query(block, source_rows)
         local lines = {
             "<!-- nvim-obsidian:dataview:start -->",
         }

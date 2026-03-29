@@ -110,6 +110,53 @@ function M.build(user_opts)
         vault_search = vault_search,
         insert_template = insert_template,
 
+        get_buffer_markdown = function(buffer)
+            if not vim or not vim.api or type(vim.api.nvim_buf_get_lines) ~= "function" then
+                return nil
+            end
+
+            local ok, lines = pcall(vim.api.nvim_buf_get_lines, buffer, 0, -1, false)
+            if not ok or type(lines) ~= "table" then
+                return nil
+            end
+
+            return table.concat(lines, "\n")
+        end,
+        apply_rendered_blocks = function(buffer, patches)
+            if not vim or not vim.api or type(vim.api.nvim_buf_set_lines) ~= "function" then
+                return false, "nvim buffer write API is unavailable"
+            end
+
+            if type(patches) ~= "table" then
+                return false, "patches must be a table"
+            end
+
+            -- Apply from bottom to top so line numbers remain stable.
+            table.sort(patches, function(a, b)
+                return (a.start_line or 0) > (b.start_line or 0)
+            end)
+
+            for _, patch in ipairs(patches) do
+                local start_line = tonumber(patch.start_line)
+                local end_line = tonumber(patch.end_line)
+                local lines = patch.lines
+
+                if not start_line or not end_line or start_line < 1 or end_line < start_line then
+                    return false, "invalid patch range"
+                end
+                if type(lines) ~= "table" then
+                    return false, "invalid patch lines"
+                end
+
+                local ok, err = pcall(vim.api.nvim_buf_set_lines, buffer, start_line - 1, end_line, false, lines)
+                if not ok then
+                    return false, tostring(err)
+                end
+            end
+
+            return true
+        end,
+
         scan_markdown_files = function()
             local files, list_err = adapter_set.fs_io.list_markdown_files(opts.vault_root)
             if type(files) ~= "table" then

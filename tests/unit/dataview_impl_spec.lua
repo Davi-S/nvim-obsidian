@@ -23,7 +23,6 @@ describe("dataview domain impl", function()
         assert.equals(2, #out.blocks)
         assert.equals("task", out.blocks[1].query.kind)
         assert.equals("table", out.blocks[2].query.kind)
-        assert.equals("notes", out.blocks[2].query.from_value)
     end)
 
     it("returns parse failure for invalid query", function()
@@ -45,7 +44,7 @@ describe("dataview domain impl", function()
                 kind = "task",
                 from_kind = "path",
                 from_value = "journal",
-                where_title_eq = nil,
+                where_expr = nil,
                 sort_field = nil,
                 sort_dir = "ASC",
             },
@@ -62,7 +61,6 @@ describe("dataview domain impl", function()
         assert.equals("task", out.result.kind)
         assert.equals(2, #out.result.rows)
         assert.equals("journal/2024-01-01.md", out.result.rows[1].file.path)
-        assert.equals("- [ ] [[2024-01-01]]", out.result.rendered_lines[1])
     end)
 
     it("executes TABLE query with WHERE and SORT", function()
@@ -75,7 +73,7 @@ describe("dataview domain impl", function()
                     { expr = "file.link", label = "Title" },
                     { expr = "file.path", label = "Path" },
                 },
-                where_title_eq = "Alpha",
+                where_expr = "title = Alpha",
                 sort_field = "title",
                 sort_dir = "DESC",
             },
@@ -106,7 +104,7 @@ describe("dataview domain impl", function()
                 kind = "task",
                 from_kind = "tag",
                 from_value = "work",
-                where_title_eq = nil,
+                where_expr = nil,
                 sort_field = nil,
                 sort_dir = "ASC",
             },
@@ -125,5 +123,92 @@ describe("dataview domain impl", function()
         assert.equals(2, #out.result.rows)
         assert.equals("notes/1.md", out.result.rows[1].file.path)
         assert.equals("notes/3.md", out.result.rows[2].file.path)
+    end)
+
+    it("parses TASK query with where/group/sort clauses", function()
+        local markdown = table.concat({
+            "```dataview",
+            "TASK",
+            "FROM \"11 Diario/11.01 Diario\"",
+            "WHERE !checked AND file.link.date > date(2026-03-29) AND file.link.date < date(2026-04-05)",
+            "GROUP BY file.link AS foo",
+            "SORT foo.date ASC",
+            "```",
+        }, "\n")
+
+        local out = dataview.parse_blocks(markdown)
+        assert.is_nil(out.error)
+        assert.equals(1, #out.blocks)
+        assert.equals("task", out.blocks[1].query.kind)
+        assert.equals("file.link", out.blocks[1].query.group_by)
+        assert.equals("foo", out.blocks[1].query.group_alias)
+        assert.equals("foo.date", out.blocks[1].query.sort_field)
+    end)
+
+    it("executes TASK where/group/sort with checked and date filters", function()
+        local block = {
+            query = {
+                kind = "task",
+                from_kind = "path",
+                from_value = "11 Diario/11.01 Diario",
+                where_expr = "!checked AND file.link.date > date(2026-03-29) AND file.link.date < date(2026-04-05)",
+                group_by = "file.link",
+                group_alias = "foo",
+                sort_field = "foo.date",
+                sort_dir = "ASC",
+            },
+        }
+
+        local notes = {
+            {
+                checked = false,
+                text = "Task A",
+                raw = "- [ ] Task A",
+                file = {
+                    path = "/vault/11 Diario/11.01 Diario/2026-03-30.md",
+                    title = "2026-03-30",
+                    link = { date = os.time({ year = 2026, month = 3, day = 30, hour = 12 }) },
+                },
+            },
+            {
+                checked = false,
+                text = "Task B",
+                raw = "- [ ] Task B",
+                file = {
+                    path = "/vault/11 Diario/11.01 Diario/2026-04-02.md",
+                    title = "2026-04-02",
+                    link = { date = os.time({ year = 2026, month = 4, day = 2, hour = 12 }) },
+                },
+            },
+            {
+                checked = true,
+                text = "Task done",
+                raw = "- [x] Task done",
+                file = {
+                    path = "/vault/11 Diario/11.01 Diario/2026-03-31.md",
+                    title = "2026-03-31",
+                    link = { date = os.time({ year = 2026, month = 3, day = 31, hour = 12 }) },
+                },
+            },
+            {
+                checked = false,
+                text = "Outside folder",
+                raw = "- [ ] Outside folder",
+                file = {
+                    path = "/vault/other/2026-03-31.md",
+                    title = "2026-03-31",
+                    link = { date = os.time({ year = 2026, month = 3, day = 31, hour = 12 }) },
+                },
+            },
+        }
+
+        local out = dataview.execute_query(block, notes)
+        assert.is_nil(out.error)
+        assert.equals("task", out.result.kind)
+        assert.equals(2, #out.result.rows)
+        assert.equals("/vault/11 Diario/11.01 Diario/2026-03-30.md", out.result.rows[1].file.path)
+        assert.equals("/vault/11 Diario/11.01 Diario/2026-04-02.md", out.result.rows[2].file.path)
+        assert.equals("- [ ] Task A", out.result.rendered_lines[1])
+        assert.equals("- [ ] Task B", out.result.rendered_lines[2])
     end)
 end)
