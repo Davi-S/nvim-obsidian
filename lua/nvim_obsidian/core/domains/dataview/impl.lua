@@ -775,7 +775,7 @@ function M.execute_query(block, notes)
             end
 
             sort_groups(ordered, query)
-            for _, group in ipairs(ordered) do
+            for group_index, group in ipairs(ordered) do
                 sort_rows(group.rows, { sort_field = nil, sort_dir = "ASC" })
                 -- Add file name as header
                 local display_name = tostring(group.key or "")
@@ -784,9 +784,21 @@ function M.execute_query(block, notes)
                     display_name = display_name:match("([^/]+)$") or display_name
                 end
                 display_name = display_name:gsub("%.md$", "")
+
+                -- Add spacing around the filename header for readability.
+                if group_index > 1 then
+                    table.insert(rendered_lines, {
+                        text = "",
+                        highlight = "task_text",
+                    })
+                end
                 table.insert(rendered_lines, {
                     text = display_name,
                     highlight = "header",
+                })
+                table.insert(rendered_lines, {
+                    text = "",
+                    highlight = "task_text",
                 })
                 for _, row in ipairs(group.rows) do
                     local mark = row.checked and "x" or " "
