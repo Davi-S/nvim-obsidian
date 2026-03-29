@@ -33,14 +33,14 @@ require("nvim_obsidian").setup(opts) -> container
 
 ### Optional Fields in opts
 
-| Field            | Type   | Default          | Description                                 |
-| ---------------- | ------ | ---------------- | ------------------------------------------- |
-| locale           | string | "en-US"          | Locale for month/weekday names              |
-| log_level        | enum   | "warn"           | "error" \| "warn" \| "info"                 |
-| force_create_key | string | "<S-CR>"         | Telescope key for forced note creation      |
-| new_notes_subdir | string | "10 Novas notas" | Subdirectory for new standard notes         |
-| journal          | table  | nil              | Journal configuration (optional)            |
-| dataview         | table  | (defaults)       | Dataview rendering configuration (optional) |
+| Field            | Type   | Default    | Description                                 |
+| ---------------- | ------ | ---------- | ------------------------------------------- |
+| locale           | string | "en-US"    | Locale for month/weekday names              |
+| log_level        | enum   | "warn"     | "error" \| "warn" \| "info"                 |
+| force_create_key | string | "<S-CR>"   | Telescope key for forced note creation      |
+| new_notes_subdir | string | vault_root | Subdirectory for new standard notes         |
+| journal          | table  | nil        | Journal configuration (optional)            |
+| dataview         | table  | (defaults) | Dataview rendering configuration (optional) |
 
 ### Return Value
 
@@ -54,7 +54,7 @@ Returns a **container object** with the following structure:
     locale = "en-US",
     log_level = "warn",
     force_create_key = "<S-CR>",
-    new_notes_subdir = "10 Novas notas",
+    new_notes_subdir = "/path/to/vault",
     journal = { ... },
     dataview = { ... },
   },

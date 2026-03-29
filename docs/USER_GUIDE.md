@@ -274,13 +274,13 @@ log_level = "info"   -- Verbose
 #### new_notes_subdir
 
 ```lua
-new_notes_subdir = "10 Novas notas"  -- Default
+new_notes_subdir = "/path/to/your/ObsidianVault"  -- Default (vault_root)
 ```
 
 - **Type:** string
 - **Used for:** Where `:ObsidianOmni` creates new notes
 - **When auto-detected:** If you create a note with `force_create_key` in Telescope
-- **Example:** Create note "Project Alpha" → creates in `10 Novas notas/Project Alpha.md`
+- **Example:** Create note "Project Alpha" → creates in `<vault_root>/Project Alpha.md` (unless overridden)
 
 #### force_create_key
 

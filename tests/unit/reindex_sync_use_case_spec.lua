@@ -111,7 +111,7 @@ describe("reindex_sync use case", function()
         assert.equals(1, ctx._watcher_starts())
     end)
 
-    it("returns internal when startup watcher fails", function()
+    it("continues startup reindex when watcher fails to start", function()
         local ctx = base_ctx({
             watcher = {
                 start = function()
@@ -121,8 +121,8 @@ describe("reindex_sync use case", function()
         })
 
         local out = use_case.execute(ctx, { mode = "startup", event = nil })
-        assert.is_false(out.ok)
-        assert.equals("internal", out.error.code)
+        assert.is_true(out.ok)
+        assert.equals("startup", out.stats.mode)
     end)
 
     it("handles delete event by removing note", function()

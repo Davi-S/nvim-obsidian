@@ -182,13 +182,8 @@ function M.execute(_ctx, _input)
         if mode == "startup" and type(watcher) == "table" and type(watcher.start) == "function" then
             local started, start_err = watcher.start(ctx)
             if not started then
-                return {
-                    ok = false,
-                    stats = nil,
-                    error = errors.new(errors.codes.INTERNAL, "failed to start watcher", {
-                        reason = start_err,
-                    }),
-                }
+                warn("Watcher start skipped: " ..
+                tostring(start_err and start_err.message or start_err or "failed to start watcher"))
             end
         end
 

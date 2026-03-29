@@ -184,6 +184,12 @@ function M.execute(_ctx, _input)
 
     if input.origin == "journal" and note_kind ~= "none" then
         local journal_cfg = (((cfg.journal or {})[note_kind]) or {})
+        if type(ctx.resolve_journal_title) == "function" then
+            local resolved_title = ctx.resolve_journal_title(note_kind, input.now or os.time())
+            if type(resolved_title) == "string" and resolved_title ~= "" then
+                note_title = resolved_title
+            end
+        end
         if type(journal_cfg.subdir) == "string" and journal_cfg.subdir ~= "" then
             base_subdir = journal_cfg.subdir
         end

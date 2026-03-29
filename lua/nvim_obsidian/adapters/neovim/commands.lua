@@ -43,7 +43,68 @@ local function split_lines(text)
     return out
 end
 
-local function get_current_buffer_path()
+local get_current_buffer_path
+
+local function current_note_token()
+    local path = get_current_buffer_path()
+    if not path then
+        return nil
+    end
+    local normalized = tostring(path):gsub("\\", "/")
+    local filename = normalized:match("([^/]+)$")
+    if not filename then
+        return nil
+    end
+    local token = filename:gsub("%.md$", "")
+    token = trim(token)
+    if token == "" then
+        return nil
+    end
+    return token
+end
+
+local function resolve_journal_kind(ctx)
+    local token = current_note_token()
+    if type(ctx.journal) ~= "table" or type(ctx.journal.classify_input) ~= "function" or not token then
+        return "daily"
+    end
+
+    local classified = ctx.journal.classify_input(token, os.time())
+    local kind = tostring((classified and classified.kind) or "daily")
+    if kind == "none" then
+        return "daily"
+    end
+    return kind
+end
+
+local function journal_token_for(ctx, kind, direction)
+    local journal = ctx.journal
+    if type(journal) ~= "table" or type(journal.compute_adjacent) ~= "function" then
+        return os.date("%Y-%m-%d", os.time())
+    end
+
+    local adjacent = journal.compute_adjacent(kind, os.time(), direction)
+    local target_date = (adjacent and adjacent.target_date) or os.date("*t")
+
+    if type(ctx.resolve_journal_title) == "function" then
+        local resolved = ctx.resolve_journal_title(kind, target_date)
+        if type(resolved) == "string" and resolved ~= "" then
+            return resolved
+        end
+    end
+
+    if type(journal.build_title) == "function" then
+        local built = journal.build_title(kind, target_date, (ctx.config or {}).locale)
+        local title = tostring((built and built.title) or "")
+        if title ~= "" then
+            return title
+        end
+    end
+
+    return os.date("%Y-%m-%d", os.time())
+end
+
+get_current_buffer_path = function()
     if not vim or not vim.api or type(vim.api.nvim_buf_get_name) ~= "function" then
         return nil
     end
@@ -60,11 +121,13 @@ local function register_obsidian_today(ctx)
             return
         end
 
-        local now = os.time()
+        local kind = resolve_journal_kind(ctx)
+        local token = journal_token_for(ctx, kind, "current")
         local result = ctx.use_cases.ensure_open_note.execute(ctx, {
-            title_or_token = os.date("%Y-%m-%d", now),
+            title_or_token = token,
             create_if_missing = true,
             origin = "journal",
+            now = os.time(),
         })
 
         if not result.ok then
@@ -88,11 +151,13 @@ local function register_obsidian_next(ctx)
             return
         end
 
-        -- Stub: In full implementation, detect current note type and compute next
+        local kind = resolve_journal_kind(ctx)
+        local token = journal_token_for(ctx, kind, "next")
         local result = ctx.use_cases.ensure_open_note.execute(ctx, {
-            title_or_token = os.date("%Y-%m-%d", os.time() + 86400),
+            title_or_token = token,
             create_if_missing = true,
             origin = "journal",
+            now = os.time(),
         })
 
         if not result.ok then
@@ -112,11 +177,13 @@ local function register_obsidian_prev(ctx)
             return
         end
 
-        -- Stub: In full implementation, detect current note type and compute prev
+        local kind = resolve_journal_kind(ctx)
+        local token = journal_token_for(ctx, kind, "prev")
         local result = ctx.use_cases.ensure_open_note.execute(ctx, {
-            title_or_token = os.date("%Y-%m-%d", os.time() - 86400),
+            title_or_token = token,
             create_if_missing = true,
             origin = "journal",
+            now = os.time(),
         })
 
         if not result.ok then

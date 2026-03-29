@@ -3,6 +3,22 @@
 local cwd = vim.fn.getcwd()
 vim.opt.rtp:append(cwd)
 
+if not pcall(require, "telescope") then
+    package.loaded["telescope"] = {}
+end
+
+if not pcall(require, "cmp") then
+    package.loaded["cmp"] = {}
+end
+
+if not pcall(require, "nvim-treesitter.parsers") then
+    package.loaded["nvim-treesitter.parsers"] = {}
+end
+
+if not pcall(require, "plenary.job") then
+    package.loaded["plenary.job"] = {}
+end
+
 local container = require("nvim_obsidian").setup({
     vault_root = "/tmp/nvim_obsidian_e2e_vault",
 })

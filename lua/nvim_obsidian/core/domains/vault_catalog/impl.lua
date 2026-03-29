@@ -158,6 +158,29 @@ function M.find_by_title_or_alias(token)
     return { matches = dedup_by_path(ci) }
 end
 
+function M.list_notes()
+    return collect_notes_sorted()
+end
+
+function M._replace_all(notes)
+    if type(notes) ~= "table" then
+        return false, "notes must be a table"
+    end
+
+    local next_state = {}
+    for _, note in ipairs(notes) do
+        local ok, err = validate_note(note)
+        if not ok then
+            return false, tostring(err and err.message or "invalid note")
+        end
+        local normalized = copy_note(note)
+        next_state[normalized.path] = normalized
+    end
+
+    state.by_path = next_state
+    return true, nil
+end
+
 function M._reset_for_tests()
     state.by_path = {}
 end

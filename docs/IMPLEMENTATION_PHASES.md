@@ -15,7 +15,7 @@ This document is the execution roadmap for V2. It captures phase goals, delivera
 - Phase 5: Completed
 - Phase 6: Completed
 - Phase 7: Completed
-- Phase 8: In progress (Part 1 complete)
+- Phase 8: In progress (final checkup and validation)
 
 ---
 
