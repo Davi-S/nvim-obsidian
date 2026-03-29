@@ -288,8 +288,29 @@ local function register_obsidian_today(ctx)
             return
         end
 
-        local kind = resolve_journal_kind(ctx)
-        local token = journal_token_for(ctx, kind, "current")
+        local kind = "daily"
+        local today = os.date("*t")
+        local token = nil
+
+        if type(ctx.resolve_journal_title) == "function" then
+            local resolved = ctx.resolve_journal_title(kind, today)
+            if type(resolved) == "string" and resolved ~= "" then
+                token = resolved
+            end
+        end
+
+        if not token and type(ctx.journal) == "table" and type(ctx.journal.build_title) == "function" then
+            local built = ctx.journal.build_title(kind, today, (ctx.config or {}).locale)
+            local title = tostring((built and built.title) or "")
+            if title ~= "" then
+                token = title
+            end
+        end
+
+        if not token then
+            token = os.date("%Y-%m-%d")
+        end
+
         local result = ctx.use_cases.ensure_open_note.execute(ctx, {
             title_or_token = token,
             create_if_missing = true,

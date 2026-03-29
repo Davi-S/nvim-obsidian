@@ -177,6 +177,43 @@ describe("neovim command adapter", function()
 
             assert.is_function(commands.register)
         end)
+
+        it("should always target daily today instead of current-note context", function()
+            local observed = nil
+
+            _G.vim.api.nvim_buf_get_name = function()
+                return "/vault/journal/daily/1900-01-01.md"
+            end
+
+            local container = base_container({
+                journal = {
+                    classify_input = function()
+                        return { kind = "monthly" }
+                    end,
+                    build_title = function(_kind, date)
+                        return { title = string.format("%04d-%02d-%02d", date.year, date.month, date.day) }
+                    end,
+                },
+                use_cases = {
+                    ensure_open_note = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, path = "journal/daily/today.md", created = false, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            assert.is_function(command_registry["ObsidianToday"])
+
+            command_registry["ObsidianToday"]()
+
+            assert.is_not_nil(observed)
+            assert.equals("daily", observed.journal_kind)
+            assert.is_true(observed.create_if_missing)
+            assert.not_equals("1900-01-01", observed.title_or_token)
+        end)
     end)
 
     describe(":ObsidianNext", function()
