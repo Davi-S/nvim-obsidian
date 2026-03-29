@@ -234,4 +234,34 @@ describe("search_open_create use case", function()
         assert.equals("cancelled", out.action)
         assert.equals(false, ctx._picker_payload().allow_force_create)
     end)
+
+    it("uses vault-relative relpath in picker candidates", function()
+        local ctx = base_ctx({
+            config = {
+                vault_root = "/vault",
+                omni = {
+                    display_separator = "->",
+                },
+            },
+            vault_catalog = {
+                list_notes = function()
+                    return {
+                        { path = "/vault/notes/alpha.md", title = "Alpha", aliases = {} },
+                    }
+                end,
+            },
+        })
+
+        local out = run(ctx, {
+            query = "al",
+            allow_force_create = true,
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("cancelled", out.action)
+
+        local payload = ctx._picker_payload()
+        assert.equals("notes/alpha.md", payload.items[1].candidate.relpath)
+        assert.equals("/vault/notes/alpha.md", payload.items[1].candidate.path)
+    end)
 end)

@@ -2,6 +2,42 @@ local errors = require("nvim_obsidian.core.shared.errors")
 
 local M = {}
 
+local function normalize_path(path)
+    local p = tostring(path or "")
+    p = p:gsub("\\", "/")
+    p = p:gsub("//+", "/")
+    return p
+end
+
+local function to_vault_relpath(path, vault_root)
+    local normalized_path = normalize_path(path)
+    local normalized_root = normalize_path(vault_root)
+
+    if normalized_path == "" then
+        return ""
+    end
+
+    if normalized_root == "" then
+        return normalized_path
+    end
+
+    normalized_root = normalized_root:gsub("/+$", "")
+    if normalized_root == "" then
+        return normalized_path
+    end
+
+    if normalized_path == normalized_root then
+        return ""
+    end
+
+    local prefix = normalized_root .. "/"
+    if normalized_path:sub(1, #prefix) == prefix then
+        return normalized_path:sub(#prefix + 1)
+    end
+
+    return normalized_path
+end
+
 M.contract = {
     name = "search_open_create",
     version = "phase3-contract",
@@ -131,14 +167,25 @@ function M.execute(_ctx, _input)
         }
     end
 
+    local vault_root = nil
+    if type(ctx.config) == "table" and type(ctx.config.vault_root) == "string" then
+        vault_root = ctx.config.vault_root
+    end
+
     local candidates = {}
     for _, note in ipairs(notes) do
         if type(note) == "table" then
+            local note_path = tostring(note.path or "")
+            local note_relpath = tostring(note.relpath or "")
+            if note_relpath == "" then
+                note_relpath = to_vault_relpath(note_path, vault_root)
+            end
+
             table.insert(candidates, {
                 title = tostring(note.title or ""),
                 aliases = type(note.aliases) == "table" and note.aliases or {},
-                relpath = tostring(note.path or ""),
-                path = tostring(note.path or ""),
+                relpath = note_relpath,
+                path = note_path,
             })
         end
     end
