@@ -698,7 +698,7 @@ local function register_dataview_autocmds(ctx)
                 if result and result.error and result.error.code == "parse_failure" then
                     if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.warn then
                         ctx.adapters.notifications.warn("Parse error in dataview block: " ..
-                        tostring(result.error.message or "parse failed"))
+                            tostring(result.error.message or "parse failed"))
                     end
                     return
                 end
