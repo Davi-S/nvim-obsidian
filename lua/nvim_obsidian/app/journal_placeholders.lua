@@ -47,11 +47,11 @@ local WEEKDAY_NAMES = {
     },
     ["pt-BR"] = {
         "domingo",
-        "segunda",
-        "terça",
-        "quarta",
-        "quinta",
-        "sexta",
+        "segunda-feira",
+        "terça-feira",
+        "quarta-feira",
+        "quinta-feira",
+        "sexta-feira",
         "sábado",
     },
 }

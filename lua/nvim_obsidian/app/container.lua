@@ -4,6 +4,31 @@ local notifications = require("nvim_obsidian.adapters.neovim.notifications")
 
 local M = {}
 
+local function is_absolute_path(path)
+    if type(path) ~= "string" then
+        return false
+    end
+    if path:match("^/") then
+        return true
+    end
+    if path:match("^%a:[/\\]") then
+        return true
+    end
+    return false
+end
+
+local function join_path(base, leaf)
+    local b = tostring(base or ""):gsub("\\", "/"):gsub("//+", "/")
+    local l = tostring(leaf or ""):gsub("\\", "/"):gsub("^/+", "")
+    if b == "" then
+        return l
+    end
+    if b:sub(-1) == "/" then
+        return b .. l
+    end
+    return b .. "/" .. l
+end
+
 function M.build(user_opts)
     local opts = config.normalize(user_opts)
 
@@ -107,6 +132,67 @@ function M.build(user_opts)
                 date = date,
                 kind = kind,
             })
+        end,
+        resolve_template_content = function(req)
+            local request = req or {}
+            local query = tostring(request.query or ""):gsub("^%s+", ""):gsub("%s+$", "")
+            if query == "" then
+                query = nil
+            end
+
+            local kind = tostring(request.kind or "")
+            if kind == "" and request.type ~= nil then
+                kind = tostring(request.type or "")
+            end
+
+            local candidates = {}
+
+            local function add_candidate(path)
+                if type(path) ~= "string" or path == "" then
+                    return
+                end
+                table.insert(candidates, path)
+            end
+
+            if query == "standard" then
+                add_candidate((((opts.templates or {}).standard)))
+            elseif query == "daily" or query == "weekly" or query == "monthly" or query == "yearly" then
+                add_candidate(((((opts.journal or {})[query]) or {}).template))
+            elseif query then
+                add_candidate(query)
+            end
+
+            if not query then
+                if request.origin == "journal" and (kind == "daily" or kind == "weekly" or kind == "monthly" or kind == "yearly") then
+                    add_candidate(((((opts.journal or {})[kind]) or {}).template))
+                else
+                    add_candidate((((opts.templates or {}).standard)))
+                end
+            end
+
+            for _, template_ref in ipairs(candidates) do
+                local absolute = template_ref
+                if not is_absolute_path(template_ref) then
+                    absolute = join_path(opts.vault_root, template_ref)
+                end
+
+                local try_paths = { absolute }
+                if not absolute:match("%.md$") then
+                    table.insert(try_paths, absolute .. ".md")
+                end
+
+                for _, path in ipairs(try_paths) do
+                    local content = nil
+                    if type(adapter_set.fs_io.read_file) == "function" then
+                        content = adapter_set.fs_io.read_file(path)
+                    end
+                    if type(content) == "string" then
+                        return content
+                    end
+                end
+            end
+
+            return nil
         end,
     }
 
