@@ -261,6 +261,23 @@ if obsidian.is_inside_vault() then
 end
 ```
 
+Public journal helpers for config logic:
+
+```lua
+local obsidian = require("nvim_obsidian")
+
+print(obsidian.journal.month_name(3, "pt-BR"))         -- "março"
+print(obsidian.journal.weekday_name(6, "en-US"))       -- "Friday"
+print(obsidian.journal.parse_month_token("marco", "pt-BR")) -- 3
+
+local rendered = obsidian.journal.render_title(
+  "{{year}} {{month_name}} {{day2}}",
+  { year = 2026, month = 3, day = 28 },
+  "pt-BR"
+)
+print(rendered) -- "2026 março 28"
+```
+
 ### Configuration Fields Explained
 
 #### vault_root (REQUIRED)

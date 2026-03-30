@@ -56,6 +56,93 @@ local WEEKDAY_NAMES = {
     },
 }
 
+local function normalize_token(text)
+    local s = tostring(text or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    local replacements = {
+        ["á"] = "a",
+        ["à"] = "a",
+        ["ã"] = "a",
+        ["â"] = "a",
+        ["ä"] = "a",
+        ["é"] = "e",
+        ["è"] = "e",
+        ["ê"] = "e",
+        ["ë"] = "e",
+        ["í"] = "i",
+        ["ì"] = "i",
+        ["î"] = "i",
+        ["ï"] = "i",
+        ["ó"] = "o",
+        ["ò"] = "o",
+        ["õ"] = "o",
+        ["ô"] = "o",
+        ["ö"] = "o",
+        ["ú"] = "u",
+        ["ù"] = "u",
+        ["û"] = "u",
+        ["ü"] = "u",
+        ["ç"] = "c",
+    }
+
+    for accented, base in pairs(replacements) do
+        s = s:gsub(accented, base)
+    end
+
+    return s
+end
+
+local function month_name_by_locale(month, locale)
+    local m = tonumber(month)
+    if not m or m < 1 or m > 12 then
+        return nil
+    end
+    return localize_month(tostring(locale or "en-US"), m)
+end
+
+local function weekday_name_by_locale(wday, locale)
+    local d = tonumber(wday)
+    if not d or d < 1 or d > 7 then
+        return nil
+    end
+    return localize_weekday(tostring(locale or "en-US"), d)
+end
+
+local function parse_month_token(token, locale)
+    local raw = tostring(token or "")
+    if raw == "" then
+        return nil
+    end
+
+    local numeric = tonumber(raw)
+    if numeric and numeric >= 1 and numeric <= 12 then
+        return math.floor(numeric)
+    end
+
+    local normalized = normalize_token(raw)
+    if normalized == "" then
+        return nil
+    end
+
+    local locale_names = MONTH_NAMES[tostring(locale or "")]
+    if type(locale_names) == "table" then
+        for idx, name in ipairs(locale_names) do
+            if normalize_token(name) == normalized then
+                return idx
+            end
+        end
+    end
+
+    for _, names in pairs(MONTH_NAMES) do
+        for idx, name in ipairs(names) do
+            if normalize_token(name) == normalized then
+                return idx
+            end
+        end
+    end
+
+    return nil
+end
+
 local function is_valid_name(name)
     return type(name) == "string" and name:match("^[%a_][%w_]*$") ~= nil
 end
@@ -174,6 +261,27 @@ function M.render_title_format(title_format, opts)
     end)
 
     return rendered
+end
+
+function M.month_name(month, locale)
+    return month_name_by_locale(month, locale)
+end
+
+function M.weekday_name(wday, locale)
+    return weekday_name_by_locale(wday, locale)
+end
+
+function M.parse_month_token(token, locale)
+    return parse_month_token(token, locale)
+end
+
+function M.render_title(format, date, locale)
+    return M.render_title_format(format, {
+        date = date,
+        config = {
+            locale = tostring(locale or "en-US"),
+        },
+    })
 end
 
 function M._reset_for_tests()

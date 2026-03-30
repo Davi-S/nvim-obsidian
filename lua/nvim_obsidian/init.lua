@@ -137,6 +137,22 @@ function M.journal.register_placeholder(name, resolver, regex_fragment)
     end
 end
 
+function M.journal.month_name(month, locale)
+    return journal_placeholders.month_name(month, locale)
+end
+
+function M.journal.weekday_name(wday, locale)
+    return journal_placeholders.weekday_name(wday, locale)
+end
+
+function M.journal.parse_month_token(token, locale)
+    return journal_placeholders.parse_month_token(token, locale)
+end
+
+function M.journal.render_title(format, date, locale)
+    return journal_placeholders.render_title(format, date, locale)
+end
+
 function M.wiki_link_under_cursor(line, col)
     local container = state.container
     local wiki_link = container and container.wiki_link

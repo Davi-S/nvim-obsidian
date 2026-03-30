@@ -202,4 +202,40 @@ describe("public setup api", function()
         end)
         assert.is_false(api.is_inside_vault())
     end)
+
+    it("exposes journal.month_name and journal.weekday_name helpers", function()
+        package.loaded["nvim_obsidian"] = nil
+
+        local api = require("nvim_obsidian")
+
+        assert.equals("March", api.journal.month_name(3, "en-US"))
+        assert.equals("março", api.journal.month_name(3, "pt-BR"))
+        assert.equals("Friday", api.journal.weekday_name(6, "en-US"))
+        assert.equals("sexta-feira", api.journal.weekday_name(6, "pt-BR"))
+    end)
+
+    it("exposes journal.parse_month_token helper", function()
+        package.loaded["nvim_obsidian"] = nil
+
+        local api = require("nvim_obsidian")
+
+        assert.equals(3, api.journal.parse_month_token("março", "pt-BR"))
+        assert.equals(3, api.journal.parse_month_token("marco", "pt-BR"))
+        assert.equals(3, api.journal.parse_month_token("March", "en-US"))
+        assert.equals(10, api.journal.parse_month_token("10", "en-US"))
+        assert.is_nil(api.journal.parse_month_token("not-a-month", "en-US"))
+    end)
+
+    it("exposes journal.render_title helper", function()
+        package.loaded["nvim_obsidian"] = nil
+
+        local api = require("nvim_obsidian")
+        local rendered = api.journal.render_title("{{year}} {{month_name}} {{day2}}", {
+            year = 2026,
+            month = 3,
+            day = 28,
+        }, "pt-BR")
+
+        assert.equals("2026 março 28", rendered)
+    end)
 end)

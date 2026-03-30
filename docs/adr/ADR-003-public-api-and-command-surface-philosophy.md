@@ -36,6 +36,10 @@ Public and stable in V2.0:
 - Documented setup helper APIs:
 	- `require("nvim_obsidian").template_register_placeholder(name, resolver)`
 	- `require("nvim_obsidian").journal.register_placeholder(name, resolver, regex_fragment)`
+	- `require("nvim_obsidian").journal.month_name(month, locale)`
+	- `require("nvim_obsidian").journal.weekday_name(wday, locale)`
+	- `require("nvim_obsidian").journal.parse_month_token(token, locale)`
+	- `require("nvim_obsidian").journal.render_title(format, date, locale)`
 	- `require("nvim_obsidian").wiki_link_under_cursor([line], [col])`
 	- `require("nvim_obsidian").is_inside_vault([path])`
 
