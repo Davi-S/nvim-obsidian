@@ -43,6 +43,10 @@ describe("ensure_open_note use case", function()
                     table.insert(writes, { path = path, content = content })
                     return true
                 end,
+                read_file = function(path)
+                    -- Default: file doesn't exist (returns nil, error)
+                    return nil, { code = "NOT_FOUND" }
+                end,
             },
             navigation = {
                 open_path = function(path)
@@ -313,6 +317,45 @@ describe("ensure_open_note use case", function()
 
         assert.is_false(out.ok)
         assert.equals("internal", out.error.code)
+    end)
+
+    it("opens existing file on disk when vault_catalog async startup incomplete", function()
+        -- This tests the fix for the race condition where:
+        -- - vault_catalog.find_by_identity_token returns no matches (index not yet loaded)
+        -- - But the note file already exists on filesystem
+        -- - Expected: open existing note without applying template
+        local ctx = base_ctx({
+            vault_catalog = {
+                find_by_identity_token = function()
+                    -- Simulate incomplete vault_catalog due to async startup
+                    return { matches = {} }
+                end,
+                upsert_note = function(_note)
+                    return { ok = true, error = nil }
+                end,
+            },
+            fs_io = {
+                write_file = function(path, content)
+                    error("Template should not be applied - file exists on disk!")
+                end,
+                read_file = function(path)
+                    -- File exists on disk with existing content
+                    return "# Existing Note\n\nThis content should be preserved", nil
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "Today",
+            create_if_missing = true,
+            origin = "journal",
+        })
+
+        -- Should open existing file without creating/writing new template
+        assert.is_true(out.ok)
+        assert.is_false(out.created)
+        assert.equals(1, #ctx._opened)
+        assert.equals(0, #ctx._writes)
     end)
 
     it("passes canonical nested template context when creating notes", function()

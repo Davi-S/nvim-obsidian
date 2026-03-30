@@ -326,6 +326,35 @@ function M.execute(_ctx, _input)
     local filename = filename_base .. ".md"
     local path = join_path(resolve_base_dir(base_subdir, cfg.vault_root), filename)
 
+    -- Check if the file already exists on disk.
+    -- This handles the case where vault_catalog hasn't fully loaded yet during async startup,
+    -- but the note file already exists on the filesystem.
+    -- (e.g., user runs :ObsidianToday before async startup completes)
+    if type(fs_io.read_file) == "function" then
+        local existing_content, read_err = fs_io.read_file(path)
+        if existing_content ~= nil then
+            -- File exists on disk, just open it (don't apply template)
+            local opened, open_err = navigation.open_path(path)
+            if not opened then
+                return {
+                    ok = false,
+                    path = path,
+                    created = nil,
+                    error = errors.new(errors.codes.INTERNAL, "failed to open existing note", {
+                        path = path,
+                        reason = open_err,
+                    }),
+                }
+            end
+            return {
+                ok = true,
+                path = path,
+                created = false,
+                error = nil,
+            }
+        end
+    end
+
     local content = ""
     if type(ctx.resolve_template_content) == "function" and type(ctx.template) == "table" and type(ctx.template.render) == "function" then
         local template_content = ctx.resolve_template_content({
