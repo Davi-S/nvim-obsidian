@@ -146,14 +146,23 @@ local function build_omni_ordinal(item, label)
         end
     end
 
+    local has_rich_metadata = #aliases > 0 or title ~= "" or relpath ~= ""
+    local parts = {}
+
+    local function append_part(value)
+        if type(value) == "string" and value ~= "" then
+            table.insert(parts, value)
+        end
+    end
+
     -- Keep aliases first in ordinal so exact alias typing is strongly favored by fuzzy sort.
-    local parts = {
-        table.concat(aliases, " "),
-        title,
-        relpath,
-        path,
-        tostring(label or ""),
-    }
+    append_part(table.concat(aliases, " "))
+    append_part(title)
+    append_part(relpath)
+    if has_rich_metadata then
+        append_part(path)
+    end
+    append_part(tostring(label or ""))
 
     return table.concat(parts, " ")
 end
