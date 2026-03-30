@@ -10,6 +10,7 @@ describe("neovim command adapter", function()
         command_registry = {}
         autocmd_registry = {}
         local scheduled_queue = {}
+        local deferred_queue = {}
         _G.vim = _G.vim or {}
         _G.vim.api = _G.vim.api or {}
         _G.vim.tbl_deep_extend = _G.vim.tbl_deep_extend or function(_mode, base, ext)
@@ -38,9 +39,17 @@ describe("neovim command adapter", function()
         _G.vim.schedule = function(fn)
             table.insert(scheduled_queue, fn)
         end
+        _G.vim.defer_fn = function(fn, _delay_ms)
+            -- For tests, defer_fn behaves like schedule (ignore delay)
+            table.insert(deferred_queue, fn)
+        end
         _G.vim._drain_scheduled = function()
             while #scheduled_queue > 0 do
                 local fn = table.remove(scheduled_queue, 1)
+                fn()
+            end
+            while #deferred_queue > 0 do
+                local fn = table.remove(deferred_queue, 1)
                 fn()
             end
         end

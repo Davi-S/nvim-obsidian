@@ -797,12 +797,24 @@ local function register_dataview_autocmds(ctx)
 
             -- Defer rendering to avoid blocking the triggering event (buffer save, open, etc.)
             -- This allows the user action to complete immediately while dataview renders asynchronously.
-            -- This ensures save operations respond instantly, note-open completes without delay, etc.
-            if type(vim) == "table" and type(vim.schedule) == "function" then
-                vim.schedule(function()
-                    run_for_scope(trigger)
-                end)
-                return
+            --
+            -- For BufWritePost (save events), use a longer delay via vim.defer_fn() to ensure the save
+            -- is truly complete before rendering starts. For other events (open, etc.), use vim.schedule()
+            -- for immediate (but async) processing after the event completes.
+            if type(vim) == "table" then
+                if args.event == "BufWritePost" and type(vim.defer_fn) == "function" then
+                    -- Schedule rendering after save with 50ms delay to ensure save is truly complete
+                    vim.defer_fn(function()
+                        run_for_scope(trigger)
+                    end, 50)
+                    return
+                elseif type(vim.schedule) == "function" then
+                    -- For other events, schedule immediately after event completes
+                    vim.schedule(function()
+                        run_for_scope(trigger)
+                    end)
+                    return
+                end
             end
 
             run_for_scope(trigger)
