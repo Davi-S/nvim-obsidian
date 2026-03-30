@@ -97,16 +97,19 @@ function M.build(opts)
         local title = options.note.title
         local path = options.note.path
 
-        ctx.note = {
-            kind = kind,
-            title = title,
-            path = path,
-            yaml = {
-                title = title,
+        -- Invariant: when note is present, title and path are non-empty strings.
+        if type(title) == "string" and title ~= "" and type(path) == "string" and path ~= "" then
+            ctx.note = {
                 kind = kind,
-                date = render_time.iso_date,
-            },
-        }
+                title = title,
+                path = path,
+                yaml = {
+                    title = title,
+                    kind = kind,
+                    date = render_time.iso_date,
+                },
+            }
+        end
     end
 
     return ctx
