@@ -27,6 +27,33 @@ describe("cmp completion source adapter", function()
                         { path = "journal/daily/2026-03-28.md", title = "2026-03-28", aliases = {} },
                     }
                 end,
+                find_by_identity_token = function(token)
+                    local matches = {}
+                    local all = {
+                        { path = "notes/foo.md",                title = "Foo",        aliases = { "F", "Foobar" } },
+                        { path = "notes/bar.md",                title = "Bar",        aliases = {} },
+                        { path = "notes/baz.md",                title = "Baz Note",   aliases = { "BZ" } },
+                        { path = "journal/daily/2026-03-28.md", title = "2026-03-28", aliases = {} },
+                    }
+                    for _, note in ipairs(all) do
+                        if note.title == token then
+                            table.insert(matches, note)
+                        end
+                    end
+                    return {
+                        exact_matches = matches,
+                        exact_ci_matches = {},
+                        fuzzy_matches = {},
+                    }
+                end,
+            },
+            fs_io = {
+                read_file = function(path)
+                    if path:match("notes/foo%.md$") then
+                        return "# Alpha Heading\nSome content ^blk-1\n## Beta Heading\nAnother line ^blk_2"
+                    end
+                    return ""
+                end,
             },
             search_ranking = {
                 score_candidates = function(query, notes)
@@ -215,6 +242,44 @@ describe("cmp completion source adapter", function()
                 items = result.items
             end)
             assert.is_table(items)
+        end)
+
+        it("should return heading candidates for note anchor context", function()
+            local ctx = base_ctx()
+            local source = cmp_source.create_source(ctx)
+            local completion_ctx = {
+                cur_line = "[[Foo#A",
+                col = 8,
+                before_line = "[[Foo#A",
+            }
+
+            local items = nil
+            source.complete(completion_ctx, function(result)
+                items = result.items or {}
+            end)
+
+            assert.is_true(#items > 0)
+            assert.equals("#Alpha Heading", items[1].label)
+            assert.equals("Alpha Heading", items[1].insertText)
+        end)
+
+        it("should return block-id candidates for note block context", function()
+            local ctx = base_ctx()
+            local source = cmp_source.create_source(ctx)
+            local completion_ctx = {
+                cur_line = "[[Foo#^blk",
+                col = 11,
+                before_line = "[[Foo#^blk",
+            }
+
+            local items = nil
+            source.complete(completion_ctx, function(result)
+                items = result.items or {}
+            end)
+
+            assert.is_true(#items > 0)
+            assert.equals("#^blk-1", items[1].label)
+            assert.equals("^blk-1", items[1].insertText)
         end)
 
         it("should handle empty vault gracefully", function()

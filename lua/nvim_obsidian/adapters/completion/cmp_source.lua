@@ -6,6 +6,42 @@
 
 local M = {}
 
+local function is_absolute_path(path)
+    if type(path) ~= "string" then
+        return false
+    end
+    if path:match("^/") then
+        return true
+    end
+    if path:match("^%a:[/\\]") then
+        return true
+    end
+    return false
+end
+
+local function join_path(base, leaf)
+    local b = tostring(base or ""):gsub("\\", "/"):gsub("//+", "/")
+    local l = tostring(leaf or ""):gsub("\\", "/"):gsub("^/+", "")
+    if b == "" then
+        return l
+    end
+    if b:sub(-1) == "/" then
+        return b .. l
+    end
+    return b .. "/" .. l
+end
+
+local function trim(text)
+    if type(text) ~= "string" then
+        return nil
+    end
+    local out = text:gsub("^%s+", ""):gsub("%s+$", "")
+    if out == "" then
+        return nil
+    end
+    return out
+end
+
 local function report_error(message)
     if vim and type(vim.notify) == "function" then
         local level = nil
@@ -76,6 +112,34 @@ function M.create_source(ctx)
         return true, query
     end
 
+    local function split_note_and_anchor(query)
+        local q = tostring(query or "")
+        local hash_pos = q:find("#", 1, true)
+        if not hash_pos then
+            return {
+                mode = "note",
+                note_query = q,
+                anchor_query = "",
+                is_block = false,
+            }
+        end
+
+        local note_query = q:sub(1, hash_pos - 1)
+        local raw_anchor = q:sub(hash_pos + 1)
+        local is_block = raw_anchor:sub(1, 1) == "^"
+        local anchor_query = raw_anchor
+        if is_block then
+            anchor_query = raw_anchor:sub(2)
+        end
+
+        return {
+            mode = "anchor",
+            note_query = note_query,
+            anchor_query = anchor_query,
+            is_block = is_block,
+        }
+    end
+
     local function filter_candidates(notes, query)
         -- If no query is provided, return all notes
         if not query or query == "" then
@@ -106,6 +170,146 @@ function M.create_source(ctx)
         end
 
         return filtered
+    end
+
+    local function find_target_note(notes, note_query)
+        local token = trim(note_query)
+        if not token then
+            return nil
+        end
+
+        if ctx.vault_catalog and type(ctx.vault_catalog.find_by_identity_token) == "function" then
+            local ok_lookup, lookup = pcall(ctx.vault_catalog.find_by_identity_token, token)
+            if ok_lookup and type(lookup) == "table" then
+                local exact = type(lookup.exact_matches) == "table" and lookup.exact_matches or {}
+                if #exact > 0 then
+                    return exact[1]
+                end
+
+                local exact_ci = type(lookup.exact_ci_matches) == "table" and lookup.exact_ci_matches or {}
+                if #exact_ci > 0 then
+                    return exact_ci[1]
+                end
+
+                local fuzzy = type(lookup.fuzzy_matches) == "table" and lookup.fuzzy_matches or {}
+                if #fuzzy > 0 then
+                    return fuzzy[1]
+                end
+            end
+        end
+
+        local filtered = filter_candidates(notes, token)
+        if #filtered == 0 then
+            return nil
+        end
+        return filtered[1]
+    end
+
+    local function read_note_markdown(note)
+        if type(note) ~= "table" then
+            return nil
+        end
+        if type(ctx.fs_io) ~= "table" or type(ctx.fs_io.read_file) ~= "function" then
+            return nil
+        end
+
+        local relpath = note.path
+        if type(relpath) ~= "string" or relpath == "" then
+            return nil
+        end
+
+        local fullpath = relpath
+        if not is_absolute_path(fullpath) then
+            local root = ctx.config and ctx.config.vault_root
+            if type(root) ~= "string" or root == "" then
+                return nil
+            end
+            fullpath = join_path(root, relpath)
+        end
+
+        local ok_read, content = pcall(ctx.fs_io.read_file, fullpath)
+        if not ok_read or type(content) ~= "string" then
+            return nil
+        end
+        return content
+    end
+
+    local function extract_note_anchors(markdown)
+        if type(markdown) ~= "string" then
+            return { headings = {}, blocks = {} }
+        end
+
+        local headings = {}
+        local blocks = {}
+        local seen_headings = {}
+        local seen_blocks = {}
+
+        for line in (markdown .. "\n"):gmatch("(.-)\n") do
+            local heading = line:match("^%s*#+%s+(.+)%s*$")
+            if heading then
+                heading = heading:gsub("%s+#+%s*$", "")
+                heading = trim(heading)
+                if heading and not seen_headings[heading] then
+                    seen_headings[heading] = true
+                    table.insert(headings, heading)
+                end
+            end
+
+            for block_id in line:gmatch("%^(%w[%w%-%_]*)") do
+                if block_id and not seen_blocks[block_id] then
+                    seen_blocks[block_id] = true
+                    table.insert(blocks, block_id)
+                end
+            end
+        end
+
+        return {
+            headings = headings,
+            blocks = blocks,
+        }
+    end
+
+    local function format_anchor_item(note, value, is_block)
+        local anchor_prefix = is_block and "#^" or "#"
+        local item_label = anchor_prefix .. value
+        local note_label = note.title or note.path
+        return {
+            label = item_label,
+            kind = "Variable",
+            sortText = item_label,
+            filterText = value,
+            insertText = is_block and ("^" .. value) or value,
+            detail = note.path,
+            data = {
+                path = note.path,
+                note = note,
+                anchor = value,
+                anchor_type = is_block and "block" or "heading",
+                note_label = note_label,
+            },
+        }
+    end
+
+    local function build_anchor_items(notes, anchor_ctx)
+        local target = find_target_note(notes, anchor_ctx.note_query)
+        if not target then
+            return {}
+        end
+
+        local markdown = read_note_markdown(target)
+        local extracted = extract_note_anchors(markdown)
+
+        local values = anchor_ctx.is_block and extracted.blocks or extracted.headings
+        local query = (anchor_ctx.anchor_query or ""):lower()
+        local items = {}
+
+        for _, value in ipairs(values) do
+            if query == "" or value:lower():find(query, 1, true) then
+                table.insert(items, format_anchor_item(target, value, anchor_ctx.is_block))
+            end
+        end
+
+        return items
     end
 
     local function format_completion_item(note, score_data)
@@ -189,6 +393,17 @@ function M.create_source(ctx)
         notes = listed
 
         if #notes == 0 then
+            if callback then
+                pcall(function()
+                    callback(result)
+                end)
+            end
+            return
+        end
+
+        local query_ctx = split_note_and_anchor(query)
+        if query_ctx.mode == "anchor" then
+            result.items = build_anchor_items(notes, query_ctx)
             if callback then
                 pcall(function()
                     callback(result)
