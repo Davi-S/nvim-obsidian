@@ -272,6 +272,17 @@ function M.open_omni(ctx)
         local prompt_title = "Obsidian Omni"
         local query = tostring(ctx.query or "")
 
+        local function current_prompt_query()
+            local prompt_query = query
+            if telescope.action_state and type(telescope.action_state.get_current_line) == "function" then
+                local current_line = telescope.action_state.get_current_line()
+                if type(current_line) == "string" then
+                    prompt_query = current_line
+                end
+            end
+            return prompt_query
+        end
+
         telescope.pickers.new({}, {
             prompt_title = prompt_title,
             finder = telescope.finders.new_table({
@@ -323,7 +334,7 @@ function M.open_omni(ctx)
                 local function trigger_create()
                     telescope.actions.close(prompt_bufnr)
                     if type(ctx.on_create) == "function" then
-                        pcall(ctx.on_create, query)
+                        pcall(ctx.on_create, current_prompt_query())
                     end
                 end
 

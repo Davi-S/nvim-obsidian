@@ -342,6 +342,7 @@ function M.execute(_ctx, _input)
 
     local picker_result = picker_open({
         query = query,
+        config = ctx.config,
         items = items,
         allow_create = allow_create,
         allow_force_create = input.allow_force_create and allow_create,
