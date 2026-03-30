@@ -234,6 +234,32 @@ function M.execute(_ctx, _input)
         return b .. "/" .. l
     end
 
+    local function is_absolute_path(path)
+        if type(path) ~= "string" then
+            return false
+        end
+        if path:match("^/") then
+            return true
+        end
+        if path:match("^%a:[/\\]") then
+            return true
+        end
+        return false
+    end
+
+    local function resolve_base_dir(base_dir, vault_root)
+        if type(base_dir) ~= "string" or base_dir == "" then
+            return base_dir
+        end
+        if is_absolute_path(base_dir) then
+            return base_dir
+        end
+        if type(vault_root) ~= "string" or vault_root == "" then
+            return base_dir
+        end
+        return join_path(vault_root, base_dir)
+    end
+
     local function slugify_title(title)
         local s = tostring(title or "")
         s = s:gsub("^%s+", ""):gsub("%s+$", "")
@@ -293,7 +319,7 @@ function M.execute(_ctx, _input)
     end
 
     local filename = filename_base .. ".md"
-    local path = join_path(base_subdir, filename)
+    local path = join_path(resolve_base_dir(base_subdir, cfg.vault_root), filename)
 
     local content = ""
     if type(ctx.resolve_template_content) == "function" and type(ctx.template) == "table" and type(ctx.template.render) == "function" then

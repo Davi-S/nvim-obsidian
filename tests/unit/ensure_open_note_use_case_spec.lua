@@ -304,10 +304,32 @@ describe("ensure_open_note use case", function()
         assert.is_table(captured_ctx.note)
         assert.equals("note", captured_ctx.note.kind)
         assert.equals("Alpha", captured_ctx.note.title)
-        assert.equals("notes/Alpha.md", captured_ctx.note.path)
+        assert.equals("/vault/notes/Alpha.md", captured_ctx.note.path)
         assert.is_table(captured_ctx.note.yaml)
 
         assert.is_table(captured_ctx.config)
         assert.equals("/vault", captured_ctx.config.vault_root)
+    end)
+
+    it("anchors relative new_notes_subdir to vault_root", function()
+        local ctx = base_ctx({
+            config = {
+                vault_root = "/vault",
+                new_notes_subdir = "notes",
+                journal = {
+                    daily = { subdir = "journal/daily" },
+                },
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "outside routing test",
+            create_if_missing = true,
+            origin = "omni",
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("/vault/notes/outside-routing-test.md", out.path)
+        assert.equals("/vault/notes/outside-routing-test.md", ctx._writes[1].path)
     end)
 end)
