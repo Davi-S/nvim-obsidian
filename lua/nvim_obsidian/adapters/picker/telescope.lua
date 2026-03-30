@@ -288,7 +288,7 @@ function M.open_omni(ctx)
             finder = telescope.finders.new_table({
                 results = entries,
                 entry_maker = function(entry)
-                    local filename = nil
+                    local filename = ""
                     if entry.kind == "item" and type(entry.idx) == "number" then
                         local mapped = item_map[entry.idx]
                         local candidate = mapped and mapped.candidate or nil

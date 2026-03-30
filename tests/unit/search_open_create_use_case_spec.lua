@@ -308,4 +308,47 @@ describe("search_open_create use case", function()
         assert.is_not_nil(picker_payload)
         assert.equals(0, #picker_payload.items)
     end)
+
+    it("refreshes catalog on empty first-load before opening omni picker", function()
+        local list_calls = 0
+        local reindex_calls = 0
+        local picker_payload = nil
+
+        local ctx = base_ctx({
+            vault_catalog = {
+                list_notes = function()
+                    list_calls = list_calls + 1
+                    if list_calls == 1 then
+                        return {}
+                    end
+                    return {
+                        { path = "/vault/notes/after-refresh.md", title = "After Refresh", aliases = {} },
+                    }
+                end,
+            },
+            reindex_sync = {
+                execute = function(_ctx, req)
+                    reindex_calls = reindex_calls + 1
+                    assert.equals("manual", req.mode)
+                    return { ok = true, stats = { mode = "manual" } }
+                end,
+            },
+            open_omni_picker = function(payload)
+                picker_payload = payload
+                return { action = "cancel" }
+            end,
+        })
+
+        local out = run(ctx, {
+            query = "",
+            allow_force_create = true,
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("cancelled", out.action)
+        assert.equals(1, reindex_calls)
+        assert.is_not_nil(picker_payload)
+        assert.equals(1, #picker_payload.items)
+        assert.equals("After Refresh", picker_payload.items[1].candidate.title)
+    end)
 end)

@@ -181,6 +181,24 @@ function M.execute(_ctx, _input)
         }
     end
 
+    -- When plugin is command-loaded (common outside vault buffers), startup reindex
+    -- may still be pending. If catalog is empty, attempt an on-demand refresh once.
+    if #notes == 0 and type(ctx.reindex_sync) == "table" and type(ctx.reindex_sync.execute) == "function" then
+        local refreshed = ctx.reindex_sync.execute(ctx, { mode = "manual", event = nil })
+        if type(refreshed) == "table" and refreshed.ok == true then
+            notes = vault_catalog.list_notes()
+            if type(notes) ~= "table" then
+                return {
+                    ok = false,
+                    action = "cancelled",
+                    path = nil,
+                    error = errors.new(errors.codes.INTERNAL,
+                    "vault_catalog.list_notes returned invalid result after refresh"),
+                }
+            end
+        end
+    end
+
     -- Opportunistic self-healing: if watcher misses delete events,
     -- remove stale entries before building omni candidates.
     if type(vault_catalog.remove_note) == "function" then
