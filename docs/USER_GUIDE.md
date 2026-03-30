@@ -527,14 +527,6 @@ ctx = {
     title = string | nil,
     path = string | nil,
     yaml = table | nil,
-    date = {
-      year = number,
-      month = number,
-      day = number,
-      iso_year = number,
-      iso_week = number,
-      iso_weekday = number | nil,
-    } | nil,
   } | nil,
 }
 ```
@@ -544,6 +536,7 @@ Resolver contract rules:
 - `time` is always present and derived from deterministic render time.
 - `config` is read-only for resolvers (do not mutate).
 - `note` may be `nil` for non-note-bound render flows.
+- When note-bound dates are needed, read from `ctx.note.yaml.date`.
 - `ctx.journal` and `ctx.placeholders` are not part of the template resolver contract.
 
 Create template file: `~/ObsidianVault/Templates/article.md`
