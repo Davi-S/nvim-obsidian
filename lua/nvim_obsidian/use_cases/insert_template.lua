@@ -1,4 +1,5 @@
 local errors = require("nvim_obsidian.core.shared.errors")
+local template_context = require("nvim_obsidian.app.template_context")
 
 local M = {}
 
@@ -89,11 +90,15 @@ function M.execute(_ctx, _input)
 
     local rendered = template_content
     if type(ctx.template) == "table" and type(ctx.template.render) == "function" then
-        local out = ctx.template.render(template_content, {
-            now = input.now or os.time(),
-            date = os.date("%Y-%m-%d", input.now or os.time()),
+        local render_ctx = template_context.build({
+            now = input.now,
+            meta_origin = "insert_template_command",
             command = "ObsidianInsertTemplate",
+            config_snapshot = ctx.config,
+            note = nil,
         })
+
+        local out = ctx.template.render(template_content, render_ctx)
         if type(out) == "table" and type(out.rendered) == "string" then
             rendered = out.rendered
         else

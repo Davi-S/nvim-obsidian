@@ -1,5 +1,8 @@
 local M = {}
 
+local localize_month
+local localize_weekday
+
 local state = {
     custom = {},
 }
@@ -180,7 +183,7 @@ local function to_timestamp(date_tbl)
     })
 end
 
-local function localize_month(locale, month)
+localize_month = function(locale, month)
     local names = MONTH_NAMES[locale]
     if names and names[month] then
         return names[month]
@@ -188,7 +191,7 @@ local function localize_month(locale, month)
     return os.date("%B", to_timestamp({ year = 2000, month = month, day = 1 }))
 end
 
-local function localize_weekday(locale, wday)
+localize_weekday = function(locale, wday)
     local names = WEEKDAY_NAMES[locale]
     if names and names[wday] then
         return names[wday]

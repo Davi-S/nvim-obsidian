@@ -66,7 +66,7 @@ describe("public setup api", function()
         end)
 
         assert.is_false(ok)
-        assert.truthy(tostring(err):find("nvim-obsidian not initialized; call setup%(%) first"))
+        assert.truthy(tostring(err):find("nvim%-obsidian not initialized; call setup%(%) first"))
     end)
 
     it("delegates wiki_link_under_cursor to wiki_link parser with explicit args", function()
@@ -145,7 +145,7 @@ describe("public setup api", function()
         end)
 
         assert.is_false(ok)
-        assert.truthy(tostring(err):find("nvim-obsidian not initialized; call setup%(%) first"))
+        assert.truthy(tostring(err):find("nvim%-obsidian not initialized; call setup%(%) first"))
     end)
 
     it("returns true only when explicit path is inside configured vault", function()

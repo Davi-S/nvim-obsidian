@@ -1,4 +1,5 @@
 local errors = require("nvim_obsidian.core.shared.errors")
+local template_context = require("nvim_obsidian.app.template_context")
 
 local M = {}
 
@@ -71,6 +72,16 @@ function M.execute(_ctx, _input)
             path = nil,
             created = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "origin must be a string"),
+        }
+    end
+
+    local mapped_origin = template_context.resolve_origin(input.origin)
+    if not mapped_origin then
+        return {
+            ok = false,
+            path = nil,
+            created = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "origin must be one of: omni|journal|link"),
         }
     end
 
@@ -302,11 +313,20 @@ function M.execute(_ctx, _input)
                 }
             end
             if template_content ~= "" then
-                local rendered = ctx.template.render(template_content, {
-                    title = note_title,
-                    origin = input.origin,
-                    kind = note_kind,
+                local canonical_kind = note_kind ~= "none" and note_kind or "note"
+                local render_ctx = template_context.build({
+                    now = input.now,
+                    meta_origin = mapped_origin,
+                    command = nil,
+                    config_snapshot = cfg,
+                    note = {
+                        kind = canonical_kind,
+                        title = note_title,
+                        path = path,
+                    },
                 })
+
+                local rendered = ctx.template.render(template_content, render_ctx)
                 if type(rendered) ~= "table" or type(rendered.rendered) ~= "string" then
                     return {
                         ok = false,

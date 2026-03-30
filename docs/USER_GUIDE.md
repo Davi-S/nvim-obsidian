@@ -494,6 +494,58 @@ require("nvim_obsidian").template_register_placeholder("date", function(ctx)
 end)
 ```
 
+Template resolver context contract (fixed schema):
+
+```lua
+ctx = {
+  meta = {
+    origin = "insert_template_command" | "omni_create" | "journal_navigation" | "link_follow_create",
+    command = string | nil,
+  },
+
+  config = { ... }, -- full normalized config snapshot (immutable)
+
+  time = {
+    now_ts = number,
+    iso_date = string,
+    iso_datetime = string,
+    year = number,
+    month = number,
+    day = number,
+    hour = number,
+    min = number,
+    sec = number,
+    wday = number,
+    yday = number,
+    iso_year = number,
+    iso_week = number,
+    iso_weekday = number,
+  },
+
+  note = {
+    kind = "note" | "daily" | "weekly" | "monthly" | "yearly" | nil,
+    title = string | nil,
+    path = string | nil,
+    yaml = table | nil,
+    date = {
+      year = number,
+      month = number,
+      day = number,
+      iso_year = number,
+      iso_week = number,
+      iso_weekday = number | nil,
+    } | nil,
+  } | nil,
+}
+```
+
+Resolver contract rules:
+- `meta.origin` is always present and must be a valid enum value.
+- `time` is always present and derived from deterministic render time.
+- `config` is read-only for resolvers (do not mutate).
+- `note` may be `nil` for non-note-bound render flows.
+- `ctx.journal` and `ctx.placeholders` are not part of the template resolver contract.
+
 Create template file: `~/ObsidianVault/Templates/article.md`
 
 ```markdown

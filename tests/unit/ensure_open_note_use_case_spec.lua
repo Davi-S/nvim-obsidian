@@ -226,7 +226,7 @@ describe("ensure_open_note use case", function()
             template = {
                 render = function(_content, context)
                     return {
-                        rendered = "# " .. context.title,
+                        rendered = "# " .. context.note.title,
                         unresolved = {},
                     }
                 end,
@@ -260,5 +260,54 @@ describe("ensure_open_note use case", function()
 
         assert.is_false(out.ok)
         assert.equals("internal", out.error.code)
+    end)
+
+    it("passes canonical nested template context when creating notes", function()
+        local captured_ctx = nil
+        local ctx = base_ctx({
+            config = {
+                vault_root = "/vault",
+                locale = "pt-BR",
+                new_notes_subdir = "notes",
+                journal = {
+                    daily = { subdir = "journal/daily" },
+                },
+            },
+            resolve_template_content = function()
+                return "# {{title}}"
+            end,
+            template = {
+                render = function(_content, context)
+                    captured_ctx = context
+                    return { rendered = "# ok", unresolved = {} }
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "Alpha",
+            create_if_missing = true,
+            origin = "omni",
+            now = 1700000000,
+        })
+
+        assert.is_true(out.ok)
+        assert.is_table(captured_ctx)
+
+        assert.is_table(captured_ctx.meta)
+        assert.equals("omni_create", captured_ctx.meta.origin)
+
+        assert.is_table(captured_ctx.time)
+        assert.equals(1700000000, captured_ctx.time.now_ts)
+        assert.is_truthy(captured_ctx.time.iso_week)
+
+        assert.is_table(captured_ctx.note)
+        assert.equals("note", captured_ctx.note.kind)
+        assert.equals("Alpha", captured_ctx.note.title)
+        assert.equals("notes/Alpha.md", captured_ctx.note.path)
+        assert.is_table(captured_ctx.note.yaml)
+
+        assert.is_table(captured_ctx.config)
+        assert.equals("/vault", captured_ctx.config.vault_root)
     end)
 end)

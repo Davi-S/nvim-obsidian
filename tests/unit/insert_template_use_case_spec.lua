@@ -19,7 +19,7 @@ describe("insert_template use case", function()
             template = {
                 render = function(content, context)
                     table.insert(render_calls, { content = content, context = context })
-                    return { rendered = "# rendered " .. context.date }
+                    return { rendered = "# rendered " .. context.time.iso_date }
                 end,
             },
             navigation = {
@@ -115,5 +115,38 @@ describe("insert_template use case", function()
 
         assert.is_false(out.ok)
         assert.equals("internal", out.error.code)
+    end)
+
+    it("passes canonical nested template context to resolvers", function()
+        local captured_ctx = nil
+        local ctx = base_ctx({
+            template = {
+                render = function(content, context)
+                    captured_ctx = context
+                    return { rendered = content }
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            query = "templates/daily.md",
+            now = 1700000000,
+        })
+
+        assert.is_true(out.ok)
+        assert.is_table(captured_ctx)
+
+        assert.is_table(captured_ctx.meta)
+        assert.equals("insert_template_command", captured_ctx.meta.origin)
+        assert.equals("ObsidianInsertTemplate", captured_ctx.meta.command)
+
+        assert.is_table(captured_ctx.time)
+        assert.equals(1700000000, captured_ctx.time.now_ts)
+        assert.is_truthy(captured_ctx.time.iso_date)
+        assert.is_truthy(captured_ctx.time.iso_week)
+
+        assert.is_table(captured_ctx.config)
+        assert.is_nil(captured_ctx.journal)
+        assert.is_nil(captured_ctx.placeholders)
     end)
 end)
