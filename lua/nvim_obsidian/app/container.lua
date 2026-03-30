@@ -29,6 +29,13 @@ local function join_path(base, leaf)
     return b .. "/" .. l
 end
 
+local function is_markdown_path(path)
+    if type(path) ~= "string" or path == "" then
+        return false
+    end
+    return path:match("%.md$") ~= nil
+end
+
 function M.build(user_opts)
     local opts = config.normalize(user_opts)
     local dataview_namespace = nil
@@ -298,6 +305,84 @@ function M.build(user_opts)
             return nil
         end,
     }
+
+    container.on_fs_event = function(event)
+        if type(event) ~= "table" then
+            return
+        end
+
+        local kind = tostring(event.kind or "")
+        local path = event.path
+
+        if kind == "rescan" then
+            local ok_exec, result = pcall(reindex_sync.execute, container, {
+                mode = "manual",
+                event = nil,
+            })
+            if not ok_exec then
+                if adapter_set.notifications and type(adapter_set.notifications.warn) == "function" then
+                    adapter_set.notifications.warn("Watcher rescan failed: " .. tostring(result))
+                end
+                return
+            end
+
+            if type(result) ~= "table" or result.ok ~= true then
+                if adapter_set.notifications and type(adapter_set.notifications.warn) == "function" then
+                    local message = "watcher rescan failed"
+                    if type(result) == "table" and type(result.error) == "table" and type(result.error.message) == "string" then
+                        message = result.error.message
+                    end
+                    adapter_set.notifications.warn("Watcher rescan failed: " .. message)
+                end
+            end
+            return
+        end
+
+        if kind == "rename" then
+            local old_path = event.old_path
+            local new_path = event.new_path
+            if not is_markdown_path(old_path) and not is_markdown_path(new_path) then
+                return
+            end
+        else
+            if not is_markdown_path(path) then
+                return
+            end
+            if kind ~= "create" and kind ~= "modify" and kind ~= "delete" then
+                kind = "modify"
+            end
+        end
+
+        local request = {
+            mode = "event",
+            event = {
+                kind = kind,
+                path = path,
+                old_path = event.old_path,
+                new_path = event.new_path,
+            },
+        }
+
+        local ok_exec, result = pcall(reindex_sync.execute, container, request)
+        if not ok_exec then
+            if adapter_set.notifications and type(adapter_set.notifications.warn) == "function" then
+                adapter_set.notifications.warn("Watcher sync failed: " .. tostring(result))
+            end
+            return
+        end
+
+        if type(result) ~= "table" or result.ok ~= true then
+            if adapter_set.notifications and type(adapter_set.notifications.warn) == "function" then
+                local message = "watcher event sync failed"
+                if type(result) == "table" and type(result.error) == "table" and type(result.error.message) == "string" then
+                    message = result.error.message
+                end
+                adapter_set.notifications.warn("Watcher sync failed: " .. message)
+            end
+        end
+    end
+
+    container.handle_fs_event = container.on_fs_event
 
     return container
 end

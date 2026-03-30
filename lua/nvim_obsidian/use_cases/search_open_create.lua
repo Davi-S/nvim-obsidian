@@ -38,6 +38,20 @@ local function to_vault_relpath(path, vault_root)
     return normalized_path
 end
 
+local function path_exists(path)
+    if type(path) ~= "string" or path == "" then
+        return false
+    end
+
+    local file = io.open(path, "r")
+    if file then
+        file:close()
+        return true
+    end
+
+    return false
+end
+
 M.contract = {
     name = "search_open_create",
     version = "phase3-contract",
@@ -165,6 +179,20 @@ function M.execute(_ctx, _input)
             path = nil,
             error = errors.new(errors.codes.INTERNAL, "vault_catalog.list_notes returned invalid result"),
         }
+    end
+
+    -- Opportunistic self-healing: if watcher misses delete events,
+    -- remove stale entries before building omni candidates.
+    if type(vault_catalog.remove_note) == "function" then
+        local live_notes = {}
+        for _, note in ipairs(notes) do
+            if type(note) == "table" and path_exists(note.path) then
+                table.insert(live_notes, note)
+            elseif type(note) == "table" and type(note.path) == "string" and note.path ~= "" then
+                vault_catalog.remove_note(note.path)
+            end
+        end
+        notes = live_notes
     end
 
     local vault_root = nil

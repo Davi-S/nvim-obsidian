@@ -264,4 +264,48 @@ describe("search_open_create use case", function()
         assert.equals("notes/alpha.md", payload.items[1].candidate.relpath)
         assert.equals("/vault/notes/alpha.md", payload.items[1].candidate.path)
     end)
+
+    it("prunes stale deleted notes from catalog before ranking", function()
+        local path = "/tmp/nvim_obsidian_stale_omni_note.md"
+        local wrote = io.open(path, "w")
+        assert.is_not_nil(wrote)
+        wrote:write("# temp")
+        wrote:close()
+
+        local removed = {}
+        local picker_payload = nil
+        local ctx = base_ctx({
+            vault_catalog = {
+                list_notes = function()
+                    return {
+                        { path = path, title = "Temp", aliases = {} },
+                    }
+                end,
+                remove_note = function(p)
+                    table.insert(removed, p)
+                    return { ok = true }
+                end,
+            },
+            open_omni_picker = function(payload)
+                picker_payload = payload
+                return {
+                    action = "cancel",
+                }
+            end,
+        })
+
+        os.remove(path)
+
+        local out = run(ctx, {
+            query = "Temp",
+            allow_force_create = true,
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("cancelled", out.action)
+        assert.equals(1, #removed)
+        assert.equals(path, removed[1])
+        assert.is_not_nil(picker_payload)
+        assert.equals(0, #picker_payload.items)
+    end)
 end)

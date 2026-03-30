@@ -78,10 +78,15 @@ describe("filesystem adapters", function()
 
     describe("filesystem watcher adapter", function()
         local function make_vim_loop(mocks)
+            local start_calls = 0
             local handle = {
                 _started = false,
                 _closed = false,
                 start = function(self, path, opts, cb)
+                    start_calls = start_calls + 1
+                    if mocks.fail_recursive_once and opts and opts.recursive == true then
+                        return nil, "recursive-not-supported"
+                    end
                     if mocks.start_error then
                         return nil, "start-error"
                     end
@@ -110,6 +115,9 @@ describe("filesystem adapters", function()
                     end,
                 },
                 _handle = handle,
+                _start_calls = function()
+                    return start_calls
+                end,
             }
         end
 
@@ -130,6 +138,20 @@ describe("filesystem adapters", function()
             assert.is_nil(err)
             assert.is_true(vm._handle._started)
             assert.equals(temp_root, vm._handle._path)
+        end)
+
+        it("should fallback to non-recursive watcher when recursive start fails", function()
+            local vm = make_vim_loop({ fail_recursive_once = true })
+            _G.vim = { loop = vm.loop }
+
+            local started, err = watcher.start({
+                config = { vault_root = temp_root },
+            })
+
+            assert.is_true(started)
+            assert.is_nil(err)
+            assert.equals(2, vm._start_calls())
+            assert.equals(false, vm._handle._opts.recursive)
         end)
 
         it("should fail start when root is missing", function()
@@ -156,6 +178,14 @@ describe("filesystem adapters", function()
             _G.vim = { loop = vm.loop }
             local emitted = {}
 
+            local existing = assert(io.open(temp_root .. "/existing.md", "w"))
+            existing:write("ok")
+            existing:close()
+
+            local created = assert(io.open(temp_root .. "/created.md", "w"))
+            created:write("new")
+            created:close()
+
             local started = watcher.start({
                 config = { vault_root = temp_root },
                 on_fs_event = function(event)
@@ -164,12 +194,34 @@ describe("filesystem adapters", function()
             })
             assert.is_true(started)
 
-            vm._handle._cb(nil, "note.md", { rename = false, change = true })
-            vm._handle._cb(nil, "renamed.md", { rename = true, change = false })
+            vm._handle._cb(nil, "existing.md", { rename = false, change = true })
+            vm._handle._cb(nil, "created.md", { rename = true, change = false })
+            vm._handle._cb(nil, "deleted.md", { rename = true, change = false })
 
-            assert.equals(2, #emitted)
+            assert.equals(3, #emitted)
             assert.equals("modify", emitted[1].kind)
-            assert.equals("rename", emitted[2].kind)
+            assert.equals("create", emitted[2].kind)
+            assert.equals("delete", emitted[3].kind)
+        end)
+
+        it("should emit rescan event when filename is missing", function()
+            local vm = make_vim_loop({})
+            _G.vim = { loop = vm.loop }
+            local emitted = {}
+
+            local started = watcher.start({
+                config = { vault_root = temp_root },
+                on_fs_event = function(event)
+                    table.insert(emitted, event)
+                end,
+            })
+            assert.is_true(started)
+
+            vm._handle._cb(nil, nil, { change = true })
+
+            assert.equals(1, #emitted)
+            assert.equals("rescan", emitted[1].kind)
+            assert.equals(temp_root, emitted[1].path)
         end)
 
         it("should stop and close active watcher", function()
