@@ -97,14 +97,13 @@ Behavior:
 2. Replace in-memory index atomically.
 3. Notify completion or failure.
 
-### :ObsidianInsertTemplate [type|path]
+### :ObsidianInsertTemplate <type|path>
 Purpose: Insert rendered template at cursor.
 
 Behavior:
-1. If argument provided, resolve template directly (type or path) and skip picker.
-2. If no argument, open picker.
-3. Render using user-registered placeholders.
-4. Insert at cursor location.
+1. Resolve template by type name or file path (argument required).
+2. Render using user-registered placeholders.
+3. Insert at cursor location.
 
 Rules:
 - No template inheritance.

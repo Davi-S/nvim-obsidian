@@ -122,9 +122,8 @@ Clarification on wikilink resolution and ambiguity:
 - [ ] Template placeholders are user-registered only.
 - [ ] No fixed/default placeholders are provided by V2.
 - [ ] Unknown placeholders behavior is configurable; default is non-crashing and visible to the user.
-- [ ] Command: :ObsidianInsertTemplate [type|path]
-  - Optional argument allows bypassing picker.
-  - No argument opens picker.
+- [ ] Command: :ObsidianInsertTemplate <type|path>
+  - Argument is required (template type name or file path).
 - [ ] Template inheritance/includes are not supported in V2.0.
 
 ### 8. Dataview Integration

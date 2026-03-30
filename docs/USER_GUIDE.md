@@ -570,11 +570,8 @@ Use template:
 " → Type: "My Article"
 " → Press: <S-CR>
 
-" Insert template
+" Insert template (requires template path or type)
 :ObsidianInsertTemplate ~/Templates/article.md
-" Or:
-:ObsidianInsertTemplate
-" (auto-detects file type)
 
 " Notice {{title}} and {{date}} are resolved
 ```
