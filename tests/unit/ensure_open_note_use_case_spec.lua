@@ -89,6 +89,59 @@ describe("ensure_open_note use case", function()
         assert.equals(0, #ctx._writes)
     end)
 
+    it("uses strict case-sensitive lookup for link origin", function()
+        local observed_opts = nil
+        local ctx = base_ctx({
+            vault_catalog = {
+                find_by_identity_token = function(_token, opts)
+                    observed_opts = opts
+                    return { matches = {} }
+                end,
+                upsert_note = function(_note)
+                    return { ok = true, error = nil }
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "foo",
+            create_if_missing = true,
+            origin = "link",
+        })
+
+        assert.is_true(out.ok)
+        assert.is_true(out.created)
+        assert.is_table(observed_opts)
+        assert.is_true(observed_opts.case_sensitive_only)
+    end)
+
+    it("keeps case-insensitive fallback for omni origin", function()
+        local observed_opts = "unset"
+        local ctx = base_ctx({
+            vault_catalog = {
+                find_by_identity_token = function(_token, opts)
+                    observed_opts = opts
+                    return {
+                        matches = {
+                            { path = "notes/Foo.md", title = "Foo", aliases = {} },
+                        },
+                    }
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "foo",
+            create_if_missing = true,
+            origin = "omni",
+        })
+
+        assert.is_true(out.ok)
+        assert.is_false(out.created)
+        assert.is_nil(observed_opts)
+        assert.equals("notes/Foo.md", out.path)
+    end)
+
     it("returns ambiguous_target when multiple matches are found", function()
         local ctx = base_ctx({
             vault_catalog = {

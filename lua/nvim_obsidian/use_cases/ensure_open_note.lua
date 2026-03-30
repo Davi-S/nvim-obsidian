@@ -126,7 +126,12 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local lookup = vault_catalog.find_by_identity_token(token)
+    local lookup_opts = nil
+    if input.origin == "link" then
+        lookup_opts = { case_sensitive_only = true }
+    end
+
+    local lookup = vault_catalog.find_by_identity_token(token, lookup_opts)
     if type(lookup) ~= "table" or type(lookup.matches) ~= "table" then
         return {
             ok = false,

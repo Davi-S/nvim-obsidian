@@ -137,12 +137,15 @@ function M.remove_note(path)
     return { ok = true, error = nil }
 end
 
-function M.find_by_identity_token(token)
+function M.find_by_identity_token(token, opts)
     local q = tostring(token or "")
     if q == "" then
         return { matches = {} }
     end
     local q_path = normalize_path(q)
+
+    local options = type(opts) == "table" and opts or {}
+    local case_sensitive_only = options.case_sensitive_only == true
 
     local notes = collect_notes_sorted()
 
@@ -162,7 +165,7 @@ function M.find_by_identity_token(token)
         end
     end
 
-    if #exact > 0 then
+    if #exact > 0 or case_sensitive_only then
         return { matches = dedup_by_path(exact) }
     end
 

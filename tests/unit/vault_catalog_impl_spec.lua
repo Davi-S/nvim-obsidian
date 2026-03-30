@@ -80,4 +80,15 @@ describe("vault catalog domain implementation", function()
         assert.are.equal(1, #ci_path.matches)
         assert.are.equal("notes/foo.md", ci_path.matches[1].path)
     end)
+
+    it("supports strict case-sensitive lookup mode", function()
+        catalog.upsert_note({ path = "notes/foo.md", title = "Foo", aliases = { "Alias" } })
+
+        local strict_miss = catalog.find_by_identity_token("foo", { case_sensitive_only = true })
+        assert.are.equal(0, #strict_miss.matches)
+
+        local strict_hit = catalog.find_by_identity_token("Foo", { case_sensitive_only = true })
+        assert.are.equal(1, #strict_hit.matches)
+        assert.are.equal("notes/foo.md", strict_hit.matches[1].path)
+    end)
 end)
