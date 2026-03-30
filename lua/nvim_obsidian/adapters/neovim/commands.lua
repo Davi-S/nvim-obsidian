@@ -637,6 +637,7 @@ local function register_dataview_autocmds(ctx)
     local render_cfg = ctx.config.dataview.render or {}
     local when = type(render_cfg.when) == "table" and render_cfg.when or {}
     local patterns = type(render_cfg.patterns) == "table" and render_cfg.patterns or { "*.md" }
+    local scope = render_cfg.scope or "event"
 
     local trigger_for_event = {
         BufReadPost = "on_open",
@@ -661,6 +662,87 @@ local function register_dataview_autocmds(ctx)
     end
     if #selected_events == 0 then
         return
+    end
+
+    local function list_target_buffers(args)
+        local seen = {}
+        local targets = {}
+
+        local function add(buf)
+            local n = tonumber(buf)
+            if not n or seen[n] then
+                return
+            end
+            seen[n] = true
+            table.insert(targets, n)
+        end
+
+        local function add_event_buffer()
+            if args and args.buf ~= nil then
+                add(args.buf)
+            end
+        end
+
+        if scope == "event" then
+            add_event_buffer()
+            return targets
+        end
+
+        if not vim or not vim.api then
+            add_event_buffer()
+            return targets
+        end
+
+        if scope == "current" then
+            if type(vim.api.nvim_get_current_buf) == "function" then
+                local ok, buf = pcall(vim.api.nvim_get_current_buf)
+                if ok then
+                    add(buf)
+                end
+            end
+            if #targets == 0 then
+                add_event_buffer()
+            end
+            return targets
+        end
+
+        if scope == "visible" then
+            if type(vim.api.nvim_list_wins) == "function" and type(vim.api.nvim_win_get_buf) == "function" then
+                local ok, wins = pcall(vim.api.nvim_list_wins)
+                if ok and type(wins) == "table" then
+                    for _, win in ipairs(wins) do
+                        local ok_buf, buf = pcall(vim.api.nvim_win_get_buf, win)
+                        if ok_buf then
+                            add(buf)
+                        end
+                    end
+                end
+            end
+            if #targets == 0 then
+                add_event_buffer()
+            end
+            return targets
+        end
+
+        if scope == "loaded" then
+            if type(vim.api.nvim_list_bufs) == "function" then
+                local ok, bufs = pcall(vim.api.nvim_list_bufs)
+                if ok and type(bufs) == "table" then
+                    for _, buf in ipairs(bufs) do
+                        if type(vim.api.nvim_buf_is_loaded) ~= "function" or vim.api.nvim_buf_is_loaded(buf) then
+                            add(buf)
+                        end
+                    end
+                end
+            end
+            if #targets == 0 then
+                add_event_buffer()
+            end
+            return targets
+        end
+
+        add_event_buffer()
+        return targets
     end
 
     local group = nil
@@ -706,15 +788,21 @@ local function register_dataview_autocmds(ctx)
                 end
             end
 
+            local function run_for_scope(render_trigger)
+                local buffers = list_target_buffers(args)
+                for _, buffer in ipairs(buffers) do
+                    run_render(buffer, render_trigger)
+                end
+            end
+
             if trigger == "on_open" and type(vim) == "table" and type(vim.schedule) == "function" then
-                local buffer = args.buf
                 vim.schedule(function()
-                    run_render(buffer, trigger)
+                    run_for_scope(trigger)
                 end)
                 return
             end
 
-            run_render(args.buf, trigger)
+            run_for_scope(trigger)
         end,
     })
 end

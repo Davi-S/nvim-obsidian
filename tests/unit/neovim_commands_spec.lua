@@ -59,6 +59,18 @@ describe("neovim command adapter", function()
         _G.vim.api.nvim_buf_is_loaded = function()
             return true
         end
+        _G.vim.api.nvim_get_current_buf = function()
+            return 1
+        end
+        _G.vim.api.nvim_list_wins = function()
+            return { 1 }
+        end
+        _G.vim.api.nvim_win_get_buf = function()
+            return 1
+        end
+        _G.vim.api.nvim_list_bufs = function()
+            return { 1 }
+        end
     end)
 
     local function base_container(overrides)
@@ -477,6 +489,129 @@ describe("neovim command adapter", function()
             assert.equals(2, #calls)
             assert.equals("on_open", calls[1].trigger)
             assert.equals("on_save", calls[2].trigger)
+        end)
+
+        it("renders current buffer when dataview scope is current", function()
+            local calls = {}
+            _G.vim.api.nvim_get_current_buf = function()
+                return 9
+            end
+
+            local container = base_container({
+                config = {
+                    dataview = {
+                        enabled = true,
+                        render = {
+                            when = { "on_save" },
+                            scope = "current",
+                            patterns = { "*.md" },
+                        },
+                    },
+                },
+                use_cases = {
+                    render_query_blocks = {
+                        execute = function(_ctx, input)
+                            table.insert(calls, input)
+                            return { ok = true, processed_blocks = 1, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            local callback = autocmd_registry[1].opts.callback
+
+            callback({ event = "BufWritePost", buf = 7 })
+
+            assert.equals(1, #calls)
+            assert.equals(9, calls[1].buffer)
+            assert.equals("on_save", calls[1].trigger)
+        end)
+
+        it("renders visible window buffers when dataview scope is visible", function()
+            local calls = {}
+            _G.vim.api.nvim_list_wins = function()
+                return { 10, 11, 12 }
+            end
+            _G.vim.api.nvim_win_get_buf = function(win)
+                if win == 10 then
+                    return 4
+                end
+                if win == 11 then
+                    return 4
+                end
+                return 5
+            end
+
+            local container = base_container({
+                config = {
+                    dataview = {
+                        enabled = true,
+                        render = {
+                            when = { "on_save" },
+                            scope = "visible",
+                            patterns = { "*.md" },
+                        },
+                    },
+                },
+                use_cases = {
+                    render_query_blocks = {
+                        execute = function(_ctx, input)
+                            table.insert(calls, input)
+                            return { ok = true, processed_blocks = 1, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            local callback = autocmd_registry[1].opts.callback
+
+            callback({ event = "BufWritePost", buf = 7 })
+
+            assert.equals(2, #calls)
+            assert.equals(4, calls[1].buffer)
+            assert.equals(5, calls[2].buffer)
+        end)
+
+        it("renders loaded buffers when dataview scope is loaded", function()
+            local calls = {}
+            _G.vim.api.nvim_list_bufs = function()
+                return { 21, 22, 23 }
+            end
+            _G.vim.api.nvim_buf_is_loaded = function(buf)
+                return buf ~= 22
+            end
+
+            local container = base_container({
+                config = {
+                    dataview = {
+                        enabled = true,
+                        render = {
+                            when = { "on_save" },
+                            scope = "loaded",
+                            patterns = { "*.md" },
+                        },
+                    },
+                },
+                use_cases = {
+                    render_query_blocks = {
+                        execute = function(_ctx, input)
+                            table.insert(calls, input)
+                            return { ok = true, processed_blocks = 1, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            local callback = autocmd_registry[1].opts.callback
+
+            callback({ event = "BufWritePost", buf = 7 })
+
+            assert.equals(2, #calls)
+            assert.equals(21, calls[1].buffer)
+            assert.equals(23, calls[2].buffer)
         end)
     end)
 
