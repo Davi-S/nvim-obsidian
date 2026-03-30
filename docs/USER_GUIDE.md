@@ -226,6 +226,39 @@ end)
 require("nvim_obsidian").template_register_placeholder("vault_name", function(ctx)
   return vim.fn.fnamemodify(ctx.config.vault_root, ":t")
 end)
+
+-- Reuse plugin wikilink detection in your own mappings/config helpers
+-- No args: reads current line and cursor position from Neovim
+local parsed = require("nvim_obsidian").wiki_link_under_cursor()
+if parsed and parsed.target then
+  print("Link target: " .. tostring(parsed.target.note_ref))
+end
+
+-- Optional explicit line/column (1-based column)
+local parsed_explicit = require("nvim_obsidian").wiki_link_under_cursor("See [[Project Plan|Plan]]", 8)
+if parsed_explicit and parsed_explicit.target then
+  print("Explicit target: " .. tostring(parsed_explicit.target.note_ref))
+end
+```
+
+`wiki_link_under_cursor` returns the same parser shape used by `:ObsidianFollow`:
+- `target`: parsed wikilink object when cursor is inside `[[...]]`, otherwise `nil`.
+- `error`: parser validation error for invalid inputs, otherwise `nil`.
+
+You can also reuse vault boundary checks from the plugin API:
+
+```lua
+local obsidian = require("nvim_obsidian")
+
+-- Explicit path check
+if obsidian.is_inside_vault("/home/user/MyVault/notes/today.md") then
+  print("Inside vault")
+end
+
+-- No args: uses current buffer path, then cwd fallback
+if obsidian.is_inside_vault() then
+  print("Current context is inside vault")
+end
 ```
 
 ### Configuration Fields Explained

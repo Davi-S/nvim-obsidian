@@ -33,6 +33,11 @@ Public and stable in V2.0:
 - Documented command set.
 - Documented configuration surface and defaults.
 - User-visible behavior from product and UX contracts.
+- Documented setup helper APIs:
+	- `require("nvim_obsidian").template_register_placeholder(name, resolver)`
+	- `require("nvim_obsidian").journal.register_placeholder(name, resolver, regex_fragment)`
+	- `require("nvim_obsidian").wiki_link_under_cursor([line], [col])`
+	- `require("nvim_obsidian").is_inside_vault([path])`
 
 Internal and non-stable by default:
 - Internal module names and wiring.
