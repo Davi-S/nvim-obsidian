@@ -484,7 +484,10 @@ describe("neovim command adapter", function()
             callback({ event = "BufReadPost", buf = 7 })
             assert.equals(0, #calls)
             _G.vim._drain_scheduled()
+            assert.equals(1, #calls)
             callback({ event = "BufWritePost", buf = 7 })
+            assert.equals(1, #calls)
+            _G.vim._drain_scheduled()
 
             assert.equals(2, #calls)
             assert.equals("on_open", calls[1].trigger)
@@ -522,6 +525,8 @@ describe("neovim command adapter", function()
             local callback = autocmd_registry[1].opts.callback
 
             callback({ event = "BufWritePost", buf = 7 })
+            assert.equals(0, #calls) -- render is deferred via vim.schedule()
+            _G.vim._drain_scheduled()
 
             assert.equals(1, #calls)
             assert.equals(9, calls[1].buffer)
@@ -568,6 +573,8 @@ describe("neovim command adapter", function()
             local callback = autocmd_registry[1].opts.callback
 
             callback({ event = "BufWritePost", buf = 7 })
+            assert.equals(0, #calls) -- render is deferred via vim.schedule()
+            _G.vim._drain_scheduled()
 
             assert.equals(2, #calls)
             assert.equals(4, calls[1].buffer)
@@ -608,6 +615,8 @@ describe("neovim command adapter", function()
             local callback = autocmd_registry[1].opts.callback
 
             callback({ event = "BufWritePost", buf = 7 })
+            assert.equals(0, #calls) -- render is deferred via vim.schedule()
+            _G.vim._drain_scheduled()
 
             assert.equals(2, #calls)
             assert.equals(21, calls[1].buffer)
