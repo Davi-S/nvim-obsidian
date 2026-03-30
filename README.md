@@ -1,0 +1,117 @@
+# nvim-obsidian
+
+Neovim plugin for Obsidian-style workflows, rebuilt with clear architecture boundaries and test-first contracts.
+
+This repository contains:
+- The plugin implementation in Lua.
+- Domain and behavior contracts in docs.
+- Unit, integration, and end-to-end tests.
+
+## What It Provides
+
+- Omni search and create flow for notes.
+- Wiki link follow with ambiguity handling.
+- Backlinks lookup for the current note.
+- Vault indexing and manual reindex command.
+- Journal note workflows (today, next, previous).
+- Template insertion with custom placeholders.
+- Dataview block rendering (manual and event-driven).
+
+## Repository Layout
+
+- `lua/nvim_obsidian`: Plugin source code
+- `plugin`: Neovim runtime entrypoint
+- `tests`: Unit, integration, e2e, and red tests
+- `docs`: Product, UX, architecture, and ADR documentation
+
+See full layout details in `docs/REPOSITORY_LAYOUT.md`.
+
+## Requirements
+
+Runtime dependencies enforced by startup checks:
+- `nvim-telescope/telescope.nvim`
+- `hrsh7th/nvim-cmp`
+- `nvim-treesitter/nvim-treesitter`
+- `nvim-lua/plenary.nvim`
+
+Neovim version: 0.9.0+
+
+## Install (lazy.nvim)
+
+```lua
+{
+  "Davi-S/nvim-obsidian",
+  dependencies = {
+    "nvim-telescope/telescope.nvim",
+    "hrsh7th/nvim-cmp",
+    "nvim-treesitter/nvim-treesitter",
+    "nvim-lua/plenary.nvim",
+  },
+  config = function()
+    require("nvim_obsidian").setup({
+      vault_root = vim.fn.expand("~/ObsidianVault"),
+    })
+  end,
+}
+```
+
+## Quick Usage
+
+After setup, run:
+- `:ObsidianOmni`
+- `:ObsidianFollow`
+- `:ObsidianSearch`
+- `:ObsidianBacklinks`
+- `:ObsidianReindex`
+- `:ObsidianHealth`
+
+For full command semantics and API details, see `docs/NVIM_PLUGIN.md`.
+
+## Development
+
+Common developer commands:
+
+```bash
+make fmt
+make lint
+make test
+make test-unit
+make test-integration
+make test-e2e
+make test-red
+```
+
+The Makefile supports overriding Neovim binary:
+
+```bash
+make test NVIM=nvim
+```
+
+## Documentation Map
+
+- Product and behavior contracts: `docs/PRODUCT_CONTRACT.md`, `docs/UX_BEHAVIOR_CONTRACT.md`
+- Architecture ownership: `docs/DOMAIN_OWNERSHIP_MAP.md`
+- Project context: `docs/PROJECT_CONTEXT.md`
+- ADRs: `docs/adr/`
+- End-user guide: `docs/USER_GUIDE.md`
+- Plugin reference: `docs/NVIM_PLUGIN.md`
+
+## Quality and Architecture Notes
+
+This codebase follows layered dependency rules:
+- adapters -> use_cases -> core domains -> shared
+
+Architecture decisions are captured in ADRs under `docs/adr/`.
+
+## Current Status
+
+Project context tracks implementation phases with this current state:
+- Phases 0 through 6 completed
+- Phase 7 not started
+
+See `docs/PROJECT_CONTEXT.md` for detailed history.
+
+## License
+
+No license file is currently present in this repository.
+Add one if you plan to distribute under a specific license.
