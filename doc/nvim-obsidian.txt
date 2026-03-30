@@ -1,0 +1,208 @@
+*nvim-obsidian.txt*      Obsidian-style note workflows for Neovim      *nvim-obsidian*
+
+===============================================================================
+CONTENTS                                                        *nvim-obsidian-toc*
+
+1. Introduction ...................................... |nvim-obsidian-introduction|
+2. Installation ........................................ |nvim-obsidian-installation|
+3. Setup ..................................................... |nvim-obsidian-setup|
+4. Commands ............................................... |nvim-obsidian-commands|
+5. Configuration ..................................... |nvim-obsidian-configuration|
+6. Public Lua API ........................................... |nvim-obsidian-api|
+7. Dataview Rendering ................................. |nvim-obsidian-dataview|
+8. Troubleshooting ................................. |nvim-obsidian-troubleshooting|
+
+===============================================================================
+1. INTRODUCTION                                        *nvim-obsidian-introduction*
+
+nvim-obsidian provides Obsidian-like workflows in Markdown vaults:
+
+- Omni note search/open/create
+- Wiki link follow under cursor
+- Backlinks lookup for current note
+- Journal note commands (today/next/prev)
+- Template insertion with placeholders
+- Dataview block rendering
+
+Main help tag: >
+  :help nvim-obsidian
+<
+
+===============================================================================
+2. INSTALLATION                                        *nvim-obsidian-installation*
+
+Required dependencies:
+
+- nvim-telescope/telescope.nvim
+- hrsh7th/nvim-cmp
+- nvim-treesitter/nvim-treesitter
+- nvim-lua/plenary.nvim
+
+If your plugin manager does not generate helptags automatically, run: >
+  :helptags ALL
+<
+
+===============================================================================
+3. SETUP                                                      *nvim-obsidian-setup*
+
+Minimal setup: >
+  require("nvim_obsidian").setup({
+    vault_root = vim.fn.expand("~/ObsidianVault"),
+  })
+<
+
+Notes:
+
+- vault_root is required.
+- vault_root must be an absolute path.
+- setup is idempotent for equivalent input.
+
+===============================================================================
+4. COMMANDS                                                *nvim-obsidian-commands*
+
+                                                     *:ObsidianToday*
+:ObsidianToday
+  Open or create today's daily journal note.
+
+                                                      *:ObsidianNext*
+:ObsidianNext
+  Open or create next journal note in current context.
+
+                                                      *:ObsidianPrev*
+:ObsidianPrev
+  Open or create previous journal note in current context.
+
+                                                      *:ObsidianOmni*
+:ObsidianOmni
+  Omni search/create workflow.
+
+                                                    *:ObsidianFollow*
+:ObsidianFollow
+  Follow wiki link under cursor.
+
+                                                 *:ObsidianBacklinks*
+:ObsidianBacklinks
+  Show notes that link to current note.
+
+                                                    *:ObsidianSearch*
+:ObsidianSearch
+  Vault-scoped text search.
+
+                                                   *:ObsidianReindex*
+:ObsidianReindex
+  Full vault reindex.
+
+                                            *:ObsidianInsertTemplate*
+:ObsidianInsertTemplate[!] [query]
+  Insert a rendered template at cursor.
+
+                                            *:ObsidianRenderDataview*
+:ObsidianRenderDataview
+  Render dataview query blocks for current buffer.
+
+                                                    *:ObsidianHealth*
+:ObsidianHealth
+  Check plugin wiring health.
+
+===============================================================================
+5. CONFIGURATION                                      *nvim-obsidian-configuration*
+
+Required field:
+
+- vault_root (string, absolute path)
+
+Core optional fields:
+
+- log_level: "error" | "warn" | "info" (default: "warn")
+- locale: locale string (default: "en-US")
+- force_create_key: key notation (default: "<S-CR>")
+- new_notes_subdir: target for new notes (default: vault_root)
+
+Dataview fields:
+
+- dataview.enabled (boolean)
+- dataview.render.when: list containing "on_open" and/or "on_save"
+- dataview.render.scope: "event" | "current" | "visible" | "loaded"
+- dataview.render.patterns: non-empty list of glob patterns
+- dataview.placement: "below_block" | "above_block"
+- dataview.messages.task_no_results.enabled (boolean)
+- dataview.messages.task_no_results.text (non-empty string)
+
+Journal fields (all optional):
+
+- journal.daily
+- journal.weekly
+- journal.monthly
+- journal.yearly
+
+Each provided journal section requires:
+
+- subdir (non-empty string)
+- title_format (non-empty string)
+
+Example: >
+  require("nvim_obsidian").setup({
+    vault_root = vim.fn.expand("~/ObsidianVault"),
+    journal = {
+      daily = {
+        subdir = "daily",
+        title_format = "%Y-%m-%d",
+      },
+      weekly = {
+        subdir = "weekly",
+        title_format = "%G-W%V",
+      },
+    },
+  })
+<
+
+===============================================================================
+6. PUBLIC LUA API                                            *nvim-obsidian-api*
+
+Module: >
+  local obsidian = require("nvim_obsidian")
+<
+
+Functions:
+
+- obsidian.setup(opts)
+- obsidian.template_register_placeholder(name, resolver)
+- obsidian.journal.register_placeholder(name, resolver, regex_fragment)
+
+Template placeholder example: >
+  require("nvim_obsidian").template_register_placeholder("author", function(ctx)
+    return "Jane Doe"
+  end)
+<
+
+Journal placeholder example: >
+  require("nvim_obsidian").journal.register_placeholder("weekday", function(ctx)
+    return os.date("%A")
+  end)
+<
+
+===============================================================================
+7. DATAVIEW RENDERING                                    *nvim-obsidian-dataview*
+
+When enabled, render triggers map to:
+
+- on_open -> BufReadPost
+- on_save -> BufWritePost
+
+Dataview output is displayed through virtual lines (extmarks).
+
+Manual render command: >
+  :ObsidianRenderDataview
+<
+
+===============================================================================
+8. TROUBLESHOOTING                                  *nvim-obsidian-troubleshooting*
+
+- Run |:ObsidianHealth| to verify command wiring.
+- Ensure all required dependencies are installed.
+- Ensure vault_root is absolute and points to an existing directory.
+- For doc lookup problems, regenerate help tags with :helptags ALL.
+
+===============================================================================
+
+vim:tw=78:ts=8:noet:ft=help:norl:
