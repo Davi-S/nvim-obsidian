@@ -129,6 +129,66 @@ function M.execute(_ctx, _input)
         end
     end
 
+    local function maybe_jump_to_target(path, target_spec)
+        local anchor = target_spec and target_spec.anchor or nil
+        local block_id = target_spec and target_spec.block_id or nil
+        if not anchor and not block_id then
+            return {
+                ok = true,
+                missing_anchor = false,
+            }
+        end
+
+        local anchor_ok = true
+        if type(ctx.anchor_exists) == "function" then
+            anchor_ok = ctx.anchor_exists(path, {
+                anchor = anchor,
+                block_id = block_id,
+            })
+        end
+
+        if not anchor_ok then
+            maybe_warn("ObsidianFollow: heading or block target not found")
+            return {
+                ok = true,
+                missing_anchor = true,
+            }
+        end
+
+        if type(navigation.jump_to_anchor) == "function" then
+            local jumped, jump_err = navigation.jump_to_anchor({
+                path = path,
+                anchor = anchor,
+                block_id = block_id,
+            })
+
+            if jumped == false then
+                local code = type(jump_err) == "table" and jump_err.code or nil
+                if code == errors.codes.NOT_FOUND then
+                    maybe_warn("ObsidianFollow: heading or block target not found")
+                    return {
+                        ok = true,
+                        missing_anchor = true,
+                    }
+                end
+                return {
+                    ok = false,
+                    error = errors.new(errors.codes.INTERNAL, "failed to jump to link anchor", {
+                        path = path,
+                        anchor = anchor,
+                        block_id = block_id,
+                        reason = jump_err,
+                    }),
+                }
+            end
+        end
+
+        return {
+            ok = true,
+            missing_anchor = false,
+        }
+    end
+
     local token = tostring(target.note_ref or "")
     local resolved
 
@@ -224,6 +284,23 @@ function M.execute(_ctx, _input)
             }
         end
 
+        local jump_result = maybe_jump_to_target(picked_path, target)
+        if not jump_result.ok then
+            return {
+                ok = false,
+                status = "invalid",
+                error = jump_result.error,
+            }
+        end
+
+        if jump_result.missing_anchor then
+            return {
+                ok = true,
+                status = "missing_anchor",
+                error = nil,
+            }
+        end
+
         return {
             ok = true,
             status = "opened",
@@ -274,33 +351,21 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local anchor = target.anchor
-    local block_id = target.block_id
-    if anchor or block_id then
-        local anchor_ok = true
-        if type(ctx.anchor_exists) == "function" then
-            anchor_ok = ctx.anchor_exists(path, {
-                anchor = anchor,
-                block_id = block_id,
-            })
-        end
+    local jump_result = maybe_jump_to_target(path, target)
+    if not jump_result.ok then
+        return {
+            ok = false,
+            status = "invalid",
+            error = jump_result.error,
+        }
+    end
 
-        if not anchor_ok then
-            maybe_warn("ObsidianFollow: heading or block target not found")
-            return {
-                ok = true,
-                status = "missing_anchor",
-                error = nil,
-            }
-        end
-
-        if type(navigation.jump_to_anchor) == "function" then
-            navigation.jump_to_anchor({
-                path = path,
-                anchor = anchor,
-                block_id = block_id,
-            })
-        end
+    if jump_result.missing_anchor then
+        return {
+            ok = true,
+            status = "missing_anchor",
+            error = nil,
+        }
     end
 
     return {

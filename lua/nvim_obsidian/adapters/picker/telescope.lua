@@ -253,7 +253,7 @@ local function open_telescope_disambiguation(matches, prompt_title, opts)
 
                 if selected_path and type(opts.open_path) == "function" then
                     local run_open = function()
-                        local ok, result = pcall(opts.open_path, selected_path)
+                        local ok, result = pcall(opts.open_path, selected_path, picked)
                         opened = ok == true and result == true
                     end
 
@@ -537,7 +537,7 @@ function M.open_disambiguation(matches)
     local payload_mode = type(matches) == "table" and type(matches.matches) == "table"
     local source_matches = payload_mode and matches.matches or matches
     local result = open_telescope_disambiguation(source_matches,
-    payload_mode and "Backlinks" or "Disambiguate link target",
+        payload_mode and "Backlinks" or "Disambiguate link target",
         payload_mode and { open_path = matches.open_path } or nil)
     if result == nil then
         if payload_mode then

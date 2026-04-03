@@ -114,6 +114,44 @@ describe("follow_link use case", function()
         assert.equals("notes/target.md", ctx._opened[1])
     end)
 
+    it("jumps to heading anchor after opening target", function()
+        local ctx = base_ctx({
+            wiki_link = {
+                parse_at_cursor = function()
+                    return {
+                        target = {
+                            raw = "[[Target#Section Title]]",
+                            note_ref = "Target",
+                            anchor = "Section Title",
+                            block_id = nil,
+                            display_alias = nil,
+                        },
+                        error = nil,
+                    }
+                end,
+                resolve_target = function(_target, _candidate_notes)
+                    return {
+                        status = "resolved",
+                        resolved_path = "notes/target.md",
+                        ambiguous_matches = nil,
+                    }
+                end,
+            },
+        })
+
+        local out = run(ctx, {
+            line = "[[Target#Section Title]]",
+            col = 10,
+            buffer_path = "notes/current.md",
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("opened", out.status)
+        assert.equals("notes/target.md", ctx._opened[1])
+        assert.is_table(ctx._jumped[1])
+        assert.equals("Section Title", ctx._jumped[1].anchor)
+    end)
+
     it("creates missing target via ensure_open_note", function()
         local ensure_called = false
         local ctx = base_ctx({
@@ -225,6 +263,50 @@ describe("follow_link use case", function()
         assert.is_true(out.ok)
         assert.equals("opened", out.status)
         assert.equals("b/foo.md", ctx._opened[1])
+    end)
+
+    it("jumps to block target after disambiguation selection", function()
+        local ctx = base_ctx({
+            wiki_link = {
+                parse_at_cursor = function()
+                    return {
+                        target = {
+                            raw = "[[Foo#^task-1]]",
+                            note_ref = "Foo",
+                            anchor = nil,
+                            block_id = "task-1",
+                            display_alias = nil,
+                        },
+                        error = nil,
+                    }
+                end,
+                resolve_target = function()
+                    return {
+                        status = "ambiguous",
+                        resolved_path = nil,
+                        ambiguous_matches = {
+                            { path = "a/foo.md" },
+                            { path = "b/foo.md" },
+                        },
+                    }
+                end,
+            },
+            open_disambiguation_picker = function()
+                return { path = "b/foo.md" }
+            end,
+        })
+
+        local out = run(ctx, {
+            line = "[[Foo#^task-1]]",
+            col = 8,
+            buffer_path = "notes/current.md",
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("opened", out.status)
+        assert.equals("b/foo.md", ctx._opened[1])
+        assert.is_table(ctx._jumped[1])
+        assert.equals("task-1", ctx._jumped[1].block_id)
     end)
 
     it("returns invalid when ambiguous target has no disambiguation picker", function()

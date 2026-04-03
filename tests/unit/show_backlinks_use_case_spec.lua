@@ -5,6 +5,7 @@ local use_case = require("nvim_obsidian.use_cases.show_backlinks")
 describe("show_backlinks use case", function()
     local function base_ctx(overrides)
         local opened = {}
+        local jumped_lines = {}
         local disambiguation_payload = nil
 
         local contents = {
@@ -53,6 +54,10 @@ describe("show_backlinks use case", function()
                     table.insert(opened, path)
                     return true
                 end,
+                jump_to_line = function(line)
+                    table.insert(jumped_lines, line)
+                    return true
+                end,
             },
         }
 
@@ -63,6 +68,7 @@ describe("show_backlinks use case", function()
         end
 
         ctx._opened = opened
+        ctx._jumped_lines = jumped_lines
         ctx._payload = function()
             return disambiguation_payload
         end
@@ -119,10 +125,13 @@ describe("show_backlinks use case", function()
         assert.is_true(out.opened)
         assert.equals(1, out.match_count)
         assert.equals("vault/notes/other.md", ctx._opened[1])
+        assert.equals(1, ctx._jumped_lines[1])
 
         local payload = ctx._payload()
         assert.equals("vault/notes/current.md", payload.buffer_path)
         assert.equals("Current Note", payload.target.note_ref)
+        assert.equals(1, payload.matches[1].backlink_line)
+        assert.is_function(payload.open_path)
     end)
 
     it("accepts direct-open disambiguation results from the picker", function()
@@ -130,6 +139,7 @@ describe("show_backlinks use case", function()
             telescope = {
                 open_disambiguation = function(payload)
                     disambiguation_payload = payload
+                    payload.open_path("vault/notes/other.md", { backlink_line = 1 })
                     return { action = "opened", path = "vault/notes/other.md" }
                 end,
             },
@@ -140,7 +150,8 @@ describe("show_backlinks use case", function()
         assert.is_true(out.ok)
         assert.is_true(out.opened)
         assert.equals(1, out.match_count)
-        assert.is_nil(ctx._opened[1])
+        assert.equals("vault/notes/other.md", ctx._opened[1])
+        assert.equals(1, ctx._jumped_lines[1])
     end)
 
     it("returns internal when selected backlink fails to open", function()

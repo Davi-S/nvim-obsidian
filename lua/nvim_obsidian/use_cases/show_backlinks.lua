@@ -185,32 +185,46 @@ function M.execute(_ctx, _input)
         }
     end
     local matches = {}
+    local line_by_path = {}
     local seen = {}
 
     for _, path in ipairs(files) do
         if path ~= input.buffer_path then
             local content = fs_io.read_file(path)
             if type(content) == "string" then
-                local links = markdown.extract_wikilinks(content)
-                if type(links) ~= "table" then
-                    return {
-                        ok = false,
-                        opened = nil,
-                        match_count = nil,
-                        error = errors.new(errors.codes.INTERNAL, "markdown.extract_wikilinks returned invalid result"),
-                    }
-                end
-
-                for _, link in ipairs(links) do
-                    local ref = type(link) == "table" and tostring(link.note_ref or "") or ""
-                    if token_map[ref] and not seen[path] then
-                        seen[path] = true
-                        local n = by_path[path] or {
-                            path = path,
-                            title = basename(path):gsub("%.md$", ""),
-                            aliases = {},
+                local line_no = 0
+                for line in (content .. "\n"):gmatch("(.-)\n") do
+                    line_no = line_no + 1
+                    local links = markdown.extract_wikilinks(line)
+                    if type(links) ~= "table" then
+                        return {
+                            ok = false,
+                            opened = nil,
+                            match_count = nil,
+                            error = errors.new(errors.codes.INTERNAL,
+                                "markdown.extract_wikilinks returned invalid result"),
                         }
-                        table.insert(matches, n)
+                    end
+
+                    for _, link in ipairs(links) do
+                        local ref = type(link) == "table" and tostring(link.note_ref or "") or ""
+                        if token_map[ref] and not seen[path] then
+                            seen[path] = true
+                            local indexed = by_path[path] or {}
+                            local n = {
+                                path = path,
+                                title = indexed.title or basename(path):gsub("%.md$", ""),
+                                aliases = indexed.aliases or {},
+                                backlink_line = line_no,
+                            }
+                            table.insert(matches, n)
+                            line_by_path[path] = line_no
+                            break
+                        end
+                    end
+
+                    if seen[path] then
+                        break
                     end
                 end
             end
@@ -230,7 +244,19 @@ function M.execute(_ctx, _input)
         target = { note_ref = current_note.title },
         matches = matches,
         buffer_path = input.buffer_path,
-        open_path = navigation.open_path,
+        open_path = function(path, item)
+            local opened, _ = navigation.open_path(path)
+            if not opened then
+                return false
+            end
+
+            local line = tonumber((type(item) == "table" and item.backlink_line) or line_by_path[path])
+            if line and line >= 1 and type(navigation.jump_to_line) == "function" then
+                navigation.jump_to_line(line)
+            end
+
+            return true
+        end,
     })
 
     if type(picked) ~= "table" or (picked.action ~= "open" and picked.action ~= "opened") or type(picked.path) ~= "string" then
@@ -254,6 +280,11 @@ function M.execute(_ctx, _input)
                     reason = open_err,
                 }),
             }
+        end
+        local picked_line = tonumber((picked.item and picked.item.backlink_line) or picked.backlink_line or
+        line_by_path[picked.path])
+        if picked_line and picked_line >= 1 and type(navigation.jump_to_line) == "function" then
+            navigation.jump_to_line(picked_line)
         end
     end
 
