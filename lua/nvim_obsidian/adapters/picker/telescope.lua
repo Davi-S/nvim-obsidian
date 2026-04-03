@@ -167,6 +167,129 @@ local function build_omni_ordinal(item, label)
     return table.concat(parts, " ")
 end
 
+local function build_disambiguation_ordinal(match)
+    local path = ""
+    local title = ""
+    if type(match) == "table" then
+        path = tostring(match.path or "")
+        title = tostring(match.title or "")
+    end
+
+    if title ~= "" then
+        return title .. " " .. path
+    end
+
+    return path
+end
+
+local function open_telescope_disambiguation(matches, prompt_title, opts)
+    local telescope = load_telescope_for_custom_picker()
+    if not telescope then
+        return nil
+    end
+
+    opts = type(opts) == "table" and opts or {}
+
+    local items = {}
+    local match_map = {}
+
+    for _, item in ipairs(matches) do
+        if type(item) == "table" and type(item.path) == "string" and item.path ~= "" then
+            local idx = #match_map + 1
+            table.insert(items, {
+                kind = "item",
+                idx = idx,
+                label = tostring(item.title or "(untitled)") .. " -> " .. item.path,
+                ordinal = build_disambiguation_ordinal(item),
+            })
+            match_map[idx] = item
+        end
+    end
+
+    if #items == 0 then
+        return {
+            action = "cancel",
+        }
+    end
+
+    local picked = nil
+    local opened = false
+    telescope.pickers.new({}, {
+        prompt_title = prompt_title,
+        finder = telescope.finders.new_table({
+            results = items,
+            entry_maker = function(entry)
+                local filename = ""
+                if entry.kind == "item" and type(entry.idx) == "number" then
+                    local mapped = match_map[entry.idx]
+                    if type(mapped) == "table" and type(mapped.path) == "string" then
+                        filename = mapped.path
+                    end
+                end
+
+                return {
+                    value = entry,
+                    display = entry.label,
+                    ordinal = entry.ordinal,
+                    filename = filename,
+                    path = filename,
+                }
+            end,
+        }),
+        sorter = telescope.config.values.generic_sorter({}),
+        previewer = telescope.config.values.file_previewer({}),
+        attach_mappings = function(prompt_bufnr, map)
+            telescope.actions.select_default:replace(function()
+                local selected = telescope.action_state.get_selected_entry()
+                local value = selected and selected.value or nil
+                local selected_path = nil
+                if type(value) == "table" and value.kind == "item" and type(value.idx) == "number" then
+                    picked = match_map[value.idx]
+                    if picked then
+                        selected_path = picked.path
+                    end
+                end
+                telescope.actions.close(prompt_bufnr)
+
+                if selected_path and type(opts.open_path) == "function" then
+                    local run_open = function()
+                        local ok, result = pcall(opts.open_path, selected_path)
+                        opened = ok == true and result == true
+                    end
+
+                    if vim and type(vim.schedule) == "function" then
+                        vim.schedule(run_open)
+                    else
+                        run_open()
+                    end
+                end
+            end)
+
+            return true
+        end,
+    }):find()
+
+    if not picked then
+        return {
+            action = "cancel",
+        }
+    end
+
+    if opened then
+        return {
+            action = "opened",
+            item = picked,
+            path = picked.path,
+        }
+    end
+
+    return {
+        action = "open",
+        item = picked,
+        path = picked.path,
+    }
+end
+
 function M._prepare_candidates(ctx, notes)
     if type(notes) ~= "table" then
         report_error("telescope _prepare_candidates received invalid notes payload")
@@ -413,42 +536,21 @@ end
 function M.open_disambiguation(matches)
     local payload_mode = type(matches) == "table" and type(matches.matches) == "table"
     local source_matches = payload_mode and matches.matches or matches
-    local items, match_map = M._prepare_disambiguation(source_matches)
-    if #items == 0 then
+    local result = open_telescope_disambiguation(source_matches,
+    payload_mode and "Backlinks" or "Disambiguate link target",
+        payload_mode and { open_path = matches.open_path } or nil)
+    if result == nil then
         if payload_mode then
             return { action = "cancel" }
         end
         return false
     end
-
-    if not has_select() then
-        if payload_mode then
-            return { action = "cancel" }
-        end
-        return false
-    end
-
-    local selected = nil
-    safe_call(vim.ui.select, items, {
-        prompt = payload_mode and "Backlinks" or "Disambiguate link target",
-    }, function(choice, idx)
-        if choice and idx and match_map[idx] then
-            selected = match_map[idx]
-        end
-    end)
 
     if payload_mode then
-        if not selected then
-            return { action = "cancel" }
-        end
-        return {
-            action = "open",
-            item = selected,
-            path = selected.path,
-        }
+        return result
     end
 
-    return selected ~= nil
+    return result.action == "open"
 end
 
 function M.open_search(opts)

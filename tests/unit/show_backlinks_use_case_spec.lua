@@ -125,6 +125,24 @@ describe("show_backlinks use case", function()
         assert.equals("Current Note", payload.target.note_ref)
     end)
 
+    it("accepts direct-open disambiguation results from the picker", function()
+        local ctx = base_ctx({
+            telescope = {
+                open_disambiguation = function(payload)
+                    disambiguation_payload = payload
+                    return { action = "opened", path = "vault/notes/other.md" }
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, { buffer_path = "vault/notes/current.md" })
+
+        assert.is_true(out.ok)
+        assert.is_true(out.opened)
+        assert.equals(1, out.match_count)
+        assert.is_nil(ctx._opened[1])
+    end)
+
     it("returns internal when selected backlink fails to open", function()
         local ctx = base_ctx({
             navigation = {

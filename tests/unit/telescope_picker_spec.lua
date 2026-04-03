@@ -217,6 +217,208 @@ describe("telescope picker adapter", function()
             -- Selected match should be identical to original
             assert.is_function(telescope.open_disambiguation)
         end)
+
+        it("should use Telescope with preview for disambiguation when available", function()
+            local original_pickers = package.loaded["telescope.pickers"]
+            local original_finders = package.loaded["telescope.finders"]
+            local original_config = package.loaded["telescope.config"]
+            local original_actions = package.loaded["telescope.actions"]
+            local original_state = package.loaded["telescope.actions.state"]
+            local original_vim_ui_select = vim and vim.ui and vim.ui.select or nil
+
+            local function restore_modules()
+                package.loaded["telescope.pickers"] = original_pickers
+                package.loaded["telescope.finders"] = original_finders
+                package.loaded["telescope.config"] = original_config
+                package.loaded["telescope.actions"] = original_actions
+                package.loaded["telescope.actions.state"] = original_state
+                if original_vim_ui_select and vim and vim.ui then
+                    vim.ui.select = original_vim_ui_select
+                end
+            end
+
+            local captured = {
+                previewer = nil,
+                filename = nil,
+                path = nil,
+                select_default = nil,
+            }
+
+            local test_ok, test_err = pcall(function()
+                package.loaded["telescope.pickers"] = {
+                    new = function(_, opts)
+                        captured.previewer = opts.previewer
+                        local first_entry = opts.finder.results[1]
+                        local built = opts.finder.entry_maker(first_entry)
+                        captured.filename = built.filename
+                        captured.path = built.path
+                        opts.attach_mappings(0, function() end)
+                        return {
+                            find = function()
+                                if type(captured.select_default) == "function" then
+                                    captured.select_default()
+                                end
+                            end,
+                        }
+                    end,
+                }
+                package.loaded["telescope.finders"] = {
+                    new_table = function(opts)
+                        return {
+                            results = opts.results,
+                            entry_maker = opts.entry_maker,
+                        }
+                    end,
+                }
+                package.loaded["telescope.config"] = {
+                    values = {
+                        generic_sorter = function()
+                            return {}
+                        end,
+                        file_previewer = function()
+                            return { preview = true }
+                        end,
+                    },
+                }
+                package.loaded["telescope.actions"] = {
+                    close = function() end,
+                    select_default = {
+                        replace = function(_self, fn)
+                            captured.select_default = fn
+                        end,
+                    },
+                }
+                package.loaded["telescope.actions.state"] = {
+                    get_selected_entry = function()
+                        return {
+                            value = {
+                                kind = "item",
+                                idx = 1,
+                            },
+                        }
+                    end,
+                }
+                if vim and vim.ui then
+                    vim.ui.select = function()
+                        error("vim.ui.select should not be used for disambiguation")
+                    end
+                end
+
+                local ok = telescope.open_disambiguation({
+                    { path = "notes/foo.md", title = "Foo" },
+                })
+
+                assert.is_true(ok)
+                assert.equals("notes/foo.md", captured.filename)
+                assert.equals("notes/foo.md", captured.path)
+                assert.is_table(captured.previewer)
+            end)
+
+            restore_modules()
+            if not test_ok then
+                error(test_err)
+            end
+        end)
+
+        it("invokes payload open_path callback on selection", function()
+            local original_pickers = package.loaded["telescope.pickers"]
+            local original_finders = package.loaded["telescope.finders"]
+            local original_config = package.loaded["telescope.config"]
+            local original_actions = package.loaded["telescope.actions"]
+            local original_state = package.loaded["telescope.actions.state"]
+            local original_schedule = vim and vim.schedule or nil
+
+            local opened_path = nil
+            local captured_select = nil
+
+            local function restore_modules()
+                package.loaded["telescope.pickers"] = original_pickers
+                package.loaded["telescope.finders"] = original_finders
+                package.loaded["telescope.config"] = original_config
+                package.loaded["telescope.actions"] = original_actions
+                package.loaded["telescope.actions.state"] = original_state
+                if vim and original_schedule then
+                    vim.schedule = original_schedule
+                end
+            end
+
+            local test_ok, test_err = pcall(function()
+                package.loaded["telescope.pickers"] = {
+                    new = function(_, opts)
+                        opts.attach_mappings(0, function() end)
+                        return {
+                            find = function()
+                                if type(captured_select) == "function" then
+                                    captured_select()
+                                end
+                            end,
+                        }
+                    end,
+                }
+                package.loaded["telescope.finders"] = {
+                    new_table = function(opts)
+                        return {
+                            results = opts.results,
+                            entry_maker = opts.entry_maker,
+                        }
+                    end,
+                }
+                package.loaded["telescope.config"] = {
+                    values = {
+                        generic_sorter = function()
+                            return {}
+                        end,
+                        file_previewer = function()
+                            return {}
+                        end,
+                    },
+                }
+                package.loaded["telescope.actions"] = {
+                    close = function() end,
+                    select_default = {
+                        replace = function(_self, fn)
+                            captured_select = fn
+                        end,
+                    },
+                }
+                package.loaded["telescope.actions.state"] = {
+                    get_selected_entry = function()
+                        return {
+                            value = {
+                                kind = "item",
+                                idx = 1,
+                            },
+                        }
+                    end,
+                }
+
+                if vim then
+                    vim.schedule = function(fn)
+                        fn()
+                    end
+                end
+
+                local out = telescope.open_disambiguation({
+                    target = { note_ref = "Current Note" },
+                    matches = {
+                        { path = "vault/notes/other.md", title = "Other" },
+                    },
+                    open_path = function(path)
+                        opened_path = path
+                        return true
+                    end,
+                })
+
+                assert.is_table(out)
+                assert.is_true(out.action == "open" or out.action == "opened")
+                assert.equals("vault/notes/other.md", opened_path)
+            end)
+
+            restore_modules()
+            if not test_ok then
+                error(test_err)
+            end
+        end)
     end)
 
     describe("error handling", function()

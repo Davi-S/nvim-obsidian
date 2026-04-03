@@ -230,9 +230,10 @@ function M.execute(_ctx, _input)
         target = { note_ref = current_note.title },
         matches = matches,
         buffer_path = input.buffer_path,
+        open_path = navigation.open_path,
     })
 
-    if type(picked) ~= "table" or picked.action ~= "open" or type(picked.path) ~= "string" then
+    if type(picked) ~= "table" or (picked.action ~= "open" and picked.action ~= "opened") or type(picked.path) ~= "string" then
         return {
             ok = true,
             opened = false,
@@ -241,17 +242,19 @@ function M.execute(_ctx, _input)
         }
     end
 
-    local opened, open_err = navigation.open_path(picked.path)
-    if not opened then
-        return {
-            ok = false,
-            opened = nil,
-            match_count = #matches,
-            error = errors.new(errors.codes.INTERNAL, "failed to open selected backlink", {
-                path = picked.path,
-                reason = open_err,
-            }),
-        }
+    if picked.action == "open" then
+        local opened, open_err = navigation.open_path(picked.path)
+        if not opened then
+            return {
+                ok = false,
+                opened = nil,
+                match_count = #matches,
+                error = errors.new(errors.codes.INTERNAL, "failed to open selected backlink", {
+                    path = picked.path,
+                    reason = open_err,
+                }),
+            }
+        end
     end
 
     return {
