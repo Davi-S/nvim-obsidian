@@ -280,4 +280,46 @@ describe("dataview domain impl", function()
         assert.equals("- [ ] Task B", out.result.rendered_lines[7].text)
         assert.equals("task_text", out.result.rendered_lines[7].highlight)
     end)
+
+    it("preserves task indentation from raw source lines", function()
+        local block = {
+            query = {
+                kind = "task",
+                from_kind = "path",
+                from_value = "notes",
+                where_expr = nil,
+                sort_field = nil,
+                sort_dir = "ASC",
+            },
+        }
+
+        local notes = {
+            {
+                checked = false,
+                text = "Parent task",
+                raw = "- [ ] Parent task",
+                line = 10,
+                file = {
+                    path = "notes/parent.md",
+                    title = "parent",
+                },
+            },
+            {
+                checked = false,
+                text = "Nested task",
+                raw = "    - [ ] Nested task",
+                line = 11,
+                file = {
+                    path = "notes/parent.md",
+                    title = "parent",
+                },
+            },
+        }
+
+        local out = dataview.execute_query(block, notes)
+        assert.is_nil(out.error)
+        assert.equals(2, #out.result.rendered_lines)
+        assert.equals("- [ ] Parent task", out.result.rendered_lines[1].text)
+        assert.equals("    - [ ] Nested task", out.result.rendered_lines[2].text)
+    end)
 end)

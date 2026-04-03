@@ -534,6 +534,11 @@ local function sort_rows(rows, query)
             local ap = tostring(a.file and a.file.path or "")
             local bp = tostring(b.file and b.file.path or "")
             if ap == bp then
+                local al = tonumber(a.line)
+                local bl = tonumber(b.line)
+                if al ~= nil and bl ~= nil and al ~= bl then
+                    return al < bl
+                end
                 return tostring(a.text or "") < tostring(b.text or "")
             end
             return ap < bp
@@ -547,6 +552,13 @@ local function sort_rows(rows, query)
         if av == bv then
             local ap = tostring(a.file and a.file.path or "")
             local bp = tostring(b.file and b.file.path or "")
+            if ap == bp then
+                local al = tonumber(a.line)
+                local bl = tonumber(b.line)
+                if al ~= nil and bl ~= nil and al ~= bl then
+                    return al < bl
+                end
+            end
             return ap < bp
         end
         if query.sort_dir == "DESC" then
@@ -773,6 +785,21 @@ local function is_numeric_text(value)
     return tonumber(tostring(value)) ~= nil
 end
 
+local function task_render_text(row)
+    local raw = tostring(row and row.raw or "")
+    if raw ~= "" then
+        return raw
+    end
+
+    local task_text = tostring(row and row.text or "")
+    if task_text == "" then
+        task_text = tostring((row and row.file and row.file.title) or "")
+    end
+
+    local mark = row and row.checked and "x" or " "
+    return "- [" .. mark .. "] " .. task_text
+end
+
 function M.execute_query(block, notes)
     if type(block) ~= "table" then
         return {
@@ -878,13 +905,8 @@ function M.execute_query(block, notes)
                     highlight = "task_text",
                 })
                 for _, row in ipairs(group.rows) do
-                    local mark = row.checked and "x" or " "
-                    local task_text = tostring(row.text or "")
-                    if task_text == "" then
-                        task_text = tostring((row.file and row.file.title) or "")
-                    end
                     table.insert(rendered_lines, {
-                        text = "- [" .. mark .. "] " .. task_text,
+                        text = task_render_text(row),
                         highlight = "task_text",
                     })
                 end
@@ -892,13 +914,8 @@ function M.execute_query(block, notes)
         else
             sort_rows(where_rows, query)
             for _, row in ipairs(where_rows) do
-                local mark = row.checked and "x" or " "
-                local task_text = tostring(row.text or "")
-                if task_text == "" then
-                    task_text = tostring((row.file and row.file.title) or "")
-                end
                 table.insert(rendered_lines, {
-                    text = "- [" .. mark .. "] " .. task_text,
+                    text = task_render_text(row),
                     highlight = "task_text",
                 })
             end

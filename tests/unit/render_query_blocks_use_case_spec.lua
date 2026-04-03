@@ -112,6 +112,49 @@ describe("render_query_blocks use case", function()
         assert.is_true(overlays[1].lines[1].highlight == "task_text" or overlays[1].lines[1].highlight == nil)
     end)
 
+    it("passes through nested task indentation in rendered overlays", function()
+        local ctx = base_ctx({
+            dataview = {
+                parse_blocks = function(_markdown)
+                    return {
+                        blocks = {
+                            {
+                                start_line = 2,
+                                end_line = 5,
+                                body_lines = { "TASK", "FROM \"notes\"" },
+                                query = { kind = "task", from_kind = "path", from_value = "notes" },
+                            },
+                        },
+                        error = nil,
+                    }
+                end,
+                execute_query = function(_block, _notes)
+                    return {
+                        result = {
+                            kind = "task",
+                            rows = {
+                                { file = { path = "notes/a.md", title = "A" }, raw = "- [ ] [[A]]" },
+                                { file = { path = "notes/a.md", title = "A" }, raw = "    - [ ] nested task" },
+                            },
+                            rendered_lines = {
+                                "- [ ] [[A]]",
+                                "    - [ ] nested task",
+                            },
+                        },
+                        error = nil,
+                    }
+                end,
+            },
+        })
+
+        local out = run(ctx)
+        assert.is_true(out.ok)
+
+        local lines = ctx._applied()[1].lines
+        assert.equals("- [ ] [[A]]", lines[1].text)
+        assert.equals("    - [ ] nested task", lines[2].text)
+    end)
+
     it("returns zero rendered blocks when trigger is disabled by config", function()
         local ctx = base_ctx({
             config = {
