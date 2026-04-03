@@ -193,7 +193,7 @@ function M.execute(_ctx, _input)
                     action = "cancelled",
                     path = nil,
                     error = errors.new(errors.codes.INTERNAL,
-                    "vault_catalog.list_notes returned invalid result after refresh"),
+                        "vault_catalog.list_notes returned invalid result after refresh"),
                 }
             end
         end
@@ -288,11 +288,12 @@ function M.execute(_ctx, _input)
 
     local allow_create = not has_exact_or_full_match
 
-    local function run_ensure(title_or_token, create_if_missing, origin)
+    local function run_ensure(title_or_token, create_if_missing, origin, journal_kind)
         local out = ensure_open_note.execute(ctx, {
             title_or_token = title_or_token,
             create_if_missing = create_if_missing,
             origin = origin or "omni",
+            journal_kind = journal_kind,
         })
 
         if not out.ok then
@@ -332,7 +333,7 @@ function M.execute(_ctx, _input)
             }
         end
 
-        return run_ensure(token, false, "omni")
+        return run_ensure(token, false, "omni", nil)
     end
 
     local function run_create_flow(raw_query)
@@ -361,15 +362,17 @@ function M.execute(_ctx, _input)
         end
 
         local create_origin = "omni"
+        local create_journal_kind = nil
         if type(ctx.journal) == "table" and type(ctx.journal.classify_input) == "function" then
             local classified = ctx.journal.classify_input(create_query, input.now)
             local kind = tostring((classified and classified.kind) or "none")
-            if kind ~= "none" then
+            if kind == "daily" or kind == "weekly" or kind == "monthly" or kind == "yearly" then
                 create_origin = "journal"
+                create_journal_kind = kind
             end
         end
 
-        return run_ensure(create_query, true, create_origin)
+        return run_ensure(create_query, true, create_origin, create_journal_kind)
     end
 
     local function notify_async_error(out, fallback)

@@ -59,6 +59,98 @@ local PT_MONTHS = {
     dezembro = true,
 }
 
+local function normalize_token(text)
+    local s = tostring(text or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    local replacements = {
+        ["á"] = "a",
+        ["à"] = "a",
+        ["ã"] = "a",
+        ["â"] = "a",
+        ["ä"] = "a",
+        ["é"] = "e",
+        ["è"] = "e",
+        ["ê"] = "e",
+        ["ë"] = "e",
+        ["í"] = "i",
+        ["ì"] = "i",
+        ["î"] = "i",
+        ["ï"] = "i",
+        ["ó"] = "o",
+        ["ò"] = "o",
+        ["õ"] = "o",
+        ["ô"] = "o",
+        ["ö"] = "o",
+        ["ú"] = "u",
+        ["ù"] = "u",
+        ["û"] = "u",
+        ["ü"] = "u",
+        ["ç"] = "c",
+    }
+
+    for accented, base in pairs(replacements) do
+        s = s:gsub(accented, base)
+    end
+
+    s = s:gsub("[%.,;:]+$", "")
+    s = s:gsub("%s+", "-")
+    s = s:gsub("%-+", "-")
+    s = s:gsub("^%-+", ""):gsub("%-+$", "")
+    return s
+end
+
+local function build_normalized_set(words)
+    local out = {}
+    for word in pairs(words) do
+        out[normalize_token(word)] = true
+    end
+    return out
+end
+
+local NORMALIZED_MONTHS = build_normalized_set(EN_MONTHS)
+for word in pairs(PT_MONTHS) do
+    NORMALIZED_MONTHS[normalize_token(word)] = true
+end
+
+local NORMALIZED_WEEKDAYS = build_normalized_set(EN_WEEKDAYS)
+for word in pairs(PT_WEEKDAYS) do
+    NORMALIZED_WEEKDAYS[normalize_token(word)] = true
+end
+
+local function is_month_token(token)
+    return NORMALIZED_MONTHS[normalize_token(token)] == true
+end
+
+local function is_weekday_token(token)
+    return NORMALIZED_WEEKDAYS[normalize_token(token)] == true
+end
+
+local function classify_structured_daily(raw)
+    local year, month_token, day_token, weekday_token = raw:match("^(%d%d%d%d)%s+(%S+)%s+(%d%d?)%s*,?%s*(.-)$")
+    if not year or not month_token or not day_token then
+        return nil
+    end
+
+    if not is_month_token(month_token) then
+        return nil
+    end
+
+    local day = tonumber(day_token)
+    if not day or day < 1 or day > 31 then
+        return nil
+    end
+
+    local weekday = tostring(weekday_token or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if weekday == "" then
+        return "daily"
+    end
+
+    if is_weekday_token(weekday) then
+        return "daily"
+    end
+
+    return nil
+end
+
 local function trim(text)
     local s = tostring(text or "")
     return (s:gsub("^%s+", ""):gsub("%s+$", ""))
@@ -143,17 +235,22 @@ local function classify_by_keyword(raw)
         return "daily"
     end
 
-    if EN_WEEKDAYS[s] or PT_WEEKDAYS[s] then
+    if is_weekday_token(s) then
         return "daily"
     end
 
+    local structured_daily = classify_structured_daily(s)
+    if structured_daily then
+        return structured_daily
+    end
+
     local left, right = s:match("^(%S+)%s+(%d%d%d%d)$")
-    if left and right and (EN_MONTHS[left] or PT_MONTHS[left]) then
+    if left and right and is_month_token(left) then
         return "monthly"
     end
 
     local year, month_word = s:match("^(%d%d%d%d)%s+(%S+)$")
-    if year and month_word and (EN_MONTHS[month_word] or PT_MONTHS[month_word]) then
+    if year and month_word and is_month_token(month_word) then
         return "monthly"
     end
 

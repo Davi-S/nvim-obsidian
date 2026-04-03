@@ -1,6 +1,7 @@
 ---@diagnostic disable: undefined-global
 
 local use_case = require("nvim_obsidian.use_cases.search_open_create")
+local journal_impl = require("nvim_obsidian.core.domains.journal.impl")
 
 describe("search_open_create use case", function()
     local function base_ctx(overrides)
@@ -162,6 +163,33 @@ describe("search_open_create use case", function()
         assert.is_true(out.ok)
         assert.equals("created", out.action)
         assert.equals("journal", ctx._ensured[1].origin)
+    end)
+
+    it("routes localized full-date omni create through journal origin", function()
+        local ctx = base_ctx({
+            journal = {
+                classify_input = function(raw, now)
+                    return journal_impl.classify_input(raw, now)
+                end,
+            },
+            open_omni_picker = function(_payload)
+                return {
+                    action = "create",
+                    query = "2026 abril 06, segunda-feira",
+                }
+            end,
+        })
+
+        local out = run(ctx, {
+            query = "2026 abril",
+            allow_force_create = true,
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("created", out.action)
+        assert.equals("journal", ctx._ensured[1].origin)
+        assert.equals("daily", ctx._ensured[1].journal_kind)
+        assert.equals("2026 abril 06, segunda-feira", ctx._ensured[1].title_or_token)
     end)
 
     it("forbids create when exact/full match exists", function()
