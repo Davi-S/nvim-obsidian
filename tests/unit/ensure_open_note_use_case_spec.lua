@@ -256,7 +256,7 @@ describe("ensure_open_note use case", function()
         assert.equals("journal/daily/tomorrow-title.md", ctx._opened[1])
     end)
 
-    it("creates in default subdir for non-journal origin", function()
+    it("preserves spaces in filenames for omni origin", function()
         local ctx = base_ctx({
             journal = {
                 classify_input = function()
@@ -272,7 +272,20 @@ describe("ensure_open_note use case", function()
         })
 
         assert.is_true(out.ok)
-        assert.equals("notes/my-note.md", out.path)
+        assert.equals("notes/my note.md", out.path)
+    end)
+
+    it("sanitizes invalid filename characters while preserving spaces for omni origin", function()
+        local ctx = base_ctx()
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "my: note?",
+            create_if_missing = true,
+            origin = "omni",
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("notes/my- note-.md", out.path)
     end)
 
     it("renders configured template content before write", function()
@@ -425,7 +438,7 @@ describe("ensure_open_note use case", function()
         })
 
         assert.is_true(out.ok)
-        assert.equals("/vault/notes/outside-routing-test.md", out.path)
-        assert.equals("/vault/notes/outside-routing-test.md", ctx._writes[1].path)
+        assert.equals("/vault/notes/outside routing test.md", out.path)
+        assert.equals("/vault/notes/outside routing test.md", ctx._writes[1].path)
     end)
 end)
