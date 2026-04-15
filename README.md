@@ -30,7 +30,7 @@ See full layout details in `docs/REPOSITORY_LAYOUT.md`.
 
 Runtime dependencies enforced by startup checks:
 - `nvim-telescope/telescope.nvim`
-- `hrsh7th/nvim-cmp`
+- `saghen/blink.cmp`
 - `nvim-treesitter/nvim-treesitter`
 - `nvim-lua/plenary.nvim`
 
@@ -43,7 +43,7 @@ Neovim version: 0.9.0+
   "Davi-S/nvim-obsidian",
   dependencies = {
     "nvim-telescope/telescope.nvim",
-    "hrsh7th/nvim-cmp",
+    "saghen/blink.cmp",
     "nvim-treesitter/nvim-treesitter",
     "nvim-lua/plenary.nvim",
   },

@@ -6,8 +6,8 @@ local REQUIRED_DEPENDENCIES = {
         name = "nvim-telescope/telescope.nvim",
     },
     {
-        module = "cmp",
-        name = "hrsh7th/nvim-cmp",
+        module = "blink.cmp",
+        name = "saghen/blink.cmp",
     },
     {
         module = "nvim-treesitter.parsers",

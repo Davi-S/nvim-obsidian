@@ -102,11 +102,11 @@ Policy authority: Product rules are canonical in docs/PRODUCT_CONTRACT.md.
 
 ## Completion
 
-| Feature                 | Owner                                             | Notes                                         |
-| ----------------------- | ------------------------------------------------- | --------------------------------------------- |
-| cmp source registration | Neovim Adapter                                    | nvim-cmp integration                          |
-| Candidate supply        | Wiki Link Domain + Vault Catalog + Parser Adapter | titles, aliases, headings (#), block IDs (#^) |
-| Insert behavior         | Neovim Adapter                                    | Correct wikilink output                       |
+| Feature                        | Owner                                             | Notes                                         |
+| ------------------------------ | ------------------------------------------------- | --------------------------------------------- |
+| completion source registration | Neovim Adapter                                    | blink.cmp integration                         |
+| Candidate supply               | Wiki Link Domain + Vault Catalog + Parser Adapter | titles, aliases, headings (#), block IDs (#^) |
+| Insert behavior                | Neovim Adapter                                    | Correct wikilink output                       |
 
 ---
 

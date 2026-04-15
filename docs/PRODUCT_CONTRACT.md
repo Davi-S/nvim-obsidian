@@ -16,7 +16,7 @@ Related documents:
 
 nvim-obsidian V2 is a Neovim plugin for local markdown vault workflows. It focuses on journal routing, wikilinks, templates, dataview rendering, and picker/completion integration.
 
-The plugin provides no custom UI framework; it integrates with Neovim, Telescope, and nvim-cmp.
+The plugin provides no custom UI framework; it integrates with Neovim, Telescope, and blink.cmp.
 
 Reference vault for examples and testing context:
 - ~/Documents/ObsidianAllInVault
@@ -31,7 +31,7 @@ Users can:
 3. Render templates through user-registered placeholders.
 4. Use an omni picker to search by title/alias and create notes when missing.
 5. Render dataview TASK/TABLE blocks inside buffers.
-6. Complete wiki targets (titles, aliases, headings, block IDs) from nvim-cmp.
+6. Complete wiki targets (titles, aliases, headings, block IDs) from blink.cmp.
 
 ---
 
@@ -134,8 +134,8 @@ Clarification on wikilink resolution and ambiguity:
 - [ ] On-open/on-save hooks are configurable.
 - [ ] Parse and execution errors are rendered clearly without crashing UI.
 
-### 9. Completion (nvim-cmp)
-- [ ] Register cmp source for wikilinks.
+### 9. Completion (blink.cmp)
+- [ ] Register blink source for wikilinks.
 - [ ] Trigger on [[.
 - [ ] Candidate groups include:
   - Note titles

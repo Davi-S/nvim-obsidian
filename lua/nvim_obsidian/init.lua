@@ -114,6 +114,10 @@ function M.setup(opts)
     return container
 end
 
+function M.get_container()
+    return state.container
+end
+
 function M.template_register_placeholder(name, resolver)
     local registered = template_impl.register_placeholders({
         [name] = resolver,

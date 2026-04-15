@@ -64,7 +64,7 @@ function M.build(user_opts)
         }),
         navigation = require("nvim_obsidian.adapters.neovim.navigation"),
         telescope = require("nvim_obsidian.adapters.picker.telescope"),
-        cmp_source = require("nvim_obsidian.adapters.completion.cmp_source"),
+        blink_source = require("nvim_obsidian.adapters.completion.blink_source"),
         fs_io = require("nvim_obsidian.adapters.filesystem.io"),
         watcher = require("nvim_obsidian.adapters.filesystem.watcher"),
         frontmatter = require("nvim_obsidian.adapters.parser.frontmatter"),
@@ -243,9 +243,12 @@ function M.build(user_opts)
         end,
         resolve_template_content = function(req)
             local request = req or {}
-            local query = tostring(request.query or ""):gsub("^%s+", ""):gsub("%s+$", "")
-            if query == "" then
-                query = nil
+            local query = nil
+            if type(request.query) == "string" then
+                local trimmed = request.query:gsub("^%s+", ""):gsub("%s+$", "")
+                if trimmed ~= "" then
+                    query = trimmed
+                end
             end
 
             local kind = tostring(request.kind or "")

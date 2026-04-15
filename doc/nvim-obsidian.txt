@@ -34,7 +34,7 @@ Main help tag: >
 Required dependencies:
 
 - nvim-telescope/telescope.nvim
-- hrsh7th/nvim-cmp
+- saghen/blink.cmp
 - nvim-treesitter/nvim-treesitter
 - nvim-lua/plenary.nvim
 

@@ -7,8 +7,8 @@ if not pcall(require, "telescope") then
     package.loaded["telescope"] = {}
 end
 
-if not pcall(require, "cmp") then
-    package.loaded["cmp"] = {}
+if not pcall(require, "blink.cmp") then
+    package.loaded["blink.cmp"] = {}
 end
 
 if not pcall(require, "nvim-treesitter.parsers") then

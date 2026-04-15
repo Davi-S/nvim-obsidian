@@ -1,8 +1,8 @@
 ---@mod nvim-obsidian.adapters.completion Completion Adapters
 ---@brief [[
---- Adapters for Neovim completion frameworks (nvim-cmp)
+--- Adapters for Neovim completion frameworks (blink.cmp)
 ---@brief ]]
 
 return {
-    cmp_source = require("nvim_obsidian.adapters.completion.cmp_source"),
+    blink_source = require("nvim_obsidian.adapters.completion.blink_source"),
 }

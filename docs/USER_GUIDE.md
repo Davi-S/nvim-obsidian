@@ -29,7 +29,7 @@ Before installing nvim-obsidian V2, ensure you have:
 
 2. **Required Plugins**
    - `nvim-telescope/telescope.nvim` - Note picker and search
-   - `hrsh7th/nvim-cmp` - Completion menu
+  - `saghen/blink.cmp` - Completion menu
    - `nvim-treesitter/nvim-treesitter` - Markdown parsing
    - `nvim-lua/plenary.nvim` - Async jobs and utilities
 
@@ -39,7 +39,7 @@ Before installing nvim-obsidian V2, ensure you have:
 -- In your plugins specification
 use "Davi-S/nvim-obsidian"  -- Main plugin
 use "nvim-telescope/telescope.nvim"  -- For pickers
-use "hrsh7th/nvim-cmp"  -- For completions
+use "saghen/blink.cmp"  -- For completions
 use "nvim-treesitter/nvim-treesitter"  -- For parsing
 use "nvim-lua/plenary.nvim"  -- For utilities
 ```
@@ -54,7 +54,7 @@ Then run `:PackerSync` in Neovim.
   "Davi-S/nvim-obsidian",
   dependencies = {
     "nvim-telescope/telescope.nvim",
-    "hrsh7th/nvim-cmp",
+    "saghen/blink.cmp",
     "nvim-treesitter/nvim-treesitter",
     "nvim-lua/plenary.nvim",
   },
