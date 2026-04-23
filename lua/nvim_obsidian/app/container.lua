@@ -42,6 +42,7 @@ function M.build(user_opts)
 
     local vault_catalog = require("nvim_obsidian.core.domains.vault_catalog.impl")
     local journal = require("nvim_obsidian.core.domains.journal.impl")
+    local date_picker = require("nvim_obsidian.core.domains.date_picker.impl")
     local wiki_link = require("nvim_obsidian.core.domains.wiki_link.impl")
     local template = require("nvim_obsidian.core.domains.template.impl")
     local dataview = require("nvim_obsidian.core.domains.dataview.impl")
@@ -55,6 +56,7 @@ function M.build(user_opts)
     local show_backlinks = require("nvim_obsidian.use_cases.show_backlinks")
     local vault_search = require("nvim_obsidian.use_cases.vault_search")
     local insert_template = require("nvim_obsidian.use_cases.insert_template")
+    local open_date_picker = require("nvim_obsidian.use_cases.open_date_picker")
 
     local adapter_set = {
         commands = require("nvim_obsidian.adapters.neovim.commands"),
@@ -63,6 +65,7 @@ function M.build(user_opts)
             config = opts,
         }),
         navigation = require("nvim_obsidian.adapters.neovim.navigation"),
+        calendar_buffer = require("nvim_obsidian.adapters.neovim.calendar_buffer"),
         telescope = require("nvim_obsidian.adapters.picker.telescope"),
         blink_source = require("nvim_obsidian.adapters.completion.blink_source"),
         fs_io = require("nvim_obsidian.adapters.filesystem.io"),
@@ -76,6 +79,7 @@ function M.build(user_opts)
         domains = {
             vault_catalog = vault_catalog,
             journal = journal,
+            date_picker = date_picker,
             wiki_link = wiki_link,
             template = template,
             dataview = dataview,
@@ -90,6 +94,7 @@ function M.build(user_opts)
             show_backlinks = show_backlinks,
             vault_search = vault_search,
             insert_template = insert_template,
+            open_date_picker = open_date_picker,
         },
         adapters = adapter_set,
 
@@ -104,6 +109,7 @@ function M.build(user_opts)
 
         vault_catalog = vault_catalog,
         journal = journal,
+        date_picker = date_picker,
         wiki_link = wiki_link,
         template = template,
         dataview = dataview,
@@ -117,6 +123,7 @@ function M.build(user_opts)
         show_backlinks = show_backlinks,
         vault_search = vault_search,
         insert_template = insert_template,
+        open_date_picker = open_date_picker,
 
         get_buffer_markdown = function(buffer)
             if not vim or not vim.api or type(vim.api.nvim_buf_get_lines) ~= "function" then

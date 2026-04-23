@@ -576,6 +576,67 @@ local function register_obsidian_insert_template(ctx)
     end, { desc = "Insert rendered template at cursor", nargs = "?" })
 end
 
+local function register_obsidian_calendar(ctx)
+    create_user_command("ObsidianCalendar", function(cmd)
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        -- MVP interface:
+        -- :ObsidianCalendar           -> visualizer mode (default)
+        -- :ObsidianCalendar pick      -> picker mode (returns selected date)
+        --
+        -- Keeping mode selection command-driven allows reviewers to validate both
+        -- interaction contracts immediately while we still have only one UI variant.
+        local raw_args = trim((cmd and cmd.args) or "")
+        local mode = "visualizer"
+        if raw_args == "pick" or raw_args == "picker" then
+            mode = "picker"
+        elseif raw_args == "visualizer" then
+            mode = "visualizer"
+        end
+
+        local result = ctx.use_cases.open_date_picker.execute(ctx, {
+            mode = mode,
+            ui_variant = "buffer",
+            initial_date = os.date("*t"),
+        })
+
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+
+        if not (ctx.adapters and ctx.adapters.notifications) then
+            return
+        end
+
+        if mode == "picker" and result.action == "selected" and type(result.date) == "table" then
+            local selected = string.format("%04d-%02d-%02d", result.date.year, result.date.month, result.date.day)
+            ctx.adapters.notifications.info({
+                command = "ObsidianCalendar",
+                message = "Selected date",
+                target = selected,
+                next_step = "This payload is ready for journal or other consumers",
+            })
+            return
+        end
+
+        if mode == "visualizer" then
+            ctx.adapters.notifications.info({
+                command = "ObsidianCalendar",
+                message = "Calendar closed",
+            })
+        end
+    end, {
+        desc = "Open interactive calendar (visualizer or picker)",
+        nargs = "?",
+        complete = function()
+            return { "pick", "picker", "visualizer" }
+        end,
+    })
+end
+
 local function register_obsidian_render_dataview(ctx)
     create_user_command("ObsidianRenderDataview", function()
         if not ctx or not ctx.use_cases or not ctx.use_cases.render_query_blocks then
@@ -844,6 +905,7 @@ function M.register(container)
     register_obsidian_search(container)
     register_obsidian_reindex(container)
     register_obsidian_insert_template(container)
+    register_obsidian_calendar(container)
     register_obsidian_render_dataview(container)
     register_dataview_autocmds(container)
     register_obsidian_health(container)
