@@ -21,17 +21,47 @@ local MONTH_NAMES = {
     [12] = "December",
 }
 
--- Render labels in Monday-first order to match date-picker domain matrix.
-local WEEKDAY_LABELS = { "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" }
+local WEEKDAY_LABELS = {
+    sunday = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" },
+    monday = { "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" },
+}
+
+-- Frontend-side normalization for week start.
+--
+-- Note:
+-- The backend also normalizes this value. We normalize here too so rendering
+-- decisions (labels/layout assumptions) are deterministic even before matrix usage.
+local function resolve_week_start(value)
+    if tostring(value or "") == "monday" then
+        return "monday"
+    end
+    return "sunday"
+end
+
+local function resolve_highlights(value)
+    -- Merge user-provided highlight groups with stable defaults.
+    --
+    -- This keeps the frontend resilient to partial user config while still
+    -- making visual styling fully configurable.
+    local user = type(value) == "table" and value or {}
+    return {
+        title = tostring(user.title or "Title"),
+        weekday = tostring(user.weekday or "Comment"),
+        in_month_day = tostring(user.in_month_day or "Normal"),
+        outside_month_day = tostring(user.outside_month_day or "Comment"),
+        today = tostring(user.today or "DiagnosticOk"),
+    }
+end
 
 local function is_nvim_ready()
     return vim
         and type(vim) == "table"
         and type(vim.api) == "table"
         and type(vim.keymap) == "table"
-    and type(vim.keymap.set) == "function"
+        and type(vim.keymap.set) == "function"
 end
 
+-- Normalize mode so all downstream branches can assume one of two values.
 local function normalize_mode(mode)
     if mode == "picker" then
         return "picker"
@@ -46,6 +76,9 @@ local function build_title_line(mode)
     return "Obsidian Calendar (visualizer mode)"
 end
 
+-- Build user-facing keymap guidance shown in the buffer footer.
+--
+-- We keep this in one function so future keymap changes only touch one place.
 local function build_help_line(mode)
     if mode == "picker" then
         return "Keys: h/j/k/l move | H/L month | J/K year | t today | <CR> select | q close"
@@ -76,13 +109,21 @@ local function day_to_cursor(matrix, target_token)
 end
 
 -- Build all buffer lines plus metadata needed for click/cursor translation.
+--
+-- Returns:
+-- - lines: printable content for buffer
+-- - matrix: domain matrix used for highlighting decisions
+-- - line_to_tokens: reverse map for cursor/mouse token resolution
 local function build_lines(date_picker, state)
-    local matrix = date_picker.month_matrix(state.view_date)
+    local matrix = date_picker.month_matrix(state.view_date, {
+        week_start = state.week_start,
+    })
     local lines = {}
 
     table.insert(lines, build_title_line(state.mode))
     table.insert(lines, month_label(state.view_date))
-    table.insert(lines, table.concat(WEEKDAY_LABELS, " "))
+    local weekday_labels = WEEKDAY_LABELS[state.week_start] or WEEKDAY_LABELS.sunday
+    table.insert(lines, table.concat(weekday_labels, " "))
 
     local line_to_tokens = {}
 
@@ -91,13 +132,9 @@ local function build_lines(date_picker, state)
         local tokens = {}
 
         for _, cell in ipairs(week) do
-            -- In-month days use normal 2-digit format; out-of-month days keep the same shape
-            -- with surrounding dots to make calendar boundaries obvious in plain text UI.
-            if cell.in_view_month then
-                table.insert(day_chunks, string.format("%02d", cell.date.day))
-            else
-                table.insert(day_chunks, string.format(".%02d", cell.date.day):sub(1, 2))
-            end
+            -- Always keep two-character numeric day text. Differentiation between current
+            -- month and adjacent months is handled by highlighting, not by mutating digits.
+            table.insert(day_chunks, string.format("%02d", cell.date.day))
             table.insert(tokens, cell.token)
         end
 
@@ -115,6 +152,63 @@ local function build_lines(date_picker, state)
     }
 end
 
+-- Lazily create one namespace per calendar instance.
+--
+-- We scope highlights to an instance namespace so redraw operations can clear
+-- only calendar artifacts without touching user highlights.
+local function ensure_namespace(state)
+    if state.namespace then
+        return state.namespace
+    end
+    if type(vim.api.nvim_create_namespace) ~= "function" then
+        return nil
+    end
+    state.namespace = vim.api.nvim_create_namespace("nvim-obsidian-calendar")
+    return state.namespace
+end
+
+local function apply_highlights(bufnr, state, payload)
+    -- Highlighting is purely presentational; never mutate matrix/domain state.
+    local ns = ensure_namespace(state)
+    if not ns or type(vim.api.nvim_buf_add_highlight) ~= "function" then
+        return
+    end
+
+    if type(vim.api.nvim_buf_clear_namespace) == "function" then
+        vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+    end
+
+    local highlights = state.highlights
+    local today_token = state.today_token
+    local matrix = payload.matrix
+
+    -- Title line.
+    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.title, 0, 0, -1)
+
+    -- Weekday header line.
+    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.weekday, 2, 0, -1)
+
+    -- Day cells lines (4..9 in 1-based display, 3..8 in 0-based buffer lines).
+    for week_idx, week in ipairs(matrix.weeks or {}) do
+        local line0 = 2 + week_idx
+        for day_idx, cell in ipairs(week) do
+            local col_start = (day_idx - 1) * 3
+            local col_end = col_start + 2
+
+            local group = highlights.in_month_day
+            if not cell.in_view_month then
+                group = highlights.outside_month_day
+            end
+            if cell.token == today_token then
+                group = highlights.today
+            end
+
+            vim.api.nvim_buf_add_highlight(bufnr, ns, group, line0, col_start, col_end)
+        end
+    end
+end
+
+-- Configure the backing buffer as an ephemeral UI surface.
 local function ensure_buffer_opts(bufnr)
     vim.api.nvim_set_option_value("buftype", "nofile", { buf = bufnr })
     vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
@@ -123,6 +217,14 @@ local function ensure_buffer_opts(bufnr)
     vim.api.nvim_set_option_value("filetype", "markdown", { buf = bufnr })
 end
 
+-- Redraw the entire calendar view from the current state snapshot.
+--
+-- Rendering order:
+-- 1) text lines
+-- 2) cursor placement
+-- 3) highlights
+--
+-- This order guarantees highlight application always matches final content.
 local function render(date_picker, bufnr, state)
     local payload = build_lines(date_picker, state)
 
@@ -135,8 +237,12 @@ local function render(date_picker, bufnr, state)
     pcall(vim.api.nvim_win_set_cursor, state.winid, { line, col })
 
     state.line_to_tokens = payload.line_to_tokens
+    apply_highlights(bufnr, state, payload)
 end
 
+-- Convert current cursor position to a date token using line_to_tokens map.
+--
+-- This is used for mouse-driven selection/movement sync.
 local function token_from_cursor(date_picker, state)
     local ok, pos = pcall(vim.api.nvim_win_get_cursor, state.winid)
     if not ok or type(pos) ~= "table" then
@@ -159,6 +265,9 @@ local function token_from_cursor(date_picker, state)
     return token
 end
 
+-- Parse an ISO token back to a date table.
+--
+-- The frontend intentionally uses the same token shape as the backend contract.
 local function parse_token(token)
     local y, m, d = tostring(token or ""):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
     if not y then
@@ -171,12 +280,14 @@ local function parse_token(token)
     }
 end
 
+-- Safe window closer helper used by finish paths.
 local function close_window(winid)
     if type(winid) == "number" and vim.api.nvim_win_is_valid(winid) then
         pcall(vim.api.nvim_win_close, winid, true)
     end
 end
 
+-- Guarded callback execution to prevent consumer errors from breaking UI teardown.
 local function safe_on_finish(handler, payload)
     if type(handler) ~= "function" then
         return
@@ -185,6 +296,8 @@ local function safe_on_finish(handler, payload)
 end
 
 function M.open_calendar(ctx, request)
+    -- Adapter boundary checks.
+    -- This function must fail gracefully because it is called from command paths.
     if not is_nvim_ready() then
         return {
             ok = false,
@@ -207,14 +320,22 @@ function M.open_calendar(ctx, request)
     end
 
     local mode = normalize_mode(request and request.mode)
+    local week_start = resolve_week_start(request and request.week_start)
+    local highlights = resolve_highlights(request and request.highlights)
     local on_finish = request and request.on_finish or nil
     local now = os.date("*t")
     local start_date = date_picker.normalize_date(request and request.initial_date or now)
 
     -- Interactive state is centralized in one table so every mapping callback
     -- mutates one source of truth and re-renders from it.
+    --
+    -- Keeping a single state object is important for future multi-frontend
+    -- consistency (buffer view now, floating view later).
     local state = {
         mode = mode,
+        week_start = week_start,
+        highlights = highlights,
+        today_token = date_picker.to_token(now),
         view_date = {
             year = start_date.year,
             month = start_date.month,
@@ -236,6 +357,7 @@ function M.open_calendar(ctx, request)
         winid = nil,
         bufnr = nil,
         line_to_tokens = {},
+        namespace = nil,
     }
 
     -- Open a dedicated normal window/buffer. This intentionally favors simplicity and
@@ -248,6 +370,8 @@ function M.open_calendar(ctx, request)
     render(date_picker, state.bufnr, state)
 
     local function refresh_after_cursor_shift(new_cursor)
+        -- Cursor movement updates both cursor_date and view month so month boundaries
+        -- are handled naturally when stepping across adjacent months.
         state.cursor_date = date_picker.normalize_date(new_cursor)
         state.view_date = {
             year = state.cursor_date.year,
@@ -261,6 +385,9 @@ function M.open_calendar(ctx, request)
         if state.done then
             return
         end
+
+        -- Finish is idempotent: once done=true all later finish attempts are ignored.
+        -- This protects against double-trigger scenarios from keymaps + autocmds.
         state.result.action = action
         state.result.date = selected_date and date_picker.normalize_date(selected_date) or nil
         state.result.cursor_date = date_picker.normalize_date(state.cursor_date)
@@ -299,6 +426,11 @@ function M.open_calendar(ctx, request)
     end
 
     local function sync_cursor_from_window()
+        -- Mouse navigation path:
+        -- 1) read cursor cell
+        -- 2) map to token
+        -- 3) parse token into date
+        -- 4) redraw consistent month/cursor state
         local token = token_from_cursor(date_picker, state)
         if not token then
             return
@@ -320,6 +452,7 @@ function M.open_calendar(ctx, request)
         render(date_picker, state.bufnr, state)
     end
 
+    -- Buffer-local mappings keep calendar controls isolated from user global maps.
     local map_opts = { buffer = state.bufnr, silent = true, nowait = true }
 
     vim.keymap.set("n", "h", function() move_by_days(-1) end, map_opts)

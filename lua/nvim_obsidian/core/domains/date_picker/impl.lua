@@ -9,6 +9,20 @@ local M = {}
 
 local SECONDS_PER_DAY = 24 * 60 * 60
 
+-- Normalize incoming week-start options to a strict internal enum.
+--
+-- Why this helper exists:
+-- - Frontends and callers may pass nil/unknown values.
+-- - Domain logic should never branch on untrusted values repeatedly.
+-- - Keeping this in one place guarantees consistent behavior across all frontends.
+local function normalize_week_start(value)
+    local key = tostring(value or "sunday")
+    if key == "monday" then
+        return "monday"
+    end
+    return "sunday"
+end
+
 -- Normalize a date-like table into a strict { year, month, day } shape.
 --
 -- Why this exists:
@@ -48,6 +62,10 @@ end
 
 -- Convert a normalized date to an ISO token used across the plugin.
 -- This token is stable and easy to use as a map key for date marks.
+--
+-- Design note:
+-- The token is intentionally backend-owned and frontend-agnostic so all
+-- consumers (buffer/floating/CLI) can share one identity format.
 local function to_token(date)
     local normalized = normalize_date(date)
     return string.format("%04d-%02d-%02d", normalized.year, normalized.month, normalized.day)
@@ -69,6 +87,10 @@ local function days_in_month(year, month)
 end
 
 -- Shift a date by N days and return normalized {year, month, day}.
+--
+-- Implementation detail:
+-- We always compute from a noon timestamp. This mitigates edge cases around
+-- DST transitions where midnight arithmetic can behave unexpectedly.
 local function shift_days(date, delta_days)
     local base = normalize_date(date)
     local ts = os.time({
@@ -119,6 +141,9 @@ local function shift_months(date, delta_months)
 end
 
 -- Shift a date by N years while clamping day safely.
+--
+-- This keeps leap-day and short-month transitions valid while preserving
+-- maximum intent from the original date.
 local function shift_years(date, delta_years)
     local base = normalize_date(date)
     local target_year = base.year + (tonumber(delta_years) or 0)
@@ -134,7 +159,10 @@ end
 
 -- Weekday with Monday=1..Sunday=7 (ISO weekday), which matches common
 -- calendar UX expectations and keeps grid alignment straightforward.
-local function iso_weekday(date)
+--
+-- For sunday mode we intentionally remap to Sunday=1..Saturday=7 so matrix
+-- generation stays symmetrical with monday mode (always 1..7 indexing).
+local function weekday_index(date, week_start)
     local normalized = normalize_date(date)
     local ts = os.time({
         year = normalized.year,
@@ -142,7 +170,15 @@ local function iso_weekday(date)
         day = normalized.day,
         hour = 12,
     })
-    return tonumber(os.date("%u", ts)) or 1
+
+    local start = normalize_week_start(week_start)
+    if start == "monday" then
+        -- %u maps Monday..Sunday to 1..7.
+        return tonumber(os.date("%u", ts)) or 1
+    end
+
+    -- %w maps Sunday..Saturday to 0..6; shift to 1..7.
+    return (tonumber(os.date("%w", ts)) or 0) + 1
 end
 
 -- Build a 6x7 month matrix centered around the given date's month.
@@ -167,18 +203,25 @@ end
 -- Why always 6 rows:
 -- This keeps rendering stable in text UIs and avoids cursor remapping when month
 -- height changes between 4/5/6 rows.
-local function month_matrix(anchor_date)
+local function month_matrix(anchor_date, options)
+    -- All caller input is normalized inside the domain so matrix generation is
+    -- deterministic and does not depend on frontend validation quality.
     local anchor = normalize_date(anchor_date)
+    local week_start = normalize_week_start(type(options) == "table" and options.week_start or nil)
     local view_month_start = {
         year = anchor.year,
         month = anchor.month,
         day = 1,
     }
 
-    local first_weekday = iso_weekday(view_month_start)
+    local first_weekday = weekday_index(view_month_start, week_start)
     local grid_start = shift_days(view_month_start, -(first_weekday - 1))
 
     local weeks = {}
+
+    -- Fixed 6-row strategy:
+    -- We always produce a 6x7 grid. This avoids UI shape jitter across months
+    -- and makes cursor mapping significantly simpler for text frontends.
     for row = 1, 6 do
         local week = {}
         for col = 1, 7 do
@@ -200,6 +243,7 @@ local function month_matrix(anchor_date)
             month = anchor.month,
             day = 1,
         },
+        week_start = week_start,
         weeks = weeks,
     }
 end
@@ -212,5 +256,6 @@ M.shift_days = shift_days
 M.shift_months = shift_months
 M.shift_years = shift_years
 M.month_matrix = month_matrix
+M.normalize_week_start = normalize_week_start
 
 return M

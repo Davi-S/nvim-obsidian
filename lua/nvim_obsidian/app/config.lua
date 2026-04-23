@@ -29,6 +29,24 @@ M.defaults = {
             },
         },
     },
+    -- Calendar/date-picker defaults.
+    --
+    -- This block is shared by all future calendar frontends because it is consumed
+    -- via use-case orchestration, not directly in command handlers.
+    calendar = {
+        -- Week starts on Sunday by default; can be switched to Monday.
+        week_start = "sunday",
+
+        -- Highlight group names consumed by the buffer calendar frontend.
+        -- These are names only; users control actual colors through colorschemes.
+        highlights = {
+            title = "Title",
+            weekday = "Comment",
+            in_month_day = "Normal",
+            outside_month_day = "Comment",
+            today = "DiagnosticOk",
+        },
+    },
 }
 
 local function is_absolute_path(path)
@@ -123,6 +141,41 @@ local function validate_dataview(opts)
     end
 end
 
+local function validate_calendar(opts)
+    -- Calendar config is required because defaults are always materialized via
+    -- deep-merge in normalize().
+    local calendar = opts.calendar
+    if type(calendar) ~= "table" then
+        fail("calendar must be a table")
+    end
+
+    -- Only two week-start modes are supported in current backend contract.
+    validate_enum(calendar.week_start, {
+        sunday = true,
+        monday = true,
+    }, "calendar.week_start")
+
+    if type(calendar.highlights) ~= "table" then
+        fail("calendar.highlights must be a table")
+    end
+
+    -- All highlight keys are mandatory post-merge so frontends can avoid nil checks
+    -- in render hot paths.
+    local required_groups = {
+        "title",
+        "weekday",
+        "in_month_day",
+        "outside_month_day",
+        "today",
+    }
+
+    for _, key in ipairs(required_groups) do
+        if not is_non_empty_string(calendar.highlights[key]) then
+            fail("calendar.highlights." .. key .. " must be a non-empty string")
+        end
+    end
+end
+
 local function validate_journal(opts)
     if opts.journal == nil then
         return
@@ -149,6 +202,7 @@ local function validate_journal(opts)
 end
 
 function M.normalize(user_opts)
+    -- Merge user input over defaults so feature modules can rely on complete config.
     local opts = vim.tbl_deep_extend("force", {}, M.defaults, user_opts or {})
 
     if type(opts.vault_root) ~= "string" or opts.vault_root == "" then
@@ -180,7 +234,9 @@ function M.normalize(user_opts)
         info = true,
     }, "log_level")
 
+    -- Validate subsystem configs independently so error messages stay focused.
     validate_dataview(opts)
+    validate_calendar(opts)
     validate_journal(opts)
 
     return opts

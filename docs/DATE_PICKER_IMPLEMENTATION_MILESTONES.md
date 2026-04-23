@@ -194,6 +194,11 @@ Rules:
 - Implemented generic open-date-picker use case and composition wiring so other domains can consume it.
 - Added `:ObsidianCalendar` command with default visualizer mode and optional picker mode (`pick` / `picker`).
 - Fixed UI freeze in `:ObsidianCalendar` by replacing blocking `vim.wait(...)` loop with non-blocking event-driven close/selection callbacks.
+- Added calendar config schema under plugin config (`calendar.week_start`, `calendar.highlights.*`) and wired it through use-case and adapter.
+- Updated date-picker backend month matrix to support configurable week starts while staying pure and frontend-agnostic.
+- Switched default week start to Sunday and aligned weekday header rendering accordingly.
+- Fixed out-of-month visual artifact (`.0`, `.1`, `.3`) by rendering stable two-digit days and using highlight groups for visual differentiation.
+- Added initial calendar highlight application (title, weekday header, in-month days, outside-month days, today) as configurable frontend styling groundwork.
 
 ## Next Immediate Task
 

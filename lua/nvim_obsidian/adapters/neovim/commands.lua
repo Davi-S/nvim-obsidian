@@ -588,6 +588,13 @@ local function register_obsidian_calendar(ctx)
         --
         -- Keeping mode selection command-driven allows reviewers to validate both
         -- interaction contracts immediately while we still have only one UI variant.
+        -- Parse optional mode argument.
+        --
+        -- Supported forms:
+        -- - :ObsidianCalendar
+        -- - :ObsidianCalendar visualizer
+        -- - :ObsidianCalendar pick
+        -- - :ObsidianCalendar picker
         local raw_args = trim((cmd and cmd.args) or "")
         local mode = "visualizer"
         if raw_args == "pick" or raw_args == "picker" then
@@ -601,12 +608,16 @@ local function register_obsidian_calendar(ctx)
             ui_variant = "buffer",
             initial_date = os.date("*t"),
             on_finish = function(payload)
+                -- on_finish is invoked asynchronously by the calendar adapter when
+                -- user interaction ends. Keep this callback lightweight and side-effect
+                -- scoped to notifications.
                 if not (ctx.adapters and ctx.adapters.notifications) then
                     return
                 end
 
                 if mode == "picker" and type(payload) == "table" and payload.action == "selected" and type(payload.date) == "table" then
-                    local selected = string.format("%04d-%02d-%02d", payload.date.year, payload.date.month, payload.date.day)
+                    local selected = string.format("%04d-%02d-%02d", payload.date.year, payload.date.month,
+                    payload.date.day)
                     ctx.adapters.notifications.info({
                         command = "ObsidianCalendar",
                         message = "Selected date",
@@ -622,8 +633,9 @@ local function register_obsidian_calendar(ctx)
             return
         end
 
-        -- Non-blocking calendar opens and returns immediately. Final selection/close actions
-        -- are handled asynchronously by on_finish callback above.
+        -- Non-blocking flow:
+        -- command returns immediately after successful calendar open; final outcomes
+        -- are delivered through on_finish callback above.
     end, {
         desc = "Open interactive calendar (visualizer or picker)",
         nargs = "?",
