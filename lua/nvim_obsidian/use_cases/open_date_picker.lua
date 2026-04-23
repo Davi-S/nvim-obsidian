@@ -15,6 +15,7 @@ M.contract = {
         locale = "string|nil",
         marks = "table|nil",
         ui_variant = "buffer|nil",
+        on_finish = "function|nil",
     },
     output = {
         ok = "boolean",
@@ -108,6 +109,7 @@ function M.execute(ctx, input)
         initial_date = date_picker.normalize_date(input.initial_date),
         locale = type(input.locale) == "string" and input.locale or ((ctx.config and ctx.config.locale) or "en-US"),
         marks = type(input.marks) == "table" and input.marks or {},
+        on_finish = type(input.on_finish) == "function" and input.on_finish or nil,
     }
 
     local result = calendar_buffer.open_calendar(ctx, request)

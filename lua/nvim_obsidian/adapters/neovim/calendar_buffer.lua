@@ -29,8 +29,7 @@ local function is_nvim_ready()
         and type(vim) == "table"
         and type(vim.api) == "table"
         and type(vim.keymap) == "table"
-        and type(vim.keymap.set) == "function"
-        and type(vim.wait) == "function"
+    and type(vim.keymap.set) == "function"
 end
 
 local function normalize_mode(mode)
@@ -178,6 +177,13 @@ local function close_window(winid)
     end
 end
 
+local function safe_on_finish(handler, payload)
+    if type(handler) ~= "function" then
+        return
+    end
+    pcall(handler, payload)
+end
+
 function M.open_calendar(ctx, request)
     if not is_nvim_ready() then
         return {
@@ -201,6 +207,7 @@ function M.open_calendar(ctx, request)
     end
 
     local mode = normalize_mode(request and request.mode)
+    local on_finish = request and request.on_finish or nil
     local now = os.date("*t")
     local start_date = date_picker.normalize_date(request and request.initial_date or now)
 
@@ -221,7 +228,7 @@ function M.open_calendar(ctx, request)
         done = false,
         result = {
             ok = true,
-            action = "closed",
+            action = "opened",
             date = nil,
             cursor_date = nil,
             error = nil,
@@ -251,10 +258,23 @@ function M.open_calendar(ctx, request)
     end
 
     local function finish(action, selected_date)
+        if state.done then
+            return
+        end
         state.result.action = action
         state.result.date = selected_date and date_picker.normalize_date(selected_date) or nil
         state.result.cursor_date = date_picker.normalize_date(state.cursor_date)
         state.done = true
+
+        safe_on_finish(on_finish, {
+            ok = true,
+            action = state.result.action,
+            date = state.result.date,
+            cursor_date = state.result.cursor_date,
+            error = nil,
+        })
+
+        close_window(state.winid)
     end
 
     local function move_by_days(delta)
@@ -335,25 +355,36 @@ function M.open_calendar(ctx, request)
         finish("cancelled", nil)
     end, map_opts)
 
-    -- Wait loop keeps this API synchronous for callers while still allowing Neovim
-    -- to process key input and redraw events.
-    vim.wait(24 * 60 * 60 * 1000, function()
-        -- If user closed the window manually, treat as closed in visualizer mode and
-        -- cancelled in picker mode (because no explicit date selection happened).
-        if not state.done and (not state.winid or not vim.api.nvim_win_is_valid(state.winid)) then
-            if state.mode == "picker" then
-                state.result.action = "cancelled"
-            else
-                state.result.action = "closed"
-            end
-            state.result.cursor_date = date_picker.normalize_date(state.cursor_date)
-            state.done = true
-            return true
-        end
-        return state.done
-    end, 20)
+    -- If the user closes the buffer/window manually, finalize state without freezing the UI.
+    -- This replaces the previous blocking wait loop with event-driven completion.
+    if type(vim.api.nvim_create_autocmd) == "function" then
+        vim.api.nvim_create_autocmd({ "BufWipeout", "WinClosed" }, {
+            buffer = state.bufnr,
+            callback = function()
+                if state.done then
+                    return
+                end
 
-    close_window(state.winid)
+                if state.mode == "picker" then
+                    state.result.action = "cancelled"
+                else
+                    state.result.action = "closed"
+                end
+                state.result.date = nil
+                state.result.cursor_date = date_picker.normalize_date(state.cursor_date)
+                state.done = true
+
+                safe_on_finish(on_finish, {
+                    ok = true,
+                    action = state.result.action,
+                    date = nil,
+                    cursor_date = state.result.cursor_date,
+                    error = nil,
+                })
+            end,
+            once = true,
+        })
+    end
 
     return state.result
 end

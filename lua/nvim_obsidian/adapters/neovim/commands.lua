@@ -600,6 +600,21 @@ local function register_obsidian_calendar(ctx)
             mode = mode,
             ui_variant = "buffer",
             initial_date = os.date("*t"),
+            on_finish = function(payload)
+                if not (ctx.adapters and ctx.adapters.notifications) then
+                    return
+                end
+
+                if mode == "picker" and type(payload) == "table" and payload.action == "selected" and type(payload.date) == "table" then
+                    local selected = string.format("%04d-%02d-%02d", payload.date.year, payload.date.month, payload.date.day)
+                    ctx.adapters.notifications.info({
+                        command = "ObsidianCalendar",
+                        message = "Selected date",
+                        target = selected,
+                        next_step = "This payload is ready for journal or other consumers",
+                    })
+                end
+            end,
         })
 
         if not result.ok then
@@ -607,27 +622,8 @@ local function register_obsidian_calendar(ctx)
             return
         end
 
-        if not (ctx.adapters and ctx.adapters.notifications) then
-            return
-        end
-
-        if mode == "picker" and result.action == "selected" and type(result.date) == "table" then
-            local selected = string.format("%04d-%02d-%02d", result.date.year, result.date.month, result.date.day)
-            ctx.adapters.notifications.info({
-                command = "ObsidianCalendar",
-                message = "Selected date",
-                target = selected,
-                next_step = "This payload is ready for journal or other consumers",
-            })
-            return
-        end
-
-        if mode == "visualizer" then
-            ctx.adapters.notifications.info({
-                command = "ObsidianCalendar",
-                message = "Calendar closed",
-            })
-        end
+        -- Non-blocking calendar opens and returns immediately. Final selection/close actions
+        -- are handled asynchronously by on_finish callback above.
     end, {
         desc = "Open interactive calendar (visualizer or picker)",
         nargs = "?",

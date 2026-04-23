@@ -193,6 +193,7 @@ Rules:
 - Implemented M2 adapter MVP: normal-buffer interactive calendar with navigation keymaps and picker/visualizer modes.
 - Implemented generic open-date-picker use case and composition wiring so other domains can consume it.
 - Added `:ObsidianCalendar` command with default visualizer mode and optional picker mode (`pick` / `picker`).
+- Fixed UI freeze in `:ObsidianCalendar` by replacing blocking `vim.wait(...)` loop with non-blocking event-driven close/selection callbacks.
 
 ## Next Immediate Task
 
