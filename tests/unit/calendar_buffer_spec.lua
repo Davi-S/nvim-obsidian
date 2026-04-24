@@ -13,11 +13,15 @@ describe("calendar buffer adapter", function()
     local keymaps
     local cursor
     local last_lines
+    local close_called
+    local highlight_calls
 
     local function setup_vim_mocks()
         keymaps = {}
         cursor = { 4, 0 }
         last_lines = {}
+        close_called = false
+        highlight_calls = {}
 
         _G.vim = _G.vim or {}
 
@@ -31,7 +35,10 @@ describe("calendar buffer adapter", function()
             nvim_create_namespace = function()
                 return 1
             end,
-            nvim_buf_add_highlight = function()
+            nvim_buf_add_highlight = function(_bufnr, _ns, group, _line, _col_start, _col_end)
+                table.insert(highlight_calls, {
+                    group = group,
+                })
             end,
             nvim_buf_clear_namespace = function()
             end,
@@ -59,6 +66,7 @@ describe("calendar buffer adapter", function()
                 return true
             end,
             nvim_win_close = function()
+                close_called = true
             end,
         }
 
@@ -180,5 +188,37 @@ describe("calendar buffer adapter", function()
         keymaps["<LeftMouse>"]()
 
         assert.equals("March 2026", last_lines[2])
+    end)
+
+    it("closes calendar window before running on_finish callback", function()
+        local observed_close_state = nil
+
+        open_picker(function(_payload)
+            observed_close_state = close_called
+        end)
+
+        keymaps["<CR>"]()
+
+        assert.is_true(observed_close_state)
+    end)
+
+    it("highlights marked existing-note days with existing_note_day group", function()
+        calendar_buffer.open_calendar({ date_picker = date_picker }, {
+            mode = "picker",
+            initial_date = { year = 2026, month = 3, day = 15 },
+            marks = {
+                ["2026-03-15"] = true,
+            },
+        })
+
+        local found = false
+        for _, call in ipairs(highlight_calls) do
+            if call.group == "Bold" then
+                found = true
+                break
+            end
+        end
+
+        assert.is_true(found)
     end)
 end)

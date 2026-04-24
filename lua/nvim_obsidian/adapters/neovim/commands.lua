@@ -271,6 +271,57 @@ local function journal_token_for(ctx, kind, direction)
     return os.date("%Y-%m-%d", os.time())
 end
 
+local function basename_without_extension(path)
+    local normalized = tostring(path or ""):gsub("\\", "/")
+    local filename = normalized:match("([^/]+)$")
+    if type(filename) ~= "string" or filename == "" then
+        return nil
+    end
+    return filename:gsub("%.md$", "")
+end
+
+local function build_journal_calendar_marks(ctx)
+    local marks = {}
+    local vault_catalog = ctx and (ctx.vault_catalog or (ctx.domains and ctx.domains.vault_catalog))
+    local journal = ctx and (ctx.journal or (ctx.domains and ctx.domains.journal))
+
+    if type(vault_catalog) ~= "table" or type(vault_catalog.list_notes) ~= "function" then
+        return marks
+    end
+
+    local ok_notes, notes = pcall(vault_catalog.list_notes)
+    if not ok_notes or type(notes) ~= "table" then
+        return marks
+    end
+
+    for _, note in ipairs(notes) do
+        if type(note) == "table" then
+            local candidate = nil
+            if type(note.title) == "string" and note.title ~= "" then
+                candidate = note.title
+            else
+                candidate = basename_without_extension(note.path)
+            end
+
+            if type(candidate) == "string" and candidate ~= "" and type(journal) == "table" and type(journal.classify_input) == "function" then
+                local classified = journal.classify_input(candidate, os.time())
+                if type(classified) == "table" and classified.kind == "daily" then
+                    local parsed = parse_date_from_note_token(candidate, "daily")
+                    if type(parsed) == "table" then
+                        local token = string.format("%04d-%02d-%02d", parsed.year, parsed.month, parsed.day)
+                        marks[token] = {
+                            path = note.path,
+                            title = candidate,
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    return marks
+end
+
 get_current_buffer_path = function()
     if not vim or not vim.api or type(vim.api.nvim_buf_get_name) ~= "function" then
         return nil
@@ -657,12 +708,26 @@ local function register_obsidian_calendar(ctx)
     -- - UI variant
     -- - initial date seed
     -- - callback hookup
-    local function open_calendar(mode, command_name)
-        return ctx.use_cases.open_date_picker.execute(ctx, {
+    local function open_calendar(mode, command_name, extra_request)
+        local request = {
             mode = mode,
             ui_variant = "buffer",
             initial_date = os.date("*t"),
             on_finish = build_calendar_picker_on_finish(command_name),
+        }
+
+        if type(extra_request) == "table" then
+            for key, value in pairs(extra_request) do
+                request[key] = value
+            end
+        end
+
+        return ctx.use_cases.open_date_picker.execute(ctx, {
+            mode = request.mode,
+            ui_variant = request.ui_variant,
+            initial_date = request.initial_date,
+            on_finish = request.on_finish,
+            marks = request.marks,
         })
     end
 
@@ -725,7 +790,9 @@ local function register_obsidian_calendar(ctx)
             return
         end
 
-        local result = open_calendar("picker", "ObsidianJournalCalendar")
+        local result = open_calendar("picker", "ObsidianJournalCalendar", {
+            marks = build_journal_calendar_marks(ctx),
+        })
         if not result.ok then
             error_to_notification(ctx, result.error)
             return

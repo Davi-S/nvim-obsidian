@@ -45,6 +45,7 @@ M.defaults = {
             in_month_day = "Normal",
             outside_month_day = "Comment",
             today = "DiagnosticOk",
+            note_exists = "Bold",
         },
     },
 }
@@ -167,6 +168,7 @@ local function validate_calendar(opts)
         "in_month_day",
         "outside_month_day",
         "today",
+        "note_exists",
     }
 
     for _, key in ipairs(required_groups) do
@@ -204,6 +206,23 @@ end
 function M.normalize(user_opts)
     -- Merge user input over defaults so feature modules can rely on complete config.
     local opts = vim.tbl_deep_extend("force", {}, M.defaults, user_opts or {})
+
+    -- Keep calendar highlight defaults explicit even if callers provide only a
+    -- partial calendar table. This guards against shallow user config and makes
+    -- the rendered UI contract deterministic.
+    if type(opts.calendar) ~= "table" then
+        opts.calendar = {}
+    end
+    if type(opts.calendar.highlights) ~= "table" then
+        opts.calendar.highlights = {}
+    end
+
+    local default_calendar_highlights = M.defaults.calendar.highlights
+    for key, value in pairs(default_calendar_highlights) do
+        if type(opts.calendar.highlights[key]) ~= "string" or opts.calendar.highlights[key] == "" then
+            opts.calendar.highlights[key] = value
+        end
+    end
 
     if type(opts.vault_root) ~= "string" or opts.vault_root == "" then
         fail("vault_root is required and must be a non-empty string")

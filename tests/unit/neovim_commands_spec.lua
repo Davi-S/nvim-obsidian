@@ -664,6 +664,7 @@ describe("neovim command adapter", function()
             assert.equals("buffer", observed.ui_variant)
             assert.is_function(observed.on_finish)
         end)
+
     end)
 
     describe("error handling", function()

@@ -50,6 +50,7 @@ local function resolve_highlights(value)
         in_month_day = tostring(user.in_month_day or "Normal"),
         outside_month_day = tostring(user.outside_month_day or "Comment"),
         today = tostring(user.today or "DiagnosticOk"),
+        note_exists = tostring(user.note_exists or "Bold"),
     }
 end
 
@@ -190,6 +191,7 @@ local function apply_highlights(bufnr, state, payload)
 
     local highlights = state.highlights
     local today_token = state.today_token
+    local marks = type(state.marks) == "table" and state.marks or {}
     local matrix = payload.matrix
 
     -- Title line.
@@ -208,6 +210,9 @@ local function apply_highlights(bufnr, state, payload)
             local group = highlights.in_month_day
             if not cell.in_view_month then
                 group = highlights.outside_month_day
+            end
+            if marks[cell.token] then
+                group = highlights.note_exists
             end
             if cell.token == today_token then
                 group = highlights.today
@@ -431,6 +436,7 @@ function M.open_calendar(ctx, request)
     local mode = normalize_mode(request and request.mode)
     local week_start = resolve_week_start(request and request.week_start)
     local highlights = resolve_highlights(request and request.highlights)
+    local marks = type(request and request.marks) == "table" and request.marks or {}
     local on_finish = request and request.on_finish or nil
     local now = os.date("*t")
     local start_date = date_picker.normalize_date(request and request.initial_date or now)
@@ -444,6 +450,7 @@ function M.open_calendar(ctx, request)
         mode = mode,
         week_start = week_start,
         highlights = highlights,
+        marks = marks,
         today_token = date_picker.to_token(now),
         view_date = {
             year = start_date.year,
@@ -573,16 +580,30 @@ function M.open_calendar(ctx, request)
         state.result.selected_kind = selected_kind
         state.done = true
 
-        safe_on_finish(on_finish, {
+        -- Close the picker window before notifying consumers.
+        --
+        -- This matters for note-opening callbacks: the callback typically uses
+        -- :edit / open_path semantics, which should run after the calendar window
+        -- has been torn down so the newly opened note is not replaced or closed.
+        close_window(state.winid)
+
+        local payload = {
             ok = true,
             action = state.result.action,
             date = state.result.date,
             cursor_date = state.result.cursor_date,
             selected_kind = state.result.selected_kind,
             error = nil,
-        })
 
-        close_window(state.winid)
+        }
+
+        if type(vim.schedule) == "function" then
+            vim.schedule(function()
+                safe_on_finish(on_finish, payload)
+            end)
+        else
+            safe_on_finish(on_finish, payload)
+        end
     end
 
     local function move_by_days(delta)
