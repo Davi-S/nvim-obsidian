@@ -81,8 +81,7 @@ end
 -- We keep this in one function so future keymap changes only touch one place.
 local function build_help_line(mode)
     if mode == "picker" then
-        return
-        "Keys: h/j/k/l move | H/L month | J/K year | t today | <CR> select row | rows: title=year, month=month, weekdays=week, days=daily | q close"
+        return "Keys: h/j/k/l move | H/L month | J/K year | t today | <CR> select | q close"
     end
     return "Keys: h/j/k/l move | H/L month | J/K year | t today | <CR> close | q close"
 end
@@ -335,7 +334,7 @@ local function selection_kind_for_row(row)
     end
 
     if line == 1 then
-        return "yearly"
+        return nil
     end
 
     if line == 2 then
@@ -351,6 +350,29 @@ local function selection_kind_for_row(row)
     end
 
     return nil
+end
+
+-- Resolve picker selection kind using both row and column.
+--
+-- Month/year share the same visual line. The year can be selected by placing
+-- the cursor over its digits in that line.
+local function selection_kind_for_cursor(state, row, col)
+    local line = tonumber(row)
+    local column = tonumber(col) or 0
+    if not line then
+        return nil
+    end
+
+    if line == 2 then
+        local month_name = MONTH_NAMES[(state.view_date or {}).month] or "Month"
+        local year_start_col = #month_name + 1
+        if column >= year_start_col then
+            return "yearly"
+        end
+        return "monthly"
+    end
+
+    return selection_kind_for_row(line)
 end
 
 local function is_picker_header_row(row)
@@ -470,11 +492,6 @@ function M.open_calendar(ctx, request)
                 local parsed = parse_token(token)
                 if parsed then
                     state.cursor_date = date_picker.normalize_date(parsed)
-                    state.view_date = {
-                        year = state.cursor_date.year,
-                        month = state.cursor_date.month,
-                        day = 1,
-                    }
                 end
             end
         end
@@ -495,10 +512,40 @@ function M.open_calendar(ctx, request)
     end
 
     local function move_picker_col(delta)
-        if not state.cursor_row or state.cursor_row < 3 then
+        if not state.cursor_row or state.cursor_row < 2 then
             return
         end
 
+        if state.cursor_row == 2 then
+            -- Treat row 2 as two logical cells:
+            -- 1) month cell (left side)
+            -- 2) year cell (right side)
+            --
+            -- This matches the day-grid navigation model where one keypress
+            -- moves one logical unit, not individual characters.
+            local month_name = MONTH_NAMES[(state.view_date or {}).month] or "Month"
+            local year_start_col = #month_name + 1
+            local current_col = tonumber(state.cursor_col) or 0
+
+            if delta > 0 then
+                if current_col < year_start_col then
+                    state.cursor_col = year_start_col
+                else
+                    state.cursor_col = year_start_col
+                end
+            elseif delta < 0 then
+                if current_col >= year_start_col then
+                    state.cursor_col = 0
+                else
+                    state.cursor_col = 0
+                end
+            end
+
+            refresh_picker_from_cursor()
+            return
+        end
+
+        -- Week/day grid rows are visually chunked in 3-character cells.
         state.cursor_col = clamp((state.cursor_col or 0) + (delta * 3), 0, 18)
         refresh_picker_from_cursor()
     end
@@ -567,11 +614,6 @@ function M.open_calendar(ctx, request)
                 local parsed = parse_token(token)
                 if parsed then
                     state.cursor_date = date_picker.normalize_date(parsed)
-                    state.view_date = {
-                        year = state.cursor_date.year,
-                        month = state.cursor_date.month,
-                        day = 1,
-                    }
                 end
             end
         end
@@ -655,7 +697,7 @@ function M.open_calendar(ctx, request)
                 return
             end
 
-            local selected_kind = selection_kind_for_row(pos[1])
+            local selected_kind = selection_kind_for_cursor(state, pos[1], pos[2])
             if not selected_kind then
                 return
             end
