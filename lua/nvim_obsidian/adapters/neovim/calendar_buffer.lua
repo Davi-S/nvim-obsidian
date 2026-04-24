@@ -379,6 +379,16 @@ local function is_picker_header_row(row)
     return row == 1 or row == 2 or row == 3
 end
 
+-- Title row (line 1) is informational only and should never receive picker focus.
+-- Normalize row movement so all interactive navigation starts from line 2.
+local function normalize_picker_row(row)
+    local line = tonumber(row)
+    if not line then
+        return 2
+    end
+    return clamp(line, 2, 9)
+end
+
 -- Safe window closer helper used by finish paths.
 local function close_window(winid)
     if type(winid) == "number" and vim.api.nvim_win_is_valid(winid) then
@@ -500,7 +510,7 @@ function M.open_calendar(ctx, request)
     end
 
     local function move_picker_row(delta)
-        state.cursor_row = clamp((state.cursor_row or 4) + delta, 1, 9)
+        state.cursor_row = normalize_picker_row((state.cursor_row or 4) + delta)
 
         if is_picker_header_row(state.cursor_row) then
             state.cursor_col = 0
@@ -605,7 +615,8 @@ function M.open_calendar(ctx, request)
             return
         end
 
-        state.cursor_row = tonumber(pos[1]) or state.cursor_row
+        local new_row = tonumber(pos[1]) or state.cursor_row
+        state.cursor_row = normalize_picker_row(new_row)
         state.cursor_col = tonumber(pos[2]) or state.cursor_col
 
         if state.cursor_row and state.cursor_row >= 4 then
