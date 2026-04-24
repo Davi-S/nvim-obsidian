@@ -477,9 +477,13 @@ function M.open_calendar(ctx, request)
         namespace = nil,
     }
 
-    -- Open a dedicated normal window/buffer. This intentionally favors simplicity and
-    -- debuggability for MVP over advanced layout control.
-    vim.cmd("botright new")
+    -- Open a dedicated vertical split by default.
+    --
+    -- UX intent:
+    -- - Keep context visible in the original window.
+    -- - Let picker selection replace this calendar buffer in-place when the
+    --   callback opens a note via :edit/open_path.
+    vim.cmd("botright vsplit")
     state.winid = vim.api.nvim_get_current_win()
     state.bufnr = vim.api.nvim_get_current_buf()
 
@@ -580,13 +584,6 @@ function M.open_calendar(ctx, request)
         state.result.selected_kind = selected_kind
         state.done = true
 
-        -- Close the picker window before notifying consumers.
-        --
-        -- This matters for note-opening callbacks: the callback typically uses
-        -- :edit / open_path semantics, which should run after the calendar window
-        -- has been torn down so the newly opened note is not replaced or closed.
-        close_window(state.winid)
-
         local payload = {
             ok = true,
             action = state.result.action,
@@ -597,13 +594,27 @@ function M.open_calendar(ctx, request)
 
         }
 
-        if type(vim.schedule) == "function" then
-            vim.schedule(function()
-                safe_on_finish(on_finish, payload)
-            end)
-        else
+        if action == "selected" then
+            -- Selection path: run callback while calendar window is still active.
+            --
+            -- This allows consumers that call :edit/open_path to replace the
+            -- calendar buffer in the same split, which is the expected picker UX.
             safe_on_finish(on_finish, payload)
+
+            -- If callback did not replace this buffer, close the calendar window
+            -- to preserve prior picker semantics.
+            if type(vim.api.nvim_win_get_buf) == "function" and vim.api.nvim_win_is_valid(state.winid) then
+                local ok_buf, current_buf = pcall(vim.api.nvim_win_get_buf, state.winid)
+                if ok_buf and current_buf == state.bufnr then
+                    close_window(state.winid)
+                end
+            end
+            return
         end
+
+        -- Non-selection paths still close before callback notification.
+        close_window(state.winid)
+        safe_on_finish(on_finish, payload)
     end
 
     local function move_by_days(delta)

@@ -190,18 +190,6 @@ describe("calendar buffer adapter", function()
         assert.equals("March 2026", last_lines[2])
     end)
 
-    it("closes calendar window before running on_finish callback", function()
-        local observed_close_state = nil
-
-        open_picker(function(_payload)
-            observed_close_state = close_called
-        end)
-
-        keymaps["<CR>"]()
-
-        assert.is_true(observed_close_state)
-    end)
-
     it("highlights marked existing-note days with existing_note_day group", function()
         calendar_buffer.open_calendar({ date_picker = date_picker }, {
             mode = "picker",
