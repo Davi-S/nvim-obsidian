@@ -81,7 +81,8 @@ end
 -- We keep this in one function so future keymap changes only touch one place.
 local function build_help_line(mode)
     if mode == "picker" then
-        return "Keys: h/j/k/l move | H/L month | J/K year | t today | <CR> select | q close"
+        return
+        "Keys: h/j/k/l move | H/L month | J/K year | t today | <CR> select row | rows: title=year, month=month, weekdays=week, days=daily | q close"
     end
     return "Keys: h/j/k/l move | H/L month | J/K year | t today | <CR> close | q close"
 end
@@ -106,6 +107,16 @@ local function day_to_cursor(matrix, target_token)
 
     -- Fallback to first day cell if token is absent for any reason.
     return 4, 0
+end
+
+local function clamp(value, min_value, max_value)
+    if value < min_value then
+        return min_value
+    end
+    if value > max_value then
+        return max_value
+    end
+    return value
 end
 
 -- Build all buffer lines plus metadata needed for click/cursor translation.
@@ -232,11 +243,23 @@ local function render(date_picker, bufnr, state)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, payload.lines)
     vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
 
-    local token = date_picker.to_token(state.cursor_date)
-    local line, col = day_to_cursor(payload.matrix, token)
+    local line, col
+    if state.mode == "picker" and type(state.cursor_row) == "number" and type(state.cursor_col) == "number" then
+        line = state.cursor_row
+        col = state.cursor_col
+    else
+        local token = date_picker.to_token(state.cursor_date)
+        line, col = day_to_cursor(payload.matrix, token)
+    end
     pcall(vim.api.nvim_win_set_cursor, state.winid, { line, col })
 
     state.line_to_tokens = payload.line_to_tokens
+
+    if state.mode == "picker" and type(state.cursor_row) ~= "number" then
+        state.cursor_row = line
+        state.cursor_col = col
+    end
+
     apply_highlights(bufnr, state, payload)
 end
 
@@ -278,6 +301,60 @@ local function parse_token(token)
         month = tonumber(m),
         day = tonumber(d),
     }
+end
+
+local function token_from_position(state, row, col)
+    local tokens = state.line_to_tokens[row]
+    if type(tokens) ~= "table" then
+        return nil
+    end
+
+    local day_index = math.floor((tonumber(col) or 0) / 3) + 1
+    local token = tokens[day_index]
+    if type(token) ~= "string" then
+        return nil
+    end
+
+    return token
+end
+
+-- Map the current cursor row to a journal kind.
+--
+-- Selection model:
+-- - title row -> yearly
+-- - month label row -> monthly
+-- - weekday header row -> weekly
+-- - day grid rows -> daily
+--
+-- This keeps scope selection simple and avoids a separate mode selector while
+-- still supporting all journal note families from the same calendar view.
+local function selection_kind_for_row(row)
+    local line = tonumber(row)
+    if not line then
+        return nil
+    end
+
+    if line == 1 then
+        return "yearly"
+    end
+
+    if line == 2 then
+        return "monthly"
+    end
+
+    if line == 3 then
+        return "weekly"
+    end
+
+    if line >= 4 and line <= 9 then
+        return "daily"
+    end
+
+    return nil
+end
+
+local function is_picker_header_row(row)
+    return row == 1 or row == 2 or row == 3
 end
 
 -- Safe window closer helper used by finish paths.
@@ -352,6 +429,7 @@ function M.open_calendar(ctx, request)
             action = "opened",
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = nil,
         },
         winid = nil,
@@ -381,7 +459,51 @@ function M.open_calendar(ctx, request)
         render(date_picker, state.bufnr, state)
     end
 
-    local function finish(action, selected_date)
+    local function refresh_picker_from_cursor()
+        if type(state.cursor_row) ~= "number" then
+            return
+        end
+
+        if state.cursor_row >= 4 then
+            local token = token_from_position(state, state.cursor_row, state.cursor_col or 0)
+            if token then
+                local parsed = parse_token(token)
+                if parsed then
+                    state.cursor_date = date_picker.normalize_date(parsed)
+                    state.view_date = {
+                        year = state.cursor_date.year,
+                        month = state.cursor_date.month,
+                        day = 1,
+                    }
+                end
+            end
+        end
+
+        render(date_picker, state.bufnr, state)
+    end
+
+    local function move_picker_row(delta)
+        state.cursor_row = clamp((state.cursor_row or 4) + delta, 1, 9)
+
+        if is_picker_header_row(state.cursor_row) then
+            state.cursor_col = 0
+        else
+            state.cursor_col = clamp(state.cursor_col or 0, 0, 18)
+        end
+
+        refresh_picker_from_cursor()
+    end
+
+    local function move_picker_col(delta)
+        if not state.cursor_row or state.cursor_row < 3 then
+            return
+        end
+
+        state.cursor_col = clamp((state.cursor_col or 0) + (delta * 3), 0, 18)
+        refresh_picker_from_cursor()
+    end
+
+    local function finish(action, selected_date, selected_kind)
         if state.done then
             return
         end
@@ -391,6 +513,7 @@ function M.open_calendar(ctx, request)
         state.result.action = action
         state.result.date = selected_date and date_picker.normalize_date(selected_date) or nil
         state.result.cursor_date = date_picker.normalize_date(state.cursor_date)
+        state.result.selected_kind = selected_kind
         state.done = true
 
         safe_on_finish(on_finish, {
@@ -398,6 +521,7 @@ function M.open_calendar(ctx, request)
             action = state.result.action,
             date = state.result.date,
             cursor_date = state.result.cursor_date,
+            selected_kind = state.result.selected_kind,
             error = nil,
         })
 
@@ -428,44 +552,93 @@ function M.open_calendar(ctx, request)
     local function sync_cursor_from_window()
         -- Mouse navigation path:
         -- 1) read cursor cell
-        -- 2) map to token
-        -- 3) parse token into date
-        -- 4) redraw consistent month/cursor state
-        local token = token_from_cursor(date_picker, state)
-        if not token then
+        -- 2) capture row/col and update date only for day-grid rows
+        local ok, pos = pcall(vim.api.nvim_win_get_cursor, state.winid)
+        if not ok or type(pos) ~= "table" then
             return
         end
 
-        local parsed = parse_token(token)
-        if not parsed then
-            return
+        state.cursor_row = tonumber(pos[1]) or state.cursor_row
+        state.cursor_col = tonumber(pos[2]) or state.cursor_col
+
+        if state.cursor_row and state.cursor_row >= 4 then
+            local token = token_from_position(state, state.cursor_row, state.cursor_col or 0)
+            if token then
+                local parsed = parse_token(token)
+                if parsed then
+                    state.cursor_date = date_picker.normalize_date(parsed)
+                    state.view_date = {
+                        year = state.cursor_date.year,
+                        month = state.cursor_date.month,
+                        day = 1,
+                    }
+                end
+            end
         end
 
-        state.cursor_date = date_picker.normalize_date(parsed)
-        -- Keep the visible month aligned with the selected day when mouse navigation
-        -- crosses month boundaries.
-        state.view_date = {
-            year = state.cursor_date.year,
-            month = state.cursor_date.month,
-            day = 1,
-        }
         render(date_picker, state.bufnr, state)
     end
 
     -- Buffer-local mappings keep calendar controls isolated from user global maps.
     local map_opts = { buffer = state.bufnr, silent = true, nowait = true }
 
-    vim.keymap.set("n", "h", function() move_by_days(-1) end, map_opts)
-    vim.keymap.set("n", "l", function() move_by_days(1) end, map_opts)
-    vim.keymap.set("n", "j", function() move_by_days(7) end, map_opts)
-    vim.keymap.set("n", "k", function() move_by_days(-7) end, map_opts)
+    vim.keymap.set("n", "h", function()
+        if state.mode == "picker" then
+            move_picker_col(-1)
+            return
+        end
+        move_by_days(-1)
+    end, map_opts)
+
+    vim.keymap.set("n", "l", function()
+        if state.mode == "picker" then
+            move_picker_col(1)
+            return
+        end
+        move_by_days(1)
+    end, map_opts)
+
+    vim.keymap.set("n", "j", function()
+        if state.mode == "picker" then
+            move_picker_row(1)
+            return
+        end
+        move_by_days(7)
+    end, map_opts)
+
+    vim.keymap.set("n", "k", function()
+        if state.mode == "picker" then
+            move_picker_row(-1)
+            return
+        end
+        move_by_days(-7)
+    end, map_opts)
 
     vim.keymap.set("n", "H", function() move_by_months(-1) end, map_opts)
     vim.keymap.set("n", "L", function() move_by_months(1) end, map_opts)
     vim.keymap.set("n", "J", function() move_by_years(-1) end, map_opts)
     vim.keymap.set("n", "K", function() move_by_years(1) end, map_opts)
 
-    vim.keymap.set("n", "t", function() move_to_today() end, map_opts)
+    vim.keymap.set("n", "t", function()
+        if state.mode == "picker" then
+            local today = os.date("*t")
+            state.cursor_date = {
+                year = today.year,
+                month = today.month,
+                day = today.day,
+            }
+            state.view_date = {
+                year = today.year,
+                month = today.month,
+                day = 1,
+            }
+            state.cursor_row = nil
+            state.cursor_col = nil
+            render(date_picker, state.bufnr, state)
+            return
+        end
+        move_to_today()
+    end, map_opts)
 
     vim.keymap.set("n", "<LeftMouse>", function()
         vim.cmd("normal! <LeftMouse>")
@@ -474,18 +647,31 @@ function M.open_calendar(ctx, request)
 
     vim.keymap.set("n", "<CR>", function()
         if state.mode == "picker" then
-            finish("selected", state.cursor_date)
+            -- The cursor row determines the journal kind. Cursor position inside
+            -- the day grid selects daily notes; title/month/week rows select the
+            -- broader journal families.
+            local ok_row, pos = pcall(vim.api.nvim_win_get_cursor, state.winid)
+            if not ok_row or type(pos) ~= "table" then
+                return
+            end
+
+            local selected_kind = selection_kind_for_row(pos[1])
+            if not selected_kind then
+                return
+            end
+
+            finish("selected", state.cursor_date, selected_kind)
             return
         end
-        finish("closed", nil)
+        finish("closed", nil, nil)
     end, map_opts)
 
     vim.keymap.set("n", "q", function()
-        finish("cancelled", nil)
+        finish("cancelled", nil, nil)
     end, map_opts)
 
     vim.keymap.set("n", "<Esc>", function()
-        finish("cancelled", nil)
+        finish("cancelled", nil, nil)
     end, map_opts)
 
     -- If the user closes the buffer/window manually, finalize state without freezing the UI.
@@ -505,6 +691,7 @@ function M.open_calendar(ctx, request)
                 end
                 state.result.date = nil
                 state.result.cursor_date = date_picker.normalize_date(state.cursor_date)
+                state.result.selected_kind = nil
                 state.done = true
 
                 safe_on_finish(on_finish, {
@@ -512,6 +699,7 @@ function M.open_calendar(ctx, request)
                     action = state.result.action,
                     date = nil,
                     cursor_date = state.result.cursor_date,
+                    selected_kind = nil,
                     error = nil,
                 })
             end,

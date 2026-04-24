@@ -31,6 +31,7 @@ M.contract = {
         action = "selected|closed|cancelled|nil",
         date = "table|nil",
         cursor_date = "table|nil",
+        selected_kind = "daily|weekly|monthly|yearly|nil",
         error = "domain_error|nil",
     },
 }
@@ -56,6 +57,7 @@ function M.execute(ctx, input)
             action = nil,
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "ctx must be a table"),
         }
     end
@@ -66,6 +68,7 @@ function M.execute(ctx, input)
             action = nil,
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "input must be a table"),
         }
     end
@@ -77,6 +80,7 @@ function M.execute(ctx, input)
             action = nil,
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "mode must be visualizer or picker"),
         }
     end
@@ -91,6 +95,7 @@ function M.execute(ctx, input)
             action = nil,
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "ui_variant must be buffer for MVP"),
         }
     end
@@ -102,6 +107,7 @@ function M.execute(ctx, input)
             action = nil,
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "ctx.date_picker.normalize_date is required"),
         }
     end
@@ -117,6 +123,7 @@ function M.execute(ctx, input)
             action = nil,
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "ctx.adapters.calendar_buffer.open_calendar is required"),
         }
     end
@@ -144,6 +151,7 @@ function M.execute(ctx, input)
             action = nil,
             date = nil,
             cursor_date = nil,
+            selected_kind = nil,
             error = errors.new(errors.codes.INTERNAL, "calendar adapter returned invalid response"),
         }
     end
@@ -155,6 +163,7 @@ function M.execute(ctx, input)
         action = result.action,
         date = result.date,
         cursor_date = result.cursor_date,
+        selected_kind = result.selected_kind,
         error = result.error,
     }
 end

@@ -611,18 +611,62 @@ local function register_obsidian_calendar(ctx)
                 -- on_finish is invoked asynchronously by the calendar adapter when
                 -- user interaction ends. Keep this callback lightweight and side-effect
                 -- scoped to notifications.
-                if not (ctx.adapters and ctx.adapters.notifications) then
+                if type(payload) ~= "table" or payload.action ~= "selected" then
                     return
                 end
 
-                if mode == "picker" and type(payload) == "table" and payload.action == "selected" and type(payload.date) == "table" then
-                    local selected = string.format("%04d-%02d-%02d", payload.date.year, payload.date.month,
-                    payload.date.day)
+                local selected_kind = tostring(payload.selected_kind or "")
+                if selected_kind ~= "daily" and selected_kind ~= "weekly" and selected_kind ~= "monthly" and selected_kind ~= "yearly" then
+                    return
+                end
+
+                local target_date = payload.date or payload.cursor_date
+                if type(target_date) ~= "table" then
+                    return
+                end
+
+                if not ctx.use_cases.ensure_open_note or type(ctx.use_cases.ensure_open_note.execute) ~= "function" then
+                    return
+                end
+
+                local journal_title = nil
+                if type(ctx.resolve_journal_title) == "function" then
+                    local resolved = ctx.resolve_journal_title(selected_kind, target_date)
+                    if type(resolved) == "string" and resolved ~= "" then
+                        journal_title = resolved
+                    end
+                end
+
+                if not journal_title and type(ctx.journal) == "table" and type(ctx.journal.build_title) == "function" then
+                    local built = ctx.journal.build_title(selected_kind, target_date, (ctx.config or {}).locale)
+                    if type(built) == "table" and type(built.title) == "string" and built.title ~= "" then
+                        journal_title = built.title
+                    end
+                end
+
+                if type(journal_title) ~= "string" or journal_title == "" then
+                    return
+                end
+
+                local open_result = ctx.use_cases.ensure_open_note.execute(ctx, {
+                    title_or_token = journal_title,
+                    create_if_missing = true,
+                    origin = "journal",
+                    journal_kind = selected_kind,
+                    now = os.time(),
+                })
+
+                if not open_result.ok and ctx.adapters and ctx.adapters.notifications then
+                    error_to_notification(ctx, open_result.error)
+                    return
+                end
+
+                if ctx.adapters and ctx.adapters.notifications then
                     ctx.adapters.notifications.info({
                         command = "ObsidianCalendar",
-                        message = "Selected date",
-                        target = selected,
-                        next_step = "This payload is ready for journal or other consumers",
+                        message = "Journal note opened",
+                        target = journal_title,
+                        next_step = "Use the calendar again to create another journal note family",
                     })
                 end
             end,

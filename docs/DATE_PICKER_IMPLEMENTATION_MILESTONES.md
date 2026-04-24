@@ -199,6 +199,7 @@ Rules:
 - Switched default week start to Sunday and aligned weekday header rendering accordingly.
 - Fixed out-of-month visual artifact (`.0`, `.1`, `.3`) by rendering stable two-digit days and using highlight groups for visual differentiation.
 - Added initial calendar highlight application (title, weekday header, in-month days, outside-month days, today) as configurable frontend styling groundwork.
+- Extended calendar picker selection so Enter can create daily, weekly, monthly, or yearly journal notes based on cursor row.
 
 ## Next Immediate Task
 
