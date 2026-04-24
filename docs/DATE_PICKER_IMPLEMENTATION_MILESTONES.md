@@ -1,8 +1,8 @@
 # Date Picker Implementation Milestones
 
-Status: MVP in progress (M1 and M2 implemented, M3 partial)
+Status: MVP in progress (M1, M2, and M3 implemented; M4 in progress)
 Owner: nvim-obsidian maintainers
-Last Updated: 2026-04-23
+Last Updated: 2026-04-24
 
 ## Goal
 
@@ -138,12 +138,13 @@ Exit criteria:
 ### M3 - Journal Consumer Command
 
 Scope:
-- Add one journal command that invokes date picker and then open/create daily note
+- Add one journal command that invokes date picker and then open/create journal note
 - Reuse existing ensure_open_note flow
 - Keep visualizer command independent from journal behavior
+- Support daily/weekly/monthly/yearly selection from picker UI
 
 Exit criteria:
-- Selecting a date opens or creates correct daily note in configured subdir
+- Selecting a date opens or creates correct journal note in configured subdir
 - Existing journal commands remain unchanged and passing
 
 ### M4 - Hardening and Expandability
@@ -200,7 +201,14 @@ Rules:
 - Fixed out-of-month visual artifact (`.0`, `.1`, `.3`) by rendering stable two-digit days and using highlight groups for visual differentiation.
 - Added initial calendar highlight application (title, weekday header, in-month days, outside-month days, today) as configurable frontend styling groundwork.
 - Extended calendar picker selection so Enter can create daily, weekly, monthly, or yearly journal notes based on cursor row.
+- Wired `:ObsidianCalendar pick` selection callback into `ensure_open_note` so chosen journal family opens/creates directly.
+- Prevented picker hover from auto-switching month when cursor lands on out-of-month day cells.
+- Changed row-2 horizontal movement to two logical cells (month and year), so one keypress jumps between them.
+- Made title line non-focusable in picker interaction (line 1 is informational only).
+- Confirmed UX direction that calendar is a secondary power flow alongside directional journal commands.
+- Added `:ObsidianJournalCalendar` as a dedicated picker-first journal command while keeping `:ObsidianCalendar` generic.
+- Refactored calendar picker completion logic in command adapter into shared helpers to keep multi-command behavior aligned.
 
 ## Next Immediate Task
 
-Finish M3 by connecting picker selection to journal open/create flow in a dedicated consumer command.
+Continue M4 hardening with command-level integration tests for `:ObsidianJournalCalendar` selection outcomes and complete UX polish pass.

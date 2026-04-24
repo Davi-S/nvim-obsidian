@@ -149,6 +149,8 @@ Clarification on wikilink resolution and ambiguity:
 - [ ] :ObsidianToday
 - [ ] :ObsidianNext
 - [ ] :ObsidianPrev
+- [ ] :ObsidianCalendar [visualizer|pick]
+- [ ] :ObsidianJournalCalendar
 - [ ] :ObsidianFollow
 - [ ] :ObsidianBacklinks
 - [ ] :ObsidianSearch

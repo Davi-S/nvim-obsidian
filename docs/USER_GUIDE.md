@@ -109,7 +109,35 @@ Try these commands in a Markdown file within your vault:
 :ObsidianSearch        " Full-text search vault
 :ObsidianFollow        " Follow link under cursor
 :ObsidianReindex       " Refresh vault cache
+:ObsidianCalendar      " Open calendar visualizer
+:ObsidianCalendar pick " Open calendar picker (journal target selection)
+:ObsidianJournalCalendar " Open secondary picker-first journal calendar flow
 ```
+
+### Calendar Picker Controls
+
+Use `:ObsidianCalendar pick` to select a journal family and target date from one view.
+
+Navigation:
+- `h` / `l`: move horizontally
+- `j` / `k`: move vertically
+- `H` / `L`: previous/next month
+- `J` / `K`: previous/next year
+- `t`: jump to today
+- `<CR>`: confirm selection
+- `q` or `<Esc>`: cancel
+
+Selection model:
+- Row 2 (month/year line):
+  - month cell -> monthly note
+  - year cell -> yearly note
+- Row 3 (weekday header): weekly note
+- Rows 4-9 (day grid): daily note
+
+Interaction notes:
+- Title row is informational and cannot receive picker focus.
+- Hovering over out-of-month day cells does not auto-switch the visible month.
+- Month changes only happen through month/year navigation keys.
 
 ---
 

@@ -633,6 +633,39 @@ describe("neovim command adapter", function()
         end)
     end)
 
+    describe(":ObsidianJournalCalendar", function()
+        it("registers secondary journal calendar command", function()
+            local container = base_container()
+            commands.register(container)
+
+            assert.is_function(command_registry["ObsidianJournalCalendar"])
+        end)
+
+        it("opens date picker in picker mode", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            assert.is_function(command_registry["ObsidianJournalCalendar"])
+
+            command_registry["ObsidianJournalCalendar"]()
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("buffer", observed.ui_variant)
+            assert.is_function(observed.on_finish)
+        end)
+    end)
+
     describe("error handling", function()
         it("should normalize domain errors to notifications", function()
             local notifications = {}

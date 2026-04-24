@@ -58,6 +58,20 @@ Purpose: Open or create previous journal note in current context.
 
 Behavior mirrors :ObsidianNext with previous target calculation.
 
+### :ObsidianJournalCalendar
+Purpose: Secondary power-flow command for broad journal access/creation via calendar picker.
+
+Behavior:
+1. Open calendar directly in picker mode.
+2. Allow selecting journal family and temporal target from one interaction surface.
+3. Resolve selected family/date into journal title using existing journal title policy.
+4. Ensure note exists (create when missing) and open it.
+
+Notes:
+- This command is intentionally secondary and does not replace directional commands
+   like `:ObsidianToday`, `:ObsidianNext`, and `:ObsidianPrev`.
+- `:ObsidianCalendar` remains the generic visualizer/picker entrypoint.
+
 ### :ObsidianFollow
 Purpose: Follow wikilink under cursor.
 
