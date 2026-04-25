@@ -14,8 +14,10 @@ This repository contains:
 - Backlinks lookup for the current note.
 - Vault indexing and manual reindex command.
 - Journal note workflows (today, next, previous).
+- Calendar visualizer and picker workflows, including journal calendar layouts.
 - Template insertion with custom placeholders.
 - Dataview block rendering (manual and event-driven).
+- Shell-command delete sync to keep index consistent after external file removal.
 
 ## Repository Layout
 
@@ -63,7 +65,20 @@ After setup, run:
 - `:ObsidianSearch`
 - `:ObsidianBacklinks`
 - `:ObsidianReindex`
+- `:ObsidianCalendar`
+- `:ObsidianCalendar pick`
+- `:ObsidianJournalCalendar`
+- `:ObsidianJournalCalendarVSplit`
+- `:ObsidianJournalCalendarHSplit`
 - `:ObsidianHealth`
+
+Journal calendar layout behavior:
+- `:ObsidianJournalCalendar` opens the picker in the current buffer.
+- `:ObsidianJournalCalendarVSplit` opens in a vertical split.
+- `:ObsidianJournalCalendarHSplit` opens in a horizontal split.
+
+Calendar indicators are configurable via `calendar.highlights` in setup config
+(`today`, `outside_month_day`, `note_exists`, and related groups).
 
 For full command semantics and API details, see `docs/NVIM_PLUGIN.md`.
 

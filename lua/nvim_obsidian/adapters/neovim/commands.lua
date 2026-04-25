@@ -726,6 +726,7 @@ local function register_obsidian_calendar(ctx)
             mode = request.mode,
             ui_variant = request.ui_variant,
             initial_date = request.initial_date,
+            layout = request.layout,
             on_finish = request.on_finish,
             marks = request.marks,
         })
@@ -791,6 +792,7 @@ local function register_obsidian_calendar(ctx)
         end
 
         local result = open_calendar("picker", "ObsidianJournalCalendar", {
+            layout = "current",
             marks = build_journal_calendar_marks(ctx),
         })
         if not result.ok then
@@ -798,8 +800,115 @@ local function register_obsidian_calendar(ctx)
             return
         end
     end, {
-        desc = "Open journal calendar picker (secondary power flow)",
+        desc = "Open journal calendar picker in current buffer",
         nargs = 0,
+    })
+
+    create_user_command("ObsidianJournalCalendarVSplit", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianJournalCalendarVSplit", {
+            layout = "vsplit",
+            marks = build_journal_calendar_marks(ctx),
+        })
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open journal calendar picker in vertical split",
+        nargs = 0,
+    })
+
+    create_user_command("ObsidianJournalCalendarHSplit", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianJournalCalendarHSplit", {
+            layout = "hsplit",
+            marks = build_journal_calendar_marks(ctx),
+        })
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open journal calendar picker in horizontal split",
+        nargs = 0,
+    })
+end
+
+local function register_shell_delete_sync(ctx)
+    if not vim or not vim.api or type(vim.api.nvim_create_autocmd) ~= "function" then
+        return
+    end
+    if not ctx or not ctx.use_cases or not ctx.use_cases.reindex_sync or type(ctx.use_cases.reindex_sync.execute) ~= "function" then
+        return
+    end
+
+    local function file_exists(path)
+        if type(path) ~= "string" or path == "" then
+            return false
+        end
+
+        local uv = vim.uv or vim.loop
+        if type(uv) == "table" and type(uv.fs_stat) == "function" then
+            local ok, stat = pcall(uv.fs_stat, path)
+            if ok then
+                return stat ~= nil
+            end
+        end
+
+        local handle = io.open(path, "r")
+        if handle then
+            handle:close()
+            return true
+        end
+
+        return false
+    end
+
+    local group = nil
+    if type(vim.api.nvim_create_augroup) == "function" then
+        group = vim.api.nvim_create_augroup("NvimObsidianShellDeleteSync", { clear = true })
+    end
+
+    vim.api.nvim_create_autocmd("ShellCmdPost", {
+        group = group,
+        callback = function()
+            local path = get_current_buffer_path()
+            if type(path) ~= "string" or path == "" then
+                return
+            end
+            if not path:match("%.md$") then
+                return
+            end
+            if file_exists(path) then
+                return
+            end
+
+            local result = ctx.use_cases.reindex_sync.execute(ctx, {
+                mode = "event",
+                event = {
+                    kind = "delete",
+                    path = path,
+                },
+            })
+
+            if type(result) ~= "table" or result.ok ~= true then
+                local notifications = ctx.adapters and ctx.adapters.notifications
+                if notifications and type(notifications.warn) == "function" then
+                    local message = "shell delete sync failed"
+                    if type(result) == "table" and type(result.error) == "table" and type(result.error.message) == "string" then
+                        message = result.error.message
+                    end
+                    notifications.warn("Shell delete sync failed: " .. message)
+                end
+            end
+        end,
     })
 end
 
@@ -1074,6 +1183,7 @@ function M.register(container)
     register_obsidian_calendar(container)
     register_obsidian_render_dataview(container)
     register_dataview_autocmds(container)
+    register_shell_delete_sync(container)
     register_obsidian_health(container)
 end
 

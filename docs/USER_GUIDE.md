@@ -111,7 +111,9 @@ Try these commands in a Markdown file within your vault:
 :ObsidianReindex       " Refresh vault cache
 :ObsidianCalendar      " Open calendar visualizer
 :ObsidianCalendar pick " Open calendar picker (journal target selection)
-:ObsidianJournalCalendar " Open secondary picker-first journal calendar flow
+:ObsidianJournalCalendar        " Open journal picker in current buffer
+:ObsidianJournalCalendarVSplit  " Open journal picker in vertical split
+:ObsidianJournalCalendarHSplit  " Open journal picker in horizontal split
 ```
 
 ### Calendar Picker Controls
@@ -138,6 +140,33 @@ Interaction notes:
 - Title row is informational and cannot receive picker focus.
 - Hovering over out-of-month day cells does not auto-switch the visible month.
 - Month changes only happen through month/year navigation keys.
+
+Journal calendar layout notes:
+- `:ObsidianJournalCalendar` is current-buffer-first and replaces the active buffer with the calendar.
+- `:ObsidianJournalCalendarVSplit` and `:ObsidianJournalCalendarHSplit` keep your existing buffer visible and open the picker in a split.
+
+### Calendar Indicator Styling
+
+Calendar visual indicators are fully configurable through highlight-group names:
+
+```lua
+require("nvim_obsidian").setup({
+  vault_root = vim.fn.expand("~/ObsidianVault"),
+  calendar = {
+    week_start = "sunday", -- or "monday"
+    highlights = {
+      title = "Title",
+      weekday = "Comment",
+      in_month_day = "Normal",
+      outside_month_day = "Comment",
+      today = "DiagnosticOk",
+      note_exists = "Bold", -- day has an existing daily note
+    },
+  },
+})
+```
+
+These groups control day styling for today, out-of-month cells, and existing-note days without changing picker behavior.
 
 ---
 
@@ -760,8 +789,9 @@ Expected times:
 2. **Configure:** Set up journal, dataview, and custom templates for your workflow
 3. **Keybind:** Map commands to your preferred key combinations
 4. **Explore:** Run `:help nvim-obsidian` for built-in documentation
+5. **Calendar roadmap:** Floating-window calendar UI and optional confirmation-before-create in picker mode are planned next
 
 ---
 
-**Last Updated:** March 28, 2026  
+**Last Updated:** April 25, 2026  
 **For Issues:** Report bugs on [GitHub Issues](https://github.com/Davi-S/nvim-obsidian/issues)

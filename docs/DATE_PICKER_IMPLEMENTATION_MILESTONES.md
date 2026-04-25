@@ -2,7 +2,7 @@
 
 Status: MVP in progress (M1, M2, and M3 implemented; M4 in progress)
 Owner: nvim-obsidian maintainers
-Last Updated: 2026-04-24
+Last Updated: 2026-04-25
 
 ## Goal
 
@@ -208,7 +208,15 @@ Rules:
 - Confirmed UX direction that calendar is a secondary power flow alongside directional journal commands.
 - Added `:ObsidianJournalCalendar` as a dedicated picker-first journal command while keeping `:ObsidianCalendar` generic.
 - Refactored calendar picker completion logic in command adapter into shared helpers to keep multi-command behavior aligned.
+- Changed `:ObsidianJournalCalendar` default layout to current-buffer mode for direct replace/open workflows.
+- Added split-layout command variants: `:ObsidianJournalCalendarVSplit` and `:ObsidianJournalCalendarHSplit`.
+- Extended date-picker request contract with layout selection (`current`, `vsplit`, `hsplit`).
+- Hardened split rendering to always use a dedicated calendar buffer so the source buffer is not overwritten in both windows.
+- Added shell-command delete sync (`ShellCmdPost`) to reconcile index deletes after external removal flows like `:!rm "%"`.
 
 ## Next Immediate Task
 
-Continue M4 hardening with command-level integration tests for `:ObsidianJournalCalendar` selection outcomes and complete UX polish pass.
+Continue M4 hardening with:
+
+1. Floating-window calendar frontend (new UI adapter variant)
+2. Optional confirmation prompt before creating notes from calendar picker selections

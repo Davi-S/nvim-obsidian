@@ -22,6 +22,7 @@ M.contract = {
         initial_date = "table|nil",
         locale = "string|nil",
         marks = "table|nil",
+        layout = "current|vsplit|hsplit|nil",
         ui_variant = "buffer|nil",
         on_finish = "function|nil",
         week_start = "sunday|monday|nil",
@@ -43,6 +44,14 @@ M.contract = {
 local function resolve_mode(mode)
     local value = tostring(mode or "visualizer")
     if value == "visualizer" or value == "picker" then
+        return value
+    end
+    return nil
+end
+
+local function resolve_layout(layout)
+    local value = tostring(layout or "vsplit")
+    if value == "current" or value == "vsplit" or value == "hsplit" then
         return value
     end
     return nil
@@ -82,6 +91,18 @@ function M.execute(ctx, input)
             cursor_date = nil,
             selected_kind = nil,
             error = errors.new(errors.codes.INVALID_INPUT, "mode must be visualizer or picker"),
+        }
+    end
+
+    local layout = resolve_layout(input.layout)
+    if not layout then
+        return {
+            ok = false,
+            action = nil,
+            date = nil,
+            cursor_date = nil,
+            selected_kind = nil,
+            error = errors.new(errors.codes.INVALID_INPUT, "layout must be current, vsplit, or hsplit"),
         }
     end
 
@@ -136,9 +157,10 @@ function M.execute(ctx, input)
         initial_date = date_picker.normalize_date(input.initial_date),
         locale = type(input.locale) == "string" and input.locale or ((ctx.config and ctx.config.locale) or "en-US"),
         marks = type(input.marks) == "table" and input.marks or {},
+        layout = layout,
         on_finish = type(input.on_finish) == "function" and input.on_finish or nil,
         week_start = input.week_start or
-        ((ctx.config and ctx.config.calendar and ctx.config.calendar.week_start) or "sunday"),
+            ((ctx.config and ctx.config.calendar and ctx.config.calendar.week_start) or "sunday"),
         highlights = (ctx.config and ctx.config.calendar and ctx.config.calendar.highlights) or {},
     }
 

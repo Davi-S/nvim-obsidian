@@ -33,6 +33,38 @@ describe("app config schema", function()
         assert.equals("below_block", opts.dataview.placement)
         assert.equals(true, opts.dataview.messages.task_no_results.enabled)
         assert.equals("Dataview: No results to show for task query.", opts.dataview.messages.task_no_results.text)
+        assert.equals("sunday", opts.calendar.week_start)
+        assert.equals("Title", opts.calendar.highlights.title)
+        assert.equals("Comment", opts.calendar.highlights.weekday)
+        assert.equals("Normal", opts.calendar.highlights.in_month_day)
+        assert.equals("Comment", opts.calendar.highlights.outside_month_day)
+        assert.equals("DiagnosticOk", opts.calendar.highlights.today)
+        assert.equals("Bold", opts.calendar.highlights.note_exists)
+    end)
+
+    it("accepts custom calendar highlight groups for day indicators", function()
+        local opts = config.normalize({
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                week_start = "monday",
+                highlights = {
+                    title = "MyCalendarTitle",
+                    weekday = "MyCalendarWeekday",
+                    in_month_day = "MyCalendarDay",
+                    outside_month_day = "MyCalendarOutsideDay",
+                    today = "MyCalendarToday",
+                    note_exists = "MyCalendarHasNote",
+                },
+            },
+        })
+
+        assert.equals("monday", opts.calendar.week_start)
+        assert.equals("MyCalendarTitle", opts.calendar.highlights.title)
+        assert.equals("MyCalendarWeekday", opts.calendar.highlights.weekday)
+        assert.equals("MyCalendarDay", opts.calendar.highlights.in_month_day)
+        assert.equals("MyCalendarOutsideDay", opts.calendar.highlights.outside_month_day)
+        assert.equals("MyCalendarToday", opts.calendar.highlights.today)
+        assert.equals("MyCalendarHasNote", opts.calendar.highlights.note_exists)
     end)
 
     it("does not mutate caller input tables", function()

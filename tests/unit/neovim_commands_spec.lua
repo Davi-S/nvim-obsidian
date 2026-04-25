@@ -80,6 +80,8 @@ describe("neovim command adapter", function()
         _G.vim.api.nvim_list_bufs = function()
             return { 1 }
         end
+        _G.vim.uv = nil
+        _G.vim.loop = nil
     end)
 
     local function base_container(overrides)
@@ -149,6 +151,24 @@ describe("neovim command adapter", function()
         end
 
         return ctx
+    end
+
+    local function find_autocmd_callback(event_name)
+        for _, item in ipairs(autocmd_registry) do
+            local events = item.events
+            if type(events) == "string" then
+                if events == event_name then
+                    return item.opts and item.opts.callback
+                end
+            elseif type(events) == "table" then
+                for _, ev in ipairs(events) do
+                    if ev == event_name then
+                        return item.opts and item.opts.callback
+                    end
+                end
+            end
+        end
+        return nil
     end
 
     describe("command registration", function()
@@ -485,9 +505,9 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            assert.equals(1, #autocmd_registry)
+            assert.is_true(#autocmd_registry >= 1)
 
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufReadPost")
             assert.is_function(callback)
 
             callback({ event = "BufReadPost", buf = 7 })
@@ -531,7 +551,7 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufWritePost")
 
             callback({ event = "BufWritePost", buf = 7 })
             assert.equals(0, #calls) -- render is deferred via vim.schedule()
@@ -579,7 +599,7 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufWritePost")
 
             callback({ event = "BufWritePost", buf = 7 })
             assert.equals(0, #calls) -- render is deferred via vim.schedule()
@@ -621,7 +641,7 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufWritePost")
 
             callback({ event = "BufWritePost", buf = 7 })
             assert.equals(0, #calls) -- render is deferred via vim.schedule()
@@ -664,7 +684,6 @@ describe("neovim command adapter", function()
             assert.equals("buffer", observed.ui_variant)
             assert.is_function(observed.on_finish)
         end)
-
     end)
 
     describe("error handling", function()

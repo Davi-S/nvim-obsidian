@@ -70,6 +70,14 @@ local function normalize_mode(mode)
     return "visualizer"
 end
 
+local function normalize_layout(layout)
+    local value = tostring(layout or "vsplit")
+    if value == "current" or value == "vsplit" or value == "hsplit" then
+        return value
+    end
+    return "vsplit"
+end
+
 local function build_title_line(mode)
     if mode == "picker" then
         return "Obsidian Calendar (picker mode)"
@@ -434,6 +442,7 @@ function M.open_calendar(ctx, request)
     end
 
     local mode = normalize_mode(request and request.mode)
+    local layout = normalize_layout(request and request.layout)
     local week_start = resolve_week_start(request and request.week_start)
     local highlights = resolve_highlights(request and request.highlights)
     local marks = type(request and request.marks) == "table" and request.marks or {}
@@ -448,6 +457,7 @@ function M.open_calendar(ctx, request)
     -- consistency (buffer view now, floating view later).
     local state = {
         mode = mode,
+        layout = layout,
         week_start = week_start,
         highlights = highlights,
         marks = marks,
@@ -477,13 +487,13 @@ function M.open_calendar(ctx, request)
         namespace = nil,
     }
 
-    -- Open a dedicated vertical split by default.
-    --
-    -- UX intent:
-    -- - Keep context visible in the original window.
-    -- - Let picker selection replace this calendar buffer in-place when the
-    --   callback opens a note via :edit/open_path.
-    vim.cmd("botright vsplit")
+    if layout == "vsplit" then
+        -- Split defaults to vertical for calendar side-panel workflows.
+        vim.cmd("botright vsplit")
+    elseif layout == "hsplit" then
+        -- Horizontal variant used by dedicated split command surface.
+        vim.cmd("botright split")
+    end
     state.winid = vim.api.nvim_get_current_win()
 
     -- A vertical split initially shows the same buffer as the source window.
@@ -625,7 +635,10 @@ function M.open_calendar(ctx, request)
 
             -- If callback did not replace this buffer, close the calendar window
             -- to preserve prior picker semantics.
-            if type(vim.api.nvim_win_get_buf) == "function" and vim.api.nvim_win_is_valid(state.winid) then
+            if state.layout ~= "current"
+                and type(vim.api.nvim_win_get_buf) == "function"
+                and vim.api.nvim_win_is_valid(state.winid)
+            then
                 local ok_buf, current_buf = pcall(vim.api.nvim_win_get_buf, state.winid)
                 if ok_buf and current_buf == state.bufnr then
                     close_window(state.winid)
@@ -635,7 +648,9 @@ function M.open_calendar(ctx, request)
         end
 
         -- Non-selection paths still close before callback notification.
-        close_window(state.winid)
+        if state.layout ~= "current" then
+            close_window(state.winid)
+        end
         safe_on_finish(on_finish, payload)
     end
 
