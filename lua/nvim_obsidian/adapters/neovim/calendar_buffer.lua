@@ -485,7 +485,29 @@ function M.open_calendar(ctx, request)
     --   callback opens a note via :edit/open_path.
     vim.cmd("botright vsplit")
     state.winid = vim.api.nvim_get_current_win()
-    state.bufnr = vim.api.nvim_get_current_buf()
+
+    -- A vertical split initially shows the same buffer as the source window.
+    -- Create/switch to a dedicated scratch buffer so rendering the calendar
+    -- does not overwrite the user's original note in both windows.
+    local opened_bufnr = nil
+    if type(vim.api.nvim_create_buf) == "function" and type(vim.api.nvim_win_set_buf) == "function" then
+        local ok_create, bufnr = pcall(vim.api.nvim_create_buf, false, true)
+        if ok_create and type(bufnr) == "number" and bufnr > 0 then
+            local ok_set = pcall(vim.api.nvim_win_set_buf, state.winid, bufnr)
+            if ok_set then
+                opened_bufnr = bufnr
+            end
+        end
+    end
+
+    if not opened_bufnr then
+        -- Compatibility fallback for minimal environments/mocks where
+        -- nvim_create_buf or nvim_win_set_buf is unavailable.
+        vim.cmd("enew")
+        opened_bufnr = vim.api.nvim_get_current_buf()
+    end
+
+    state.bufnr = opened_bufnr
 
     ensure_buffer_opts(state.bufnr)
     render(date_picker, state.bufnr, state)
