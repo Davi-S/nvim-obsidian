@@ -1,3 +1,6 @@
+---Domain contract: journal token classification and date navigation.
+---
+---Defines deterministic journal semantics used by command and picker flows.
 local M = {
     name = "journal",
     version = "phase3-contract",

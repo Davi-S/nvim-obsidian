@@ -1,5 +1,10 @@
 ---@diagnostic disable: undefined-global
 
+---Configuration normalization and validation.
+---
+---This module is the single authority for default values and setup-time schema
+---validation. It guarantees downstream layers receive a fully materialized
+---configuration object with deterministic keys.
 local M = {}
 
 M.defaults = {
@@ -50,6 +55,9 @@ M.defaults = {
     },
 }
 
+---Check whether a path is absolute on Unix or Windows.
+---@param path any
+---@return boolean
 local function is_absolute_path(path)
     if type(path) ~= "string" then
         return false
@@ -64,20 +72,31 @@ local function is_absolute_path(path)
     return false
 end
 
+---Raise a setup validation error with consistent prefix.
+---@param msg string
 local function fail(msg)
     error("nvim-obsidian setup: " .. msg, 2)
 end
 
+---@param value any
+---@return boolean
 local function is_non_empty_string(value)
     return type(value) == "string" and value ~= ""
 end
 
+---Validate enum-like field values.
+---@param value any
+---@param allowed table<string, boolean>
+---@param field_name string
 local function validate_enum(value, allowed, field_name)
     if not allowed[value] then
         fail(field_name .. " has invalid value: " .. tostring(value))
     end
 end
 
+---Validate non-empty list of non-empty strings.
+---@param value any
+---@param field_name string
 local function validate_string_list(value, field_name)
     if type(value) ~= "table" then
         fail(field_name .. " must be a list of strings")
@@ -92,6 +111,8 @@ local function validate_string_list(value, field_name)
     end
 end
 
+---Validate dataview subsystem configuration.
+---@param opts table
 local function validate_dataview(opts)
     local dv = opts.dataview
     if type(dv) ~= "table" then
@@ -142,6 +163,8 @@ local function validate_dataview(opts)
     end
 end
 
+---Validate calendar subsystem configuration.
+---@param opts table
 local function validate_calendar(opts)
     -- Calendar config is required because defaults are always materialized via
     -- deep-merge in normalize().
@@ -178,6 +201,8 @@ local function validate_calendar(opts)
     end
 end
 
+---Validate optional journal section templates and format configuration.
+---@param opts table
 local function validate_journal(opts)
     if opts.journal == nil then
         return
@@ -203,6 +228,9 @@ local function validate_journal(opts)
     end
 end
 
+---Normalize and validate user options against defaults.
+---@param user_opts? table
+---@return table opts
 function M.normalize(user_opts)
     -- Merge user input over defaults so feature modules can rely on complete config.
     local opts = vim.tbl_deep_extend("force", {}, M.defaults, user_opts or {})

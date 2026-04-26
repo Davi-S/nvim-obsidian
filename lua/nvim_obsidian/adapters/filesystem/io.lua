@@ -1,6 +1,14 @@
+---Filesystem IO adapter.
+---
+---Provides read/write/list primitives used by use-cases. Returns normalized
+---domain-style errors instead of throwing.
 local M = {}
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---@param code string
+---@param message string
+---@param meta? table
+---@return table
 local function adapter_error(code, message, meta)
     return errors.new(code, message, meta)
 end
@@ -16,6 +24,10 @@ local function shell_escape_single_quotes(s)
     return tostring(s):gsub("'", "'\\''")
 end
 
+---Read text file contents.
+---@param path string
+---@return string|nil
+---@return table|nil
 function M.read_file(path)
     if type(path) ~= "string" or path == "" then
         return nil, adapter_error(errors.codes.INVALID_INPUT, "path must be a non-empty string")
@@ -41,6 +53,11 @@ function M.read_file(path)
     return content, nil
 end
 
+---Write text content to file, creating parent directory if needed.
+---@param path string
+---@param content any
+---@return boolean
+---@return table|nil
 function M.write_file(path, content)
     if type(path) ~= "string" or path == "" then
         return false, adapter_error(errors.codes.INVALID_INPUT, "path must be a non-empty string")
@@ -76,6 +93,10 @@ function M.write_file(path, content)
     return true, nil
 end
 
+---List markdown files recursively under root.
+---@param root string
+---@return string[]|nil
+---@return table|nil
 function M.list_markdown_files(root)
     if type(root) ~= "string" or root == "" then
         return {}, adapter_error(errors.codes.INVALID_INPUT, "root must be a non-empty string")

@@ -1,3 +1,7 @@
+---Neovim navigation adapter.
+---
+---Encapsulates file opening, cursor movement, and anchor/block navigation with
+---defensive API checks and normalized errors.
 local M = {}
 local errors = require("nvim_obsidian.core.shared.errors")
 
@@ -78,6 +82,10 @@ local function find_block_line(lines, block_id)
     return nil
 end
 
+---Open file path in current window.
+---@param path string
+---@return boolean
+---@return table|nil
 function M.open_path(path)
     if type(path) ~= "string" or path == "" then
         return false, adapter_error(errors.codes.INVALID_INPUT, "path must be a non-empty string")
@@ -103,6 +111,10 @@ function M.open_path(path)
     return true, nil
 end
 
+---Insert text at current cursor position.
+---@param text string
+---@return boolean
+---@return table|nil
 function M.insert_text_at_cursor(text)
     if not vim or not vim.api or type(vim.api.nvim_put) ~= "function" then
         return false, adapter_error(errors.codes.INTERNAL, "nvim_put API is unavailable")
@@ -119,6 +131,10 @@ function M.insert_text_at_cursor(text)
     return true, nil
 end
 
+---Jump cursor to given 1-based line.
+---@param line integer
+---@return boolean
+---@return table|nil
 function M.jump_to_line(line)
     local target_line = tonumber(line)
     if not target_line or target_line < 1 then
@@ -140,6 +156,10 @@ function M.jump_to_line(line)
     return true, nil
 end
 
+---Jump to heading anchor or block id within current buffer.
+---@param target table
+---@return boolean
+---@return table|nil
 function M.jump_to_anchor(target)
     if type(target) ~= "table" then
         return false, adapter_error(errors.codes.INVALID_INPUT, "target must be a table")

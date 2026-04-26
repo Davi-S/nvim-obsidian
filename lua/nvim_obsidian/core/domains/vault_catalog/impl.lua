@@ -1,5 +1,8 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Domain implementation: in-memory vault note catalog.
+---
+---Maintains normalized notes keyed by path and supports identity-token lookups.
 local M = {}
 
 local state = {
@@ -106,6 +109,9 @@ local function dedup_by_path(items)
     return out
 end
 
+---Insert or update one note identity entry.
+---@param note table
+---@return table
 function M.upsert_note(note)
     local ok, err = validate_note(note)
     if not ok then
@@ -117,6 +123,9 @@ function M.upsert_note(note)
     return { ok = true, error = nil }
 end
 
+---Remove one note identity by absolute path.
+---@param path string
+---@return table
 function M.remove_note(path)
     if not is_string(path) then
         return {
@@ -137,6 +146,10 @@ function M.remove_note(path)
     return { ok = true, error = nil }
 end
 
+---Find notes matching title/alias/path tokens.
+---@param token string
+---@param opts? table
+---@return table
 function M.find_by_identity_token(token, opts)
     local q = tostring(token or "")
     if q == "" then
@@ -193,10 +206,16 @@ end
 -- Backward-compatible alias; callers should migrate to find_by_identity_token.
 M.find_by_title_or_alias = M.find_by_identity_token
 
+---List all notes in deterministic path order.
+---@return table[]
 function M.list_notes()
     return collect_notes_sorted()
 end
 
+---Test/runtime helper: atomically replace catalog with provided notes.
+---@param notes table[]
+---@return boolean
+---@return string|nil
 function M._replace_all(notes)
     if type(notes) ~= "table" then
         return false, "notes must be a table"
@@ -216,10 +235,13 @@ function M._replace_all(notes)
     return true, nil
 end
 
+---Test helper: clear catalog state.
 function M._reset_for_tests()
     state.by_path = {}
 end
 
+---Test helper: return all notes in current state.
+---@return table[]
 function M._all_notes_for_tests()
     return collect_notes_sorted()
 end

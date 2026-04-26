@@ -1,3 +1,6 @@
+---Markdown parser adapter.
+---
+---Extracts wiki-links from markdown text for backlink and navigation features.
 local M = {}
 
 local function trim(s)
@@ -9,6 +12,9 @@ local function trim(s)
     return out
 end
 
+---Extract wiki-link references from markdown text.
+---@param markdown string
+---@return table[]
 function M.extract_wikilinks(markdown)
     if type(markdown) ~= "string" then
         return {}

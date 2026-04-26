@@ -1,3 +1,7 @@
+---Telescope picker adapter.
+---
+---Implements omni search, disambiguation, and vault text-search flows with
+---fallback behavior when Telescope is unavailable.
 local M = {}
 
 local function report_error(message)
@@ -290,6 +294,10 @@ local function open_telescope_disambiguation(matches, prompt_title, opts)
     }
 end
 
+---Prepare ranked candidate list for omni picker.
+---@param ctx table
+---@param notes table[]
+---@return table[]
 function M._prepare_candidates(ctx, notes)
     if type(notes) ~= "table" then
         report_error("telescope _prepare_candidates received invalid notes payload")
@@ -338,6 +346,9 @@ function M._prepare_candidates(ctx, notes)
     return items, note_map
 end
 
+---Prepare disambiguation picker items from note matches.
+---@param matches table[]
+---@return table[]
 function M._prepare_disambiguation(matches)
     local items = {}
     local match_map = {}
@@ -354,6 +365,9 @@ function M._prepare_disambiguation(matches)
     return items, match_map
 end
 
+---Open omni picker and return selected item payload.
+---@param ctx table
+---@return table|nil
 function M.open_omni(ctx)
     -- Use-case payload mode: items already prepared by search_open_create.
     if type(ctx) == "table" and type(ctx.items) == "table" then
@@ -533,6 +547,9 @@ function M.open_omni(ctx)
     return selected ~= nil
 end
 
+---Open disambiguation picker for ambiguous note targets.
+---@param matches table[]
+---@return table|nil
 function M.open_disambiguation(matches)
     local payload_mode = type(matches) == "table" and type(matches.matches) == "table"
     local source_matches = payload_mode and matches.matches or matches
@@ -553,6 +570,9 @@ function M.open_disambiguation(matches)
     return result.action == "open"
 end
 
+---Open vault-wide Telescope grep picker.
+---@param opts table
+---@return boolean
 function M.open_search(opts)
     opts = opts or {}
     local builtin = load_telescope_builtin()

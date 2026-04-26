@@ -1,6 +1,10 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 local template_context = require("nvim_obsidian.app.template_context")
 
+---Use-case: insert resolved template content at cursor.
+---
+---Supports explicit query path/template lookup and context-based placeholder
+---rendering before insertion.
 local M = {}
 
 M.contract = {
@@ -22,6 +26,8 @@ M.contract = {
     },
 }
 
+---@param s any
+---@return string|nil
 local function trim(s)
     if type(s) ~= "string" then return nil end
     local out = s:gsub("^%s+", ""):gsub("%s+$", "")
@@ -29,6 +35,10 @@ local function trim(s)
     return out
 end
 
+---Execute insert_template orchestration.
+---@param _ctx table
+---@param _input table|nil
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {

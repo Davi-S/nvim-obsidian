@@ -1,3 +1,6 @@
+---Domain implementation: reusable date-picker date math and month modeling.
+---
+---Exports pure helpers consumed by UI adapters and picker use-cases.
 local M = {}
 
 -- Date-picker domain module.
@@ -248,14 +251,22 @@ local function month_matrix(anchor_date, options)
     }
 end
 
--- Public API
+-- Public API (pure helpers intentionally exported for adapter reuse)
+---@type fun(value: any): table
 M.normalize_date = normalize_date
+---@type fun(date: table|number|nil): string
 M.to_token = to_token
+---@type fun(year: integer, month: integer): integer
 M.days_in_month = days_in_month
+---@type fun(date: table|number|nil, delta_days: integer): table
 M.shift_days = shift_days
+---@type fun(date: table|number|nil, delta_months: integer): table
 M.shift_months = shift_months
+---@type fun(date: table|number|nil, delta_years: integer): table
 M.shift_years = shift_years
+---@type fun(anchor_date: table|number|nil, options: table|nil): table
 M.month_matrix = month_matrix
+---@type fun(value: any): string
 M.normalize_week_start = normalize_week_start
 
 return M

@@ -2,6 +2,10 @@
 
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Neovim calendar buffer adapter.
+---
+---Renders month grids for visualizer/picker modes and drives interactive
+---selection callbacks used by journal/calendar commands.
 local M = {}
 
 -- Month labels are intentionally explicit for MVP readability.
@@ -417,6 +421,10 @@ local function safe_on_finish(handler, payload)
     pcall(handler, payload)
 end
 
+---Open interactive calendar buffer UI.
+---@param ctx table
+---@param request table
+---@return table
 function M.open_calendar(ctx, request)
     -- Adapter boundary checks.
     -- This function must fail gracefully because it is called from command paths.

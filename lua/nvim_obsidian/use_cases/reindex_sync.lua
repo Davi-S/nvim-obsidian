@@ -1,5 +1,8 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Use-case: synchronize vault catalog from filesystem events or full scans.
+---
+---Handles startup/manual full rebuilds and event-driven incremental updates.
 local M = {}
 
 M.contract = {
@@ -23,6 +26,10 @@ M.contract = {
     },
 }
 
+---Execute reindex synchronization flow.
+---@param _ctx table
+---@param _input table
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {

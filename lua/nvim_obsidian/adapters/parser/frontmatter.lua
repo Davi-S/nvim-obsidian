@@ -1,3 +1,7 @@
+---Frontmatter parser adapter.
+---
+---Parses a minimal YAML-like frontmatter subset used by the plugin for title,
+---aliases, tags, and simple scalar fields.
 local M = {}
 
 local function trim(s)
@@ -53,6 +57,10 @@ local function parse_scalar(val)
     return normalized
 end
 
+---Parse frontmatter from markdown document.
+---@param markdown string
+---@return table
+---@return string|nil
 function M.parse(markdown)
     if type(markdown) ~= "string" then
         return {}, "parse_failure: invalid_input"

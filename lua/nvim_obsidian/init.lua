@@ -2,6 +2,10 @@ local bootstrap = require("nvim_obsidian.app.bootstrap")
 local template_impl = require("nvim_obsidian.core.domains.template.impl")
 local journal_placeholders = require("nvim_obsidian.app.journal_placeholders")
 
+---Public plugin entrypoint.
+---
+---Exposes setup/runtime accessors plus selected helper APIs for template and
+---journal placeholder extension.
 local M = {}
 local state = {
     container = nil,
@@ -101,6 +105,8 @@ local function deep_copy(v)
     return v
 end
 
+---Configure and start plugin runtime.
+---@param opts table
 function M.setup(opts)
     local input = opts or {}
 
@@ -114,10 +120,17 @@ function M.setup(opts)
     return container
 end
 
+---Get active dependency container.
+---@return table|nil
 function M.get_container()
     return state.container
 end
 
+---Register template placeholder resolver in template domain.
+---@param name string
+---@param resolver function
+---@return boolean
+---@return string|nil
 function M.template_register_placeholder(name, resolver)
     local registered = template_impl.register_placeholders({
         [name] = resolver,
@@ -134,6 +147,12 @@ end
 
 M.journal = {}
 
+---Register journal title placeholder resolver.
+---@param name string
+---@param resolver function
+---@param regex_fragment? string
+---@return boolean
+---@return string|nil
 function M.journal.register_placeholder(name, resolver, regex_fragment)
     local ok, message = journal_placeholders.register_placeholder(name, resolver, regex_fragment)
     if not ok then
@@ -141,22 +160,43 @@ function M.journal.register_placeholder(name, resolver, regex_fragment)
     end
 end
 
+---Resolve localized month name.
+---@param month any
+---@param locale any
+---@return string|nil
 function M.journal.month_name(month, locale)
     return journal_placeholders.month_name(month, locale)
 end
 
+---Resolve localized weekday name.
+---@param wday any
+---@param locale any
+---@return string|nil
 function M.journal.weekday_name(wday, locale)
     return journal_placeholders.weekday_name(wday, locale)
 end
 
+---Parse month token (name or number) into month index.
+---@param token any
+---@param locale any
+---@return integer|nil
 function M.journal.parse_month_token(token, locale)
     return journal_placeholders.parse_month_token(token, locale)
 end
 
+---Render journal title from placeholder format.
+---@param format string
+---@param date any
+---@param locale any
+---@return string
 function M.journal.render_title(format, date, locale)
     return journal_placeholders.render_title(format, date, locale)
 end
 
+---Resolve wiki-link target at cursor (or provided position).
+---@param line? string
+---@param col? integer
+---@return table|nil
 function M.wiki_link_under_cursor(line, col)
     local container = state.container
     local wiki_link = container and container.wiki_link
@@ -174,6 +214,9 @@ function M.wiki_link_under_cursor(line, col)
     return wiki_link.parse_at_cursor(cursor_line, cursor_col)
 end
 
+---Check whether a path belongs to configured vault root.
+---@param path string|nil
+---@return boolean
 function M.is_inside_vault(path)
     local container = state.container
     local config = container and container.config

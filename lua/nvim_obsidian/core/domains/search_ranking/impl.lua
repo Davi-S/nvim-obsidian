@@ -1,3 +1,7 @@
+---Domain implementation: ranking and display label selection for notes.
+---
+---Used by omni-search and completion to produce stable ranking scores and
+---human-readable labels.
 local M = {}
 
 local function lower(s)
@@ -85,6 +89,10 @@ local function rank_candidate(candidate, query)
     return 99, nil
 end
 
+---Score and sort candidate notes against a query.
+---@param query string
+---@param candidates table[]
+---@return table[]
 function M.score_candidates(query, candidates)
     local input = candidates
     if type(input) ~= "table" then
@@ -122,6 +130,11 @@ function M.score_candidates(query, candidates)
     return { ranked = ranked }
 end
 
+---Select display label for a ranked candidate.
+---@param query string
+---@param candidate table
+---@param separator string|nil
+---@return string
 function M.select_display(query, candidate, separator)
     local c = normalize_candidate(candidate)
     local sep = separator

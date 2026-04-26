@@ -1,3 +1,7 @@
+---Domain implementation: journal keyword classification and date math.
+---
+---Provides locale-aware token classification for journal intent and deterministic
+---adjacent date computation for daily/weekly/monthly/yearly navigation.
 local M = {}
 
 local EN_WEEKDAYS = {
@@ -257,6 +261,10 @@ local function classify_by_keyword(raw)
     return nil
 end
 
+---Classify raw user input into journal kind intent.
+---@param raw string
+---@param _now any
+---@return table
 function M.classify_input(raw, _now)
     local s = trim(raw)
     if s == "" then
@@ -287,6 +295,11 @@ function M.classify_input(raw, _now)
     return { kind = "none" }
 end
 
+---Build canonical journal title for kind/date.
+---@param kind string
+---@param date table|number|nil
+---@param _locale string|nil
+---@return table
 function M.build_title(kind, date, _locale)
     local dt = normalize_date_input(date)
 
@@ -317,6 +330,11 @@ local function adjust_month(year, month, delta)
     return ny, nm
 end
 
+---Compute adjacent date for journal navigation.
+---@param kind string
+---@param date table|number|nil
+---@param direction string
+---@return table
 function M.compute_adjacent(kind, date, direction)
     local dt = normalize_date_input(date)
     local dir = direction or "current"

@@ -1,5 +1,8 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Use-case: open vault-wide text search picker.
+---
+---Delegates interactive flow to picker adapter and optional navigation port.
 local M = {}
 
 M.contract = {
@@ -19,6 +22,10 @@ M.contract = {
     },
 }
 
+---Execute vault search orchestration.
+---@param _ctx table
+---@param _input table|nil
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {

@@ -1,5 +1,9 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Use-case: follow wiki-link under cursor.
+---
+---This orchestrates parsing, target resolution, and navigation/create behavior,
+---including ambiguity handling through picker adapters.
 local M = {}
 
 M.contract = {
@@ -25,6 +29,10 @@ M.contract = {
     },
 }
 
+---Execute follow_link orchestration.
+---@param _ctx table
+---@param _input table
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {

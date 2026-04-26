@@ -1,5 +1,9 @@
 ---@diagnostic disable: undefined-global
 
+---Neovim command/augroup registration adapter.
+---
+---Binds user-facing commands to use-cases and wires autocmd-driven dataview and
+---filesystem-sync behaviors.
 local M = {}
 
 local function create_user_command(name, fn, opts)
@@ -1166,6 +1170,8 @@ local function register_obsidian_health(ctx)
     end, { desc = "Check nvim-obsidian adapter wiring health" })
 end
 
+---Register all nvim-obsidian commands and autocmd integrations.
+---@param container table
 function M.register(container)
     if not container then
         return

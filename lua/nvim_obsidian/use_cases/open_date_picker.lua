@@ -1,5 +1,9 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Use-case: open date picker/visualizer through selected UI adapter.
+---
+---Maintains UI-agnostic orchestration by validating requests and delegating
+---interaction lifecycle to the calendar buffer adapter.
 local M = {}
 
 -- Use-case responsibility:
@@ -41,6 +45,8 @@ M.contract = {
 --
 -- Contract decision:
 -- Returning nil for unknown values keeps failure handling explicit in execute().
+---@param mode any
+---@return string|nil
 local function resolve_mode(mode)
     local value = tostring(mode or "visualizer")
     if value == "visualizer" or value == "picker" then
@@ -49,6 +55,8 @@ local function resolve_mode(mode)
     return nil
 end
 
+---@param layout any
+---@return string|nil
 local function resolve_layout(layout)
     local value = tostring(layout or "vsplit")
     if value == "current" or value == "vsplit" or value == "hsplit" then
@@ -57,6 +65,10 @@ local function resolve_layout(layout)
     return nil
 end
 
+---Execute open_date_picker orchestration.
+---@param ctx table
+---@param input table
+---@return table
 function M.execute(ctx, input)
     -- Hard boundary validation for orchestration input.
     -- We fail early with domain-style errors to keep downstream assumptions simple.

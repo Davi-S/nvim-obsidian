@@ -1,7 +1,12 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Use-case: search notes and open/create selection.
+---
+---Combines ranking domain, picker adapter, and creation fallback behavior.
 local M = {}
 
+---@param path any
+---@return string
 local function normalize_path(path)
     local p = tostring(path or "")
     p = p:gsub("\\", "/")
@@ -9,6 +14,9 @@ local function normalize_path(path)
     return p
 end
 
+---@param path any
+---@param vault_root any
+---@return string
 local function to_vault_relpath(path, vault_root)
     local normalized_path = normalize_path(path)
     local normalized_root = normalize_path(vault_root)
@@ -38,6 +46,8 @@ local function to_vault_relpath(path, vault_root)
     return normalized_path
 end
 
+---@param path any
+---@return boolean
 local function path_exists(path)
     if type(path) ~= "string" or path == "" then
         return false
@@ -74,6 +84,10 @@ M.contract = {
     },
 }
 
+---Execute search/open/create orchestration.
+---@param _ctx table
+---@param _input table
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {

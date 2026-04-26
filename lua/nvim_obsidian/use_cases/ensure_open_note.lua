@@ -1,9 +1,17 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 local template_context = require("nvim_obsidian.app.template_context")
 
+---Use-case: ensure a note is opened, creating it when allowed.
+---
+---Responsibilities:
+---1) Validate intent and dependencies.
+---2) Resolve token/title against catalog.
+---3) Open existing note or create a new note through adapter ports.
 local M = {}
 
 M.contract = {
+    -- Contract metadata is consumed by tests/documentation and preserved as
+    -- explicit architecture vocabulary for the use-case boundary.
     name = "ensure_open_note",
     version = "phase3-contract",
     dependencies = {
@@ -27,6 +35,10 @@ M.contract = {
     },
 }
 
+---Execute ensure_open_note orchestration.
+---@param _ctx table
+---@param _input table
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {
