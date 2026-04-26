@@ -916,6 +916,70 @@ local function register_shell_delete_sync(ctx)
     })
 end
 
+local function register_yazi_sync(ctx)
+    if not vim or not vim.api or type(vim.api.nvim_create_autocmd) ~= "function" then
+        return
+    end
+    if not ctx or not ctx.use_cases or not ctx.use_cases.reindex_sync or type(ctx.use_cases.reindex_sync.execute) ~= "function" then
+        return
+    end
+
+    local group = nil
+    if type(vim.api.nvim_create_augroup) == "function" then
+        group = vim.api.nvim_create_augroup("NvimObsidianYaziSync", { clear = true })
+    end
+
+    local function run_manual_sync(source)
+        local result = ctx.use_cases.reindex_sync.execute(ctx, {
+            mode = "manual",
+            event = nil,
+        })
+
+        if type(result) ~= "table" or result.ok ~= true then
+            local notifications = ctx.adapters and ctx.adapters.notifications
+            if notifications and type(notifications.warn) == "function" then
+                local message = source .. " sync failed"
+                if type(result) == "table" and type(result.error) == "table" and type(result.error.message) == "string" then
+                    message = result.error.message
+                end
+                notifications.warn("Yazi sync failed: " .. message)
+            end
+        end
+    end
+
+    vim.api.nvim_create_autocmd("TermClose", {
+        group = group,
+        callback = function(ev)
+            if not vim.api or type(vim.api.nvim_buf_get_name) ~= "function" then
+                return
+            end
+            if type(ev) ~= "table" or type(ev.buf) ~= "number" then
+                return
+            end
+
+            local ok_name, buf_name = pcall(vim.api.nvim_buf_get_name, ev.buf)
+            if not ok_name then
+                return
+            end
+
+            local term_name = tostring(buf_name or ""):lower()
+            if not term_name:match("yazi") then
+                return
+            end
+
+            run_manual_sync("TermClose")
+        end,
+    })
+
+    vim.api.nvim_create_autocmd("User", {
+        group = group,
+        pattern = { "YaziClosed", "YaziQuit", "YaziLeave" },
+        callback = function()
+            run_manual_sync("User event")
+        end,
+    })
+end
+
 local function register_obsidian_render_dataview(ctx)
     create_user_command("ObsidianRenderDataview", function()
         if not ctx or not ctx.use_cases or not ctx.use_cases.render_query_blocks then
@@ -1190,6 +1254,7 @@ function M.register(container)
     register_obsidian_render_dataview(container)
     register_dataview_autocmds(container)
     register_shell_delete_sync(container)
+    register_yazi_sync(container)
     register_obsidian_health(container)
 end
 

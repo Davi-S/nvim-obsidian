@@ -292,7 +292,7 @@ function M.execute(_ctx, _input)
             }
         end
         local picked_line = tonumber((picked.item and picked.item.backlink_line) or picked.backlink_line or
-        line_by_path[picked.path])
+            line_by_path[picked.path])
         if picked_line and picked_line >= 1 and type(navigation.jump_to_line) == "function" then
             navigation.jump_to_line(picked_line)
         end
