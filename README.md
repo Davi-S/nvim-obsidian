@@ -67,9 +67,12 @@ After setup, run:
 - `:ObsidianReindex`
 - `:ObsidianCalendar`
 - `:ObsidianCalendar pick`
+- `:ObsidianCalendarFloat`
+- `:ObsidianCalendarFloatPick`
 - `:ObsidianJournalCalendar`
 - `:ObsidianJournalCalendarVSplit`
 - `:ObsidianJournalCalendarHSplit`
+- `:ObsidianJournalCalendarFloat`
 - `:ObsidianHealth`
 
 Journal calendar layout behavior:
@@ -83,6 +86,9 @@ Calendar indicators are configurable via `calendar.highlights` in setup config
 You can optionally require confirmation before creating missing journal notes
 from calendar picker selections with `calendar.confirm_before_create = true`.
 Existing notes still open directly without a confirmation prompt.
+
+Floating calendar UI can be configured through `calendar.floating`:
+`width`, `height`, and `border` (for centered modal behavior).
 
 For full command semantics and API details, see `docs/NVIM_PLUGIN.md`.
 

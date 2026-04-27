@@ -41,6 +41,9 @@ describe("app config schema", function()
         assert.equals("DiagnosticOk", opts.calendar.highlights.today)
         assert.equals("Bold", opts.calendar.highlights.note_exists)
         assert.equals(false, opts.calendar.confirm_before_create)
+        assert.equals(90, opts.calendar.floating.width)
+        assert.equals(24, opts.calendar.floating.height)
+        assert.equals("rounded", opts.calendar.floating.border)
     end)
 
     it("accepts custom calendar highlight groups for day indicators", function()
@@ -57,6 +60,11 @@ describe("app config schema", function()
                     today = "MyCalendarToday",
                     note_exists = "MyCalendarHasNote",
                 },
+                floating = {
+                    width = 100,
+                    height = 28,
+                    border = "double",
+                },
             },
         })
 
@@ -68,6 +76,9 @@ describe("app config schema", function()
         assert.equals("MyCalendarOutsideDay", opts.calendar.highlights.outside_month_day)
         assert.equals("MyCalendarToday", opts.calendar.highlights.today)
         assert.equals("MyCalendarHasNote", opts.calendar.highlights.note_exists)
+        assert.equals(100, opts.calendar.floating.width)
+        assert.equals(28, opts.calendar.floating.height)
+        assert.equals("double", opts.calendar.floating.border)
     end)
 
     it("does not mutate caller input tables", function()
@@ -167,6 +178,34 @@ describe("app config schema", function()
 
         assert.is_false(ok)
         assert.matches("calendar.confirm_before_create must be a boolean", tostring(err))
+    end)
+
+    it("rejects invalid calendar floating width", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                floating = {
+                    width = 20,
+                },
+            },
+        })
+
+        assert.is_false(ok)
+        assert.matches("calendar.floating.width must be a number >= 40", tostring(err))
+    end)
+
+    it("rejects invalid calendar floating border", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                floating = {
+                    border = "bevel",
+                },
+            },
+        })
+
+        assert.is_false(ok)
+        assert.matches("calendar.floating.border has invalid value", tostring(err))
     end)
 
     it("accepts valid optional journal configuration", function()

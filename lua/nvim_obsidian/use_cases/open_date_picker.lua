@@ -20,6 +20,7 @@ M.contract = {
     dependencies = {
         "date_picker",
         "adapters.neovim.calendar_buffer",
+        "adapters.neovim.calendar_floating",
     },
     input = {
         mode = "visualizer|picker",
@@ -27,7 +28,7 @@ M.contract = {
         locale = "string|nil",
         marks = "table|nil",
         layout = "current|vsplit|hsplit|nil",
-        ui_variant = "buffer|nil",
+        ui_variant = "buffer|floating|nil",
         on_finish = "function|nil",
         week_start = "sunday|monday|nil",
     },
@@ -119,17 +120,14 @@ function M.execute(ctx, input)
     end
 
     local ui_variant = tostring(input.ui_variant or "buffer")
-    -- MVP guardrail:
-    -- Only one frontend is implemented today. We reject unsupported variants
-    -- early so the failure mode is explicit and traceable.
-    if ui_variant ~= "buffer" then
+    if ui_variant ~= "buffer" and ui_variant ~= "floating" then
         return {
             ok = false,
             action = nil,
             date = nil,
             cursor_date = nil,
             selected_kind = nil,
-            error = errors.new(errors.codes.INVALID_INPUT, "ui_variant must be buffer for MVP"),
+            error = errors.new(errors.codes.INVALID_INPUT, "ui_variant must be buffer or floating"),
         }
     end
 
@@ -145,19 +143,27 @@ function M.execute(ctx, input)
         }
     end
 
-    local calendar_buffer = nil
-    if type(ctx.adapters) == "table" and type(ctx.adapters.calendar_buffer) == "table" then
-        calendar_buffer = ctx.adapters.calendar_buffer
+    local calendar_adapter = nil
+    if ui_variant == "floating" then
+        if type(ctx.adapters) == "table" and type(ctx.adapters.calendar_floating) == "table" then
+            calendar_adapter = ctx.adapters.calendar_floating
+        end
+    elseif type(ctx.adapters) == "table" and type(ctx.adapters.calendar_buffer) == "table" then
+        calendar_adapter = ctx.adapters.calendar_buffer
     end
 
-    if type(calendar_buffer) ~= "table" or type(calendar_buffer.open_calendar) ~= "function" then
+    if type(calendar_adapter) ~= "table" or type(calendar_adapter.open_calendar) ~= "function" then
+        local missing_name = "ctx.adapters.calendar_buffer.open_calendar is required"
+        if ui_variant == "floating" then
+            missing_name = "ctx.adapters.calendar_floating.open_calendar is required"
+        end
         return {
             ok = false,
             action = nil,
             date = nil,
             cursor_date = nil,
             selected_kind = nil,
-            error = errors.new(errors.codes.INVALID_INPUT, "ctx.adapters.calendar_buffer.open_calendar is required"),
+            error = errors.new(errors.codes.INVALID_INPUT, missing_name),
         }
     end
 
@@ -176,7 +182,7 @@ function M.execute(ctx, input)
         highlights = (ctx.config and ctx.config.calendar and ctx.config.calendar.highlights) or {},
     }
 
-    local result = calendar_buffer.open_calendar(ctx, request)
+    local result = calendar_adapter.open_calendar(ctx, request)
     -- Defensive adapter contract check. Adapters are expected to return tables
     -- matching the output shape, but we guard this boundary explicitly.
     if type(result) ~= "table" then

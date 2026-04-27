@@ -57,6 +57,14 @@ M.defaults = {
             today = "DiagnosticOk",
             note_exists = "Bold",
         },
+
+        -- Floating calendar frontend defaults.
+        -- Used by ui_variant = "floating" commands.
+        floating = {
+            width = 90,
+            height = 24,
+            border = "rounded",
+        },
     },
 }
 
@@ -208,6 +216,27 @@ local function validate_calendar(opts)
             fail("calendar.highlights." .. key .. " must be a non-empty string")
         end
     end
+
+    if type(calendar.floating) ~= "table" then
+        fail("calendar.floating must be a table")
+    end
+
+    if type(calendar.floating.width) ~= "number" or calendar.floating.width < 40 then
+        fail("calendar.floating.width must be a number >= 40")
+    end
+
+    if type(calendar.floating.height) ~= "number" or calendar.floating.height < 12 then
+        fail("calendar.floating.height must be a number >= 12")
+    end
+
+    validate_enum(calendar.floating.border, {
+        rounded = true,
+        single = true,
+        double = true,
+        solid = true,
+        shadow = true,
+        none = true,
+    }, "calendar.floating.border")
 end
 
 ---Validate optional journal section templates and format configuration.
@@ -259,6 +288,21 @@ function M.normalize(user_opts)
         if type(opts.calendar.highlights[key]) ~= "string" or opts.calendar.highlights[key] == "" then
             opts.calendar.highlights[key] = value
         end
+    end
+
+    if type(opts.calendar.floating) ~= "table" then
+        opts.calendar.floating = {}
+    end
+
+    local default_calendar_floating = M.defaults.calendar.floating
+    if type(opts.calendar.floating.width) ~= "number" then
+        opts.calendar.floating.width = default_calendar_floating.width
+    end
+    if type(opts.calendar.floating.height) ~= "number" then
+        opts.calendar.floating.height = default_calendar_floating.height
+    end
+    if type(opts.calendar.floating.border) ~= "string" or opts.calendar.floating.border == "" then
+        opts.calendar.floating.border = default_calendar_floating.border
     end
 
     if type(opts.vault_root) ~= "string" or opts.vault_root == "" then

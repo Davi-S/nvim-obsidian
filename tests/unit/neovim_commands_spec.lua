@@ -654,6 +654,58 @@ describe("neovim command adapter", function()
     end)
 
     describe(":ObsidianJournalCalendar", function()
+        it("registers floating calendar command variants", function()
+            local container = base_container()
+            commands.register(container)
+
+            assert.is_function(command_registry["ObsidianCalendarFloat"])
+            assert.is_function(command_registry["ObsidianCalendarFloatPick"])
+            assert.is_function(command_registry["ObsidianJournalCalendarFloat"])
+        end)
+
+        it("opens floating calendar command with floating ui variant", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianCalendarFloat"]({ args = "pick" })
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("floating", observed.ui_variant)
+        end)
+
+        it("opens floating journal calendar with floating ui variant", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianJournalCalendarFloat"]()
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("floating", observed.ui_variant)
+            assert.is_function(observed.on_finish)
+        end)
+
         it("registers secondary journal calendar command", function()
             local container = base_container()
             commands.register(container)

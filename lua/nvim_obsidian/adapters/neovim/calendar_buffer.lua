@@ -466,6 +466,7 @@ function M.open_calendar(ctx, request)
     local state = {
         mode = mode,
         layout = layout,
+        close_on_finish = request and request.close_on_finish == true,
         week_start = week_start,
         highlights = highlights,
         marks = marks,
@@ -643,7 +644,7 @@ function M.open_calendar(ctx, request)
 
             -- If callback did not replace this buffer, close the calendar window
             -- to preserve prior picker semantics.
-            if state.layout ~= "current"
+            if (state.layout ~= "current" or state.close_on_finish)
                 and type(vim.api.nvim_win_get_buf) == "function"
                 and vim.api.nvim_win_is_valid(state.winid)
             then
@@ -656,7 +657,7 @@ function M.open_calendar(ctx, request)
         end
 
         -- Non-selection paths still close before callback notification.
-        if state.layout ~= "current" then
+        if state.layout ~= "current" or state.close_on_finish then
             close_window(state.winid)
         end
         safe_on_finish(on_finish, payload)

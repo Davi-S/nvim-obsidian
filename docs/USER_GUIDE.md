@@ -111,9 +111,12 @@ Try these commands in a Markdown file within your vault:
 :ObsidianReindex       " Refresh vault cache
 :ObsidianCalendar      " Open calendar visualizer
 :ObsidianCalendar pick " Open calendar picker (journal target selection)
+:ObsidianCalendarFloat " Open floating calendar (visualizer by default)
+:ObsidianCalendarFloatPick " Open floating calendar picker directly
 :ObsidianJournalCalendar        " Open journal picker in current buffer
 :ObsidianJournalCalendarVSplit  " Open journal picker in vertical split
 :ObsidianJournalCalendarHSplit  " Open journal picker in horizontal split
+:ObsidianJournalCalendarFloat   " Open floating journal picker
 ```
 
 ### Calendar Picker Controls
@@ -147,6 +150,7 @@ Interaction notes:
 Journal calendar layout notes:
 - `:ObsidianJournalCalendar` is current-buffer-first and replaces the active buffer with the calendar.
 - `:ObsidianJournalCalendarVSplit` and `:ObsidianJournalCalendarHSplit` keep your existing buffer visible and open the picker in a split.
+- `:ObsidianJournalCalendarFloat` opens the same picker behavior in a centered floating modal window.
 
 ### Calendar Indicator Styling
 
@@ -158,6 +162,11 @@ require("nvim_obsidian").setup({
   calendar = {
     week_start = "sunday", -- or "monday"
     confirm_before_create = false, -- set true to confirm before creating missing notes
+    floating = {
+      width = 90,
+      height = 24,
+      border = "rounded", -- rounded|single|double|solid|shadow|none
+    },
     highlights = {
       title = "Title",
       weekday = "Comment",
@@ -793,9 +802,9 @@ Expected times:
 2. **Configure:** Set up journal, dataview, and custom templates for your workflow
 3. **Keybind:** Map commands to your preferred key combinations
 4. **Explore:** Run `:help nvim-obsidian` for built-in documentation
-5. **Calendar roadmap:** Floating-window calendar UI remains planned next
+5. **Calendar roadmap:** Floating-window calendar polishing and integration hardening are next
 
 ---
 
-**Last Updated:** April 26, 2026  
+**Last Updated:** April 27, 2026  
 **For Issues:** Report bugs on [GitHub Issues](https://github.com/Davi-S/nvim-obsidian/issues)

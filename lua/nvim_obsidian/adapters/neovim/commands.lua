@@ -632,6 +632,16 @@ local function register_obsidian_insert_template(ctx)
 end
 
 local function register_obsidian_calendar(ctx)
+    local function parse_calendar_mode(raw_args)
+        local mode = "visualizer"
+        if raw_args == "pick" or raw_args == "picker" then
+            mode = "picker"
+        elseif raw_args == "visualizer" then
+            mode = "visualizer"
+        end
+        return mode
+    end
+
     -- Shared completion handler for calendar picker mode.
     --
     -- Why this helper exists:
@@ -800,12 +810,7 @@ local function register_obsidian_calendar(ctx)
         -- - :ObsidianCalendar pick
         -- - :ObsidianCalendar picker
         local raw_args = trim((cmd and cmd.args) or "")
-        local mode = "visualizer"
-        if raw_args == "pick" or raw_args == "picker" then
-            mode = "picker"
-        elseif raw_args == "visualizer" then
-            mode = "visualizer"
-        end
+        local mode = parse_calendar_mode(raw_args)
 
         local result = open_calendar(mode, "ObsidianCalendar")
 
@@ -823,6 +828,47 @@ local function register_obsidian_calendar(ctx)
         complete = function()
             return { "pick", "picker", "visualizer" }
         end,
+    })
+
+    create_user_command("ObsidianCalendarFloat", function(cmd)
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local raw_args = trim((cmd and cmd.args) or "")
+        local mode = parse_calendar_mode(raw_args)
+        local result = open_calendar(mode, "ObsidianCalendarFloat", {
+            ui_variant = "floating",
+        })
+
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open floating calendar (visualizer or picker)",
+        nargs = "?",
+        complete = function()
+            return { "pick", "picker", "visualizer" }
+        end,
+    })
+
+    create_user_command("ObsidianCalendarFloatPick", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianCalendarFloatPick", {
+            ui_variant = "floating",
+        })
+
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open floating calendar picker",
+        nargs = 0,
     })
 
     -- Secondary power-flow command for journal navigation/creation via calendar picker.
@@ -886,6 +932,24 @@ local function register_obsidian_calendar(ctx)
         end
     end, {
         desc = "Open journal calendar picker in horizontal split",
+        nargs = 0,
+    })
+
+    create_user_command("ObsidianJournalCalendarFloat", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianJournalCalendarFloat", {
+            ui_variant = "floating",
+            marks = build_journal_calendar_marks(ctx),
+        })
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open floating journal calendar picker",
         nargs = 0,
     })
 end

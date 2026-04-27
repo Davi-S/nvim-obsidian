@@ -82,6 +82,7 @@ function M.build(user_opts)
         }),
         navigation = require("nvim_obsidian.adapters.neovim.navigation"),
         calendar_buffer = require("nvim_obsidian.adapters.neovim.calendar_buffer"),
+        calendar_floating = require("nvim_obsidian.adapters.neovim.calendar_floating"),
         telescope = require("nvim_obsidian.adapters.picker.telescope"),
         blink_source = require("nvim_obsidian.adapters.completion.blink_source"),
         fs_io = require("nvim_obsidian.adapters.filesystem.io"),

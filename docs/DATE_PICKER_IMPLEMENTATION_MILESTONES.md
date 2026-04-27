@@ -1,8 +1,8 @@
 # Date Picker Implementation Milestones
 
-Status: MVP in progress (M1, M2, and M3 implemented; M4 in progress)
+Status: MVP in progress (M1, M2, and M3 implemented; M4 in progress with floating frontend implementation underway)
 Owner: nvim-obsidian maintainers
-Last Updated: 2026-04-25
+Last Updated: 2026-04-27
 
 ## Goal
 
@@ -91,7 +91,7 @@ Date picker input options:
 - initial_date (table | nil)
 - locale (string | nil)
 - marks (optional metadata keyed by date token)
-- ui_variant ("buffer" for milestone 1)
+- ui_variant ("buffer" | "floating")
 - mode ("visualizer" | "picker")
 
 Suggested user entrypoint (planned):
@@ -177,6 +177,8 @@ Rules:
   - `lua/nvim_obsidian/use_cases/open_date_picker.lua`
 - Buffer UI calendar adapter:
   - `lua/nvim_obsidian/adapters/neovim/calendar_buffer.lua`
+- Floating UI calendar adapter:
+  - `lua/nvim_obsidian/adapters/neovim/calendar_floating.lua`
 - Container wiring updates:
   - `lua/nvim_obsidian/app/container.lua`
 - Command entrypoint updates:
@@ -214,9 +216,17 @@ Rules:
 - Hardened split rendering to always use a dedicated calendar buffer so the source buffer is not overwritten in both windows.
 - Added shell-command delete sync (`ShellCmdPost`) to reconcile index deletes after external removal flows like `:!rm "%"`.
 
+### 2026-04-27
+
+- Implemented optional confirmation prompt before creating missing notes from calendar picker selections (`calendar.confirm_before_create`).
+- Added floating calendar UI variant wiring through use-case routing (`ui_variant = "floating"`) and container composition.
+- Added floating calendar command variants (`:ObsidianCalendarFloat`, `:ObsidianCalendarFloatPick`, `:ObsidianJournalCalendarFloat`).
+- Added calendar floating config defaults and validation (`calendar.floating.width`, `calendar.floating.height`, `calendar.floating.border`).
+- Added unit coverage for floating adapter, floating use-case routing, and floating command registration paths.
+
 ## Next Immediate Task
 
 Continue M4 hardening with:
 
-1. Floating-window calendar frontend (new UI adapter variant)
-2. Optional confirmation prompt before creating notes from calendar picker selections
+1. Complete floating-window calendar frontend polish and UX tuning (sizing, border presets, interaction ergonomics)
+2. Add integration/e2e coverage for floating picker -> journal open/create flow
