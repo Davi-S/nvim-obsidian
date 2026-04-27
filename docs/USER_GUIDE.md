@@ -140,6 +140,9 @@ Interaction notes:
 - Title row is informational and cannot receive picker focus.
 - Hovering over out-of-month day cells does not auto-switch the visible month.
 - Month changes only happen through month/year navigation keys.
+- When `calendar.confirm_before_create` is enabled, picker selections that
+  would create a missing journal note require explicit confirmation.
+- Selecting an existing note always opens directly (no confirmation step).
 
 Journal calendar layout notes:
 - `:ObsidianJournalCalendar` is current-buffer-first and replaces the active buffer with the calendar.
@@ -154,6 +157,7 @@ require("nvim_obsidian").setup({
   vault_root = vim.fn.expand("~/ObsidianVault"),
   calendar = {
     week_start = "sunday", -- or "monday"
+    confirm_before_create = false, -- set true to confirm before creating missing notes
     highlights = {
       title = "Title",
       weekday = "Comment",
@@ -789,9 +793,9 @@ Expected times:
 2. **Configure:** Set up journal, dataview, and custom templates for your workflow
 3. **Keybind:** Map commands to your preferred key combinations
 4. **Explore:** Run `:help nvim-obsidian` for built-in documentation
-5. **Calendar roadmap:** Floating-window calendar UI and optional confirmation-before-create in picker mode are planned next
+5. **Calendar roadmap:** Floating-window calendar UI remains planned next
 
 ---
 
-**Last Updated:** April 25, 2026  
+**Last Updated:** April 26, 2026  
 **For Issues:** Report bugs on [GitHub Issues](https://github.com/Davi-S/nvim-obsidian/issues)

@@ -40,6 +40,7 @@ describe("app config schema", function()
         assert.equals("Comment", opts.calendar.highlights.outside_month_day)
         assert.equals("DiagnosticOk", opts.calendar.highlights.today)
         assert.equals("Bold", opts.calendar.highlights.note_exists)
+        assert.equals(false, opts.calendar.confirm_before_create)
     end)
 
     it("accepts custom calendar highlight groups for day indicators", function()
@@ -47,6 +48,7 @@ describe("app config schema", function()
             vault_root = "/tmp/nvim_obsidian_vault",
             calendar = {
                 week_start = "monday",
+                confirm_before_create = true,
                 highlights = {
                     title = "MyCalendarTitle",
                     weekday = "MyCalendarWeekday",
@@ -59,6 +61,7 @@ describe("app config schema", function()
         })
 
         assert.equals("monday", opts.calendar.week_start)
+        assert.equals(true, opts.calendar.confirm_before_create)
         assert.equals("MyCalendarTitle", opts.calendar.highlights.title)
         assert.equals("MyCalendarWeekday", opts.calendar.highlights.weekday)
         assert.equals("MyCalendarDay", opts.calendar.highlights.in_month_day)
@@ -152,6 +155,18 @@ describe("app config schema", function()
         })
         assert.is_false(ok)
         assert.is_truthy(tostring(err):find("journal.daily.title_format must be a non-empty string", 1, true))
+    end)
+
+    it("rejects invalid calendar confirmation flag", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                confirm_before_create = "yes",
+            },
+        })
+
+        assert.is_false(ok)
+        assert.matches("calendar.confirm_before_create must be a boolean", tostring(err))
     end)
 
     it("accepts valid optional journal configuration", function()

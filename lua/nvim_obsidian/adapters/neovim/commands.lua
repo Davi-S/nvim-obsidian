@@ -682,7 +682,52 @@ local function register_obsidian_calendar(ctx)
                 return
             end
 
-            local open_result = ctx.use_cases.ensure_open_note.execute(ctx, {
+            local calendar_cfg = ctx.config and ctx.config.calendar or {}
+            local needs_confirmation = calendar_cfg.confirm_before_create == true
+
+            -- Only gate flows that create a note. Pure opens are not affected.
+            -- The picker result does not tell us whether the note already exists,
+            -- so we inspect the note catalog before deciding whether to prompt.
+            local ensure_open_note = ctx.use_cases.ensure_open_note
+            local candidate_exists = false
+            local vault_catalog = ctx.vault_catalog or (ctx.domains and ctx.domains.vault_catalog)
+            if type(vault_catalog) == "table" and type(vault_catalog.find_by_identity_token) == "function" then
+                local lookup = vault_catalog.find_by_identity_token(journal_title)
+                if type(lookup) == "table" and type(lookup.matches) == "table" and #lookup.matches > 0 then
+                    candidate_exists = true
+                end
+            end
+
+            if needs_confirmation and not candidate_exists then
+                local confirm_prompt = "Create journal note '" .. journal_title .. "'?"
+                local confirmed = true
+
+                if vim and vim.fn and type(vim.fn.confirm) == "function" then
+                    local choice = vim.fn.confirm(confirm_prompt, "&Create\n&Cancel", 2)
+                    confirmed = choice == 1
+                elseif ctx.adapters and ctx.adapters.notifications and type(ctx.adapters.notifications.warn) == "function" then
+                    ctx.adapters.notifications.warn({
+                        command = command_name,
+                        message = confirm_prompt,
+                        target = journal_title,
+                        next_step = "Enable vim.fn.confirm to require confirmation before creating notes",
+                    })
+                    confirmed = false
+                end
+
+                if not confirmed then
+                    if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.info then
+                        ctx.adapters.notifications.info({
+                            command = command_name,
+                            message = "Journal note creation cancelled",
+                            target = journal_title,
+                        })
+                    end
+                    return
+                end
+            end
+
+            local open_result = ensure_open_note.execute(ctx, {
                 title_or_token = journal_title,
                 create_if_missing = true,
                 origin = "journal",

@@ -684,6 +684,119 @@ describe("neovim command adapter", function()
             assert.equals("buffer", observed.ui_variant)
             assert.is_function(observed.on_finish)
         end)
+
+        it("prompts before creating a missing note when confirmation is enabled", function()
+            local prompted = nil
+            local created = nil
+            local opened_picker = false
+            _G.vim.fn = _G.vim.fn or {}
+            _G.vim.fn.confirm = function(message, choices, default)
+                prompted = {
+                    message = message,
+                    choices = choices,
+                    default = default,
+                }
+                return 2
+            end
+
+            local container = base_container({
+                resolve_journal_title = function()
+                    return "2026-04-26"
+                end,
+                config = {
+                    calendar = {
+                        confirm_before_create = true,
+                    },
+                },
+                vault_catalog = {
+                    find_by_identity_token = function()
+                        return { matches = {} }
+                    end,
+                },
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            opened_picker = true
+                            input.on_finish({
+                                action = "selected",
+                                selected_kind = "daily",
+                                date = { year = 2026, month = 4, day = 26 },
+                            })
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                    ensure_open_note = {
+                        execute = function()
+                            created = true
+                            return { ok = true, path = "journal/daily/2026-04-26.md", created = true, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianJournalCalendar"]()
+
+            assert.is_true(opened_picker)
+            assert.is_table(prompted)
+            assert.matches("Create journal note", prompted.message)
+            assert.equals("&Create\n&Cancel", prompted.choices)
+            assert.equals(2, prompted.default)
+            assert.is_nil(created)
+        end)
+
+        it("does not prompt when the journal note already exists", function()
+            local confirm_called = false
+            local opened_picker = false
+            _G.vim.fn = _G.vim.fn or {}
+            _G.vim.fn.confirm = function()
+                confirm_called = true
+                return 1
+            end
+
+            local opened = nil
+            local container = base_container({
+                resolve_journal_title = function()
+                    return "2026-04-26"
+                end,
+                config = {
+                    calendar = {
+                        confirm_before_create = true,
+                    },
+                },
+                vault_catalog = {
+                    find_by_identity_token = function()
+                        return { matches = { { path = "/vault/journal/daily/2026-04-26.md" } } }
+                    end,
+                },
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            opened_picker = true
+                            input.on_finish({
+                                action = "selected",
+                                selected_kind = "daily",
+                                date = { year = 2026, month = 4, day = 26 },
+                            })
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                    ensure_open_note = {
+                        execute = function()
+                            opened = true
+                            return { ok = true, path = "journal/daily/2026-04-26.md", created = false, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianJournalCalendar"]()
+
+            assert.is_true(opened_picker)
+            assert.is_false(confirm_called)
+            assert.is_true(opened)
+        end)
     end)
 
     describe("error handling", function()

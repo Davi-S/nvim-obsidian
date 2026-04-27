@@ -42,6 +42,11 @@ M.defaults = {
         -- Week starts on Sunday by default; can be switched to Monday.
         week_start = "sunday",
 
+        -- Optional confirmation gate for note creation from calendar picker.
+        -- When enabled, picker selections that would create a missing note must
+        -- ask for confirmation before calling ensure_open_note with create_if_missing = true.
+        confirm_before_create = false,
+
         -- Highlight group names consumed by the buffer calendar frontend.
         -- These are names only; users control actual colors through colorschemes.
         highlights = {
@@ -178,6 +183,10 @@ local function validate_calendar(opts)
         sunday = true,
         monday = true,
     }, "calendar.week_start")
+
+    if type(calendar.confirm_before_create) ~= "boolean" then
+        fail("calendar.confirm_before_create must be a boolean")
+    end
 
     if type(calendar.highlights) ~= "table" then
         fail("calendar.highlights must be a table")

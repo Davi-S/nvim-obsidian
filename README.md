@@ -80,6 +80,10 @@ Journal calendar layout behavior:
 Calendar indicators are configurable via `calendar.highlights` in setup config
 (`today`, `outside_month_day`, `note_exists`, and related groups).
 
+You can optionally require confirmation before creating missing journal notes
+from calendar picker selections with `calendar.confirm_before_create = true`.
+Existing notes still open directly without a confirmation prompt.
+
 For full command semantics and API details, see `docs/NVIM_PLUGIN.md`.
 
 ## Neovim Help Docs
