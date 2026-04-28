@@ -220,7 +220,7 @@ Rules:
 
 - Implemented optional confirmation prompt before creating missing notes from calendar picker selections (`calendar.confirm_before_create`).
 - Added floating calendar UI variant wiring through use-case routing (`ui_variant = "floating"`) and container composition.
-- Added floating calendar command variants (`:ObsidianCalendarFloat`, `:ObsidianCalendarFloatPick`, `:ObsidianJournalCalendarFloat`).
+- Added floating calendar command variants (`:ObsidianCalendarFloat`, `:ObsidianJournalCalendarFloat`).
 - Added calendar floating config defaults and validation (`calendar.floating.width`, `calendar.floating.height`, `calendar.floating.border`).
 - Added unit coverage for floating adapter, floating use-case routing, and floating command registration paths.
 

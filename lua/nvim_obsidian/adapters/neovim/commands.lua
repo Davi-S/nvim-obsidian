@@ -852,24 +852,6 @@ local function register_obsidian_calendar(ctx)
         end,
     })
 
-    create_user_command("ObsidianCalendarFloatPick", function()
-        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
-            return
-        end
-
-        local result = open_calendar("picker", "ObsidianCalendarFloatPick", {
-            ui_variant = "floating",
-        })
-
-        if not result.ok then
-            error_to_notification(ctx, result.error)
-            return
-        end
-    end, {
-        desc = "Open floating calendar picker",
-        nargs = 0,
-    })
-
     -- Secondary power-flow command for journal navigation/creation via calendar picker.
     --
     -- Product intent:

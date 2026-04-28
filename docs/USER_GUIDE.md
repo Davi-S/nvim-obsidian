@@ -112,7 +112,6 @@ Try these commands in a Markdown file within your vault:
 :ObsidianCalendar      " Open calendar visualizer
 :ObsidianCalendar pick " Open calendar picker
 :ObsidianCalendarFloat " Open floating calendar (visualizer by default)
-:ObsidianCalendarFloatPick " Open floating calendar picker directly
 :ObsidianJournalCalendar        " Open journal picker in current buffer
 :ObsidianJournalCalendarVSplit  " Open journal picker in vertical split
 :ObsidianJournalCalendarHSplit  " Open journal picker in horizontal split

@@ -99,10 +99,6 @@ Notes:
   Open the same calendar workflow in a centered floating window.
   Picker mode selects a date without opening a journal note.
 
-                                      *:ObsidianCalendarFloatPick*
-:ObsidianCalendarFloatPick
-  Open the floating calendar directly in picker mode.
-
                                             *:ObsidianJournalCalendar*
 :ObsidianJournalCalendar
   Open journal calendar picker in current buffer.

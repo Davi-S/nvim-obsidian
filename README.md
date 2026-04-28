@@ -68,7 +68,6 @@ After setup, run:
 - `:ObsidianCalendar`
 - `:ObsidianCalendar pick`
 - `:ObsidianCalendarFloat`
-- `:ObsidianCalendarFloatPick`
 - `:ObsidianJournalCalendar`
 - `:ObsidianJournalCalendarVSplit`
 - `:ObsidianJournalCalendarHSplit`

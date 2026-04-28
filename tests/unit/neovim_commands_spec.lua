@@ -690,7 +690,7 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            command_registry["ObsidianCalendarFloatPick"]()
+            command_registry["ObsidianCalendarFloat"]({ args = "pick" })
 
             assert.is_table(observed)
             assert.equals("picker", observed.mode)
@@ -705,7 +705,6 @@ describe("neovim command adapter", function()
             commands.register(container)
 
             assert.is_function(command_registry["ObsidianCalendarFloat"])
-            assert.is_function(command_registry["ObsidianCalendarFloatPick"])
             assert.is_function(command_registry["ObsidianJournalCalendarFloat"])
         end)
 
