@@ -110,18 +110,19 @@ Try these commands in a Markdown file within your vault:
 :ObsidianFollow        " Follow link under cursor
 :ObsidianReindex       " Refresh vault cache
 :ObsidianCalendar      " Open calendar visualizer
-:ObsidianCalendar pick " Open calendar picker (journal target selection)
+:ObsidianCalendar pick " Open calendar picker
 :ObsidianCalendarFloat " Open floating calendar (visualizer by default)
 :ObsidianCalendarFloatPick " Open floating calendar picker directly
 :ObsidianJournalCalendar        " Open journal picker in current buffer
 :ObsidianJournalCalendarVSplit  " Open journal picker in vertical split
 :ObsidianJournalCalendarHSplit  " Open journal picker in horizontal split
-:ObsidianJournalCalendarFloat   " Open floating journal picker
+:ObsidianJournalCalendarFloat   " Open floating journal picker that opens/creates the selected journal note
 ```
 
 ### Calendar Picker Controls
 
-Use `:ObsidianCalendar pick` to select a journal family and target date from one view.
+Use `:ObsidianCalendar pick` to choose a date without opening a journal note.
+Use `:ObsidianJournalCalendar*` when you want the picker to open or create a journal note after selection.
 
 Navigation:
 - `h` / `l`: move horizontally
@@ -150,7 +151,8 @@ Interaction notes:
 Journal calendar layout notes:
 - `:ObsidianJournalCalendar` is current-buffer-first and replaces the active buffer with the calendar.
 - `:ObsidianJournalCalendarVSplit` and `:ObsidianJournalCalendarHSplit` keep your existing buffer visible and open the picker in a split.
-- `:ObsidianJournalCalendarFloat` opens the same picker behavior in a centered floating modal window.
+- `:ObsidianJournalCalendarFloat` opens the journal picker behavior in a centered floating modal window and opens the selected journal note.
+- Closing a Yazi terminal triggers a vault rescan when the terminal name includes `yazi` or the Yazi close/leave user events fire.
 
 ### Calendar Indicator Styling
 

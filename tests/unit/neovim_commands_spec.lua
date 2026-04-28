@@ -653,6 +653,52 @@ describe("neovim command adapter", function()
         end)
     end)
 
+    describe(":ObsidianCalendar", function()
+        it("opens picker mode without journal note callback", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianCalendar"]({ args = "pick" })
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("buffer", observed.ui_variant)
+            assert.is_nil(observed.on_finish)
+        end)
+
+        it("opens floating picker without journal note callback", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianCalendarFloatPick"]()
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("floating", observed.ui_variant)
+            assert.is_nil(observed.on_finish)
+        end)
+    end)
+
     describe(":ObsidianJournalCalendar", function()
         it("registers floating calendar command variants", function()
             local container = base_container()

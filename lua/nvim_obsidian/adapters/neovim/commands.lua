@@ -642,14 +642,10 @@ local function register_obsidian_calendar(ctx)
         return mode
     end
 
-    -- Shared completion handler for calendar picker mode.
+    -- Shared completion handler for journal picker mode.
     --
-    -- Why this helper exists:
-    -- - We now expose picker mode through two command surfaces:
-    --   1) :ObsidianCalendar pick (generic calendar command with explicit picker arg)
-    --   2) :ObsidianJournalCalendar (secondary power-flow command dedicated to journal access)
-    -- - Both flows must apply exactly the same journal open/create behavior.
-    -- - Keeping this logic in one closure factory prevents subtle drift between commands.
+    -- Only the journal-specific calendar commands attach this callback.
+    -- Generic calendar picker modes return their selection without opening a note.
     local function build_calendar_picker_on_finish(command_name)
         return function(payload)
             -- on_finish is invoked asynchronously by the calendar adapter when
@@ -763,22 +759,25 @@ local function register_obsidian_calendar(ctx)
 
     -- Shared opener that centralizes adapter invocation contract.
     --
-    -- This keeps both calendar commands aligned on:
+    -- This keeps calendar commands aligned on:
     -- - UI variant
     -- - initial date seed
-    -- - callback hookup
+    -- - optional completion callback
     local function open_calendar(mode, command_name, extra_request)
         local request = {
             mode = mode,
             ui_variant = "buffer",
             initial_date = os.date("*t"),
-            on_finish = build_calendar_picker_on_finish(command_name),
         }
 
         if type(extra_request) == "table" then
             for key, value in pairs(extra_request) do
                 request[key] = value
             end
+        end
+
+        if request.on_finish == nil and request.journal_on_finish == true then
+            request.on_finish = build_calendar_picker_on_finish(command_name)
         end
 
         return ctx.use_cases.open_date_picker.execute(ctx, {
@@ -889,6 +888,7 @@ local function register_obsidian_calendar(ctx)
         local result = open_calendar("picker", "ObsidianJournalCalendar", {
             layout = "current",
             marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
         })
         if not result.ok then
             error_to_notification(ctx, result.error)
@@ -907,6 +907,7 @@ local function register_obsidian_calendar(ctx)
         local result = open_calendar("picker", "ObsidianJournalCalendarVSplit", {
             layout = "vsplit",
             marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
         })
         if not result.ok then
             error_to_notification(ctx, result.error)
@@ -925,6 +926,7 @@ local function register_obsidian_calendar(ctx)
         local result = open_calendar("picker", "ObsidianJournalCalendarHSplit", {
             layout = "hsplit",
             marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
         })
         if not result.ok then
             error_to_notification(ctx, result.error)
@@ -943,6 +945,7 @@ local function register_obsidian_calendar(ctx)
         local result = open_calendar("picker", "ObsidianJournalCalendarFloat", {
             ui_variant = "floating",
             marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
         })
         if not result.ok then
             error_to_notification(ctx, result.error)

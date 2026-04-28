@@ -87,6 +87,8 @@ You can optionally require confirmation before creating missing journal notes
 from calendar picker selections with `calendar.confirm_before_create = true`.
 Existing notes still open directly without a confirmation prompt.
 
+Closing a Yazi terminal triggers a vault rescan when the terminal name includes `yazi` or the Yazi close/leave user events fire.
+
 Floating calendar UI can be configured through `calendar.floating`:
 `width`, `height`, and `border` (for centered modal behavior).
 

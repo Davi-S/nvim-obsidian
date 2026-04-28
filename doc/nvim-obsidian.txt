@@ -92,10 +92,12 @@ Notes:
                                                   *:ObsidianCalendar*
 :ObsidianCalendar [visualizer|pick|picker]
   Open calendar visualizer (default) or picker mode in the current split/window.
+  Picker mode selects a date without opening a journal note.
 
                                            *:ObsidianCalendarFloat*
 :ObsidianCalendarFloat [visualizer|pick|picker]
   Open the same calendar workflow in a centered floating window.
+  Picker mode selects a date without opening a journal note.
 
                                       *:ObsidianCalendarFloatPick*
 :ObsidianCalendarFloatPick
@@ -107,7 +109,7 @@ Notes:
 
                                   *:ObsidianJournalCalendarFloat*
 :ObsidianJournalCalendarFloat
-  Open journal calendar picker in a centered floating window.
+  Open journal calendar picker in a centered floating window and open/create the selected journal note.
 
                                       *:ObsidianJournalCalendarVSplit*
 :ObsidianJournalCalendarVSplit
