@@ -117,6 +117,11 @@ function M.open_calendar(ctx, request)
 
     wrapped_request.layout = "current"
     wrapped_request.close_on_finish = true
+    wrapped_request.center_content = true
+    wrapped_request.window_size = {
+        width = width,
+        height = height,
+    }
     wrapped_request.on_finish = function(payload)
         if type(vim.api.nvim_win_is_valid) == "function" and vim.api.nvim_win_is_valid(float_win) then
             pcall(vim.api.nvim_win_close, float_win, true)
