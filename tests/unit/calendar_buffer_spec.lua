@@ -95,7 +95,7 @@ describe("calendar buffer adapter", function()
     end
 
     local function open_picker(on_finish)
-        return calendar_buffer.open_calendar({ date_picker = date_picker, config = { calendar = {} } }, {
+        return calendar_buffer.open_calendar({ date_picker = date_picker }, {
             mode = "picker",
             initial_date = { year = 2026, month = 3, day = 15 },
             on_finish = on_finish,
@@ -116,19 +116,6 @@ describe("calendar buffer adapter", function()
         local value = tostring(line or "")
         local trimmed = value:gsub("^%s+", "")
         return #value - #trimmed
-    end
-
-    local function trimmed_text(line)
-        return tostring(line or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    end
-
-    local function first_non_blank_index(lines)
-        for index, line in ipairs(lines or {}) do
-            if tostring(line or ""):match("%S") then
-                return index
-            end
-        end
-        return nil
     end
 
     before_each(function()
@@ -210,17 +197,7 @@ describe("calendar buffer adapter", function()
     end)
 
     it("centers each calendar line independently in floating layout", function()
-        calendar_buffer.open_calendar({
-            date_picker = date_picker,
-            config = {
-                calendar = {
-                    title = {
-                        visualizer = "X",
-                        picker = "X",
-                    },
-                },
-            },
-        }, {
+        calendar_buffer.open_calendar({ date_picker = date_picker }, {
             mode = "visualizer",
             layout = "current",
             center_content = true,
@@ -231,46 +208,13 @@ describe("calendar buffer adapter", function()
             initial_date = { year = 2026, month = 3, day = 15 },
         })
 
-        local title_index = first_non_blank_index(last_lines)
-        assert.is_not_nil(title_index)
-        assert.is_true(leading_spaces(last_lines[title_index]) > leading_spaces(last_lines[title_index + 1]))
-        assert.is_true(leading_spaces(last_lines[title_index + 1]) > leading_spaces(last_lines[title_index + 2]))
-    end)
-
-    it("uses configured title and keybindings", function()
-        calendar_buffer.open_calendar({
-            date_picker = date_picker,
-            config = {
-                calendar = {
-                    title = {
-                        visualizer = "My Visualizer Title",
-                        picker = "My Picker Title",
-                    },
-                    keymaps = {
-                        left = "a",
-                        right = "d",
-                    },
-                },
-            },
-        }, {
-            mode = "picker",
-            initial_date = { year = 2026, month = 3, day = 15 },
-        })
-
-        assert.equals("My Picker Title", trimmed_text(last_lines[1]))
-
-        go_to_row_two()
-        assert.equals(0, cursor[2])
-
-        keymaps["d"]()
-        assert.equals(6, cursor[2])
-
-        keymaps["a"]()
-        assert.equals(0, cursor[2])
+        assert.is_true(leading_spaces(last_lines[1]) > 0)
+        assert.is_true(leading_spaces(last_lines[2]) > leading_spaces(last_lines[1]))
+        assert.is_true(leading_spaces(last_lines[3]) > leading_spaces(last_lines[1]))
     end)
 
     it("highlights marked existing-note days with existing_note_day group", function()
-        calendar_buffer.open_calendar({ date_picker = date_picker, config = { calendar = {} } }, {
+        calendar_buffer.open_calendar({ date_picker = date_picker }, {
             mode = "picker",
             initial_date = { year = 2026, month = 3, day = 15 },
             marks = {

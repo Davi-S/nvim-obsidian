@@ -42,31 +42,6 @@ M.defaults = {
         -- Week starts on Sunday by default; can be switched to Monday.
         week_start = "sunday",
 
-        -- Title text is configurable per frontend mode. A plain string is
-        -- normalized to both modes for simple setups.
-        title = {
-            visualizer = "Obsidian Calendar (visualizer mode)",
-            picker = "Obsidian Calendar (picker mode)",
-        },
-
-        -- Calendar keybindings are configurable so users can match their
-        -- navigation preferences without editing adapter code.
-        keymaps = {
-            left = "h",
-            right = "l",
-            up = "k",
-            down = "j",
-            month_prev = "H",
-            month_next = "L",
-            year_prev = "J",
-            year_next = "K",
-            today = "t",
-            select = "<CR>",
-            cancel = "q",
-            cancel_alt = "<Esc>",
-            mouse = "<LeftMouse>",
-        },
-
         -- Optional confirmation gate for note creation from calendar picker.
         -- When enabled, picker selections that would create a missing note must
         -- ask for confirmation before calling ensure_open_note with create_if_missing = true.
@@ -221,45 +196,6 @@ local function validate_calendar(opts)
         fail("calendar.confirm_before_create must be a boolean")
     end
 
-    if type(calendar.title) ~= "table" then
-        fail("calendar.title must be a table")
-    end
-
-    local required_title_modes = {
-        "visualizer",
-        "picker",
-    }
-    for _, mode_name in ipairs(required_title_modes) do
-        if not is_non_empty_string(calendar.title[mode_name]) then
-            fail("calendar.title." .. mode_name .. " must be a non-empty string")
-        end
-    end
-
-    if type(calendar.keymaps) ~= "table" then
-        fail("calendar.keymaps must be a table")
-    end
-
-    local required_keymaps = {
-        "left",
-        "right",
-        "up",
-        "down",
-        "month_prev",
-        "month_next",
-        "year_prev",
-        "year_next",
-        "today",
-        "select",
-        "cancel",
-        "cancel_alt",
-        "mouse",
-    }
-    for _, key in ipairs(required_keymaps) do
-        if not is_non_empty_string(calendar.keymaps[key]) then
-            fail("calendar.keymaps." .. key .. " must be a non-empty string")
-        end
-    end
-
     if type(calendar.highlights) ~= "table" then
         fail("calendar.highlights must be a table")
     end
@@ -330,41 +266,12 @@ local function validate_journal(opts)
     end
 end
 
-local function deep_copy(value)
-    if type(value) ~= "table" then
-        return value
-    end
-
-    local result = {}
-    for key, item in pairs(value) do
-        result[deep_copy(key)] = deep_copy(item)
-    end
-    return result
-end
-
-local function deep_merge(base, overlay)
-    local result = deep_copy(base)
-    if type(overlay) ~= "table" then
-        return result
-    end
-
-    for key, value in pairs(overlay) do
-        if type(value) == "table" and type(result[key]) == "table" then
-            result[key] = deep_merge(result[key], value)
-        else
-            result[key] = deep_copy(value)
-        end
-    end
-
-    return result
-end
-
 ---Normalize and validate user options against defaults.
 ---@param user_opts? table
 ---@return table opts
 function M.normalize(user_opts)
     -- Merge user input over defaults so feature modules can rely on complete config.
-    local opts = deep_merge(M.defaults, user_opts or {})
+    local opts = vim.tbl_deep_extend("force", {}, M.defaults, user_opts or {})
 
     -- Keep calendar highlight defaults explicit even if callers provide only a
     -- partial calendar table. This guards against shallow user config and makes
@@ -376,41 +283,10 @@ function M.normalize(user_opts)
         opts.calendar.highlights = {}
     end
 
-    local title = opts.calendar.title
-    if type(title) == "string" then
-        title = {
-            visualizer = title,
-            picker = title,
-        }
-    elseif type(title) ~= "table" then
-        title = {}
-    end
-    opts.calendar.title = title
-
-    local keymaps = opts.calendar.keymaps
-    if type(keymaps) ~= "table" then
-        keymaps = {}
-    end
-    opts.calendar.keymaps = keymaps
-
     local default_calendar_highlights = M.defaults.calendar.highlights
     for key, value in pairs(default_calendar_highlights) do
         if type(opts.calendar.highlights[key]) ~= "string" or opts.calendar.highlights[key] == "" then
             opts.calendar.highlights[key] = value
-        end
-    end
-
-    local default_calendar_title = M.defaults.calendar.title
-    for key, value in pairs(default_calendar_title) do
-        if type(title[key]) ~= "string" or title[key] == "" then
-            title[key] = value
-        end
-    end
-
-    local default_calendar_keymaps = M.defaults.calendar.keymaps
-    for key, value in pairs(default_calendar_keymaps) do
-        if type(keymaps[key]) ~= "string" or keymaps[key] == "" then
-            keymaps[key] = value
         end
     end
 
