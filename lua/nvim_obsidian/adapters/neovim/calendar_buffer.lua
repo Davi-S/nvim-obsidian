@@ -343,11 +343,22 @@ end
 
 -- Configure the backing buffer as an ephemeral UI surface.
 local function ensure_buffer_opts(bufnr)
-    vim.api.nvim_set_option_value("buftype", "nofile", { buf = bufnr })
-    vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
-    vim.api.nvim_set_option_value("swapfile", false, { buf = bufnr })
-    vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
-    vim.api.nvim_set_option_value("filetype", "markdown", { buf = bufnr })
+    if type(bufnr) ~= "number" then
+        return
+    end
+
+    if type(vim.api.nvim_buf_is_valid) == "function" then
+        local ok, valid = pcall(vim.api.nvim_buf_is_valid, bufnr)
+        if not ok or not valid then
+            return
+        end
+    end
+
+    pcall(vim.api.nvim_set_option_value, "buftype", "nofile", { buf = bufnr })
+    pcall(vim.api.nvim_set_option_value, "bufhidden", "wipe", { buf = bufnr })
+    pcall(vim.api.nvim_set_option_value, "swapfile", false, { buf = bufnr })
+    pcall(vim.api.nvim_set_option_value, "modifiable", true, { buf = bufnr })
+    pcall(vim.api.nvim_set_option_value, "filetype", "markdown", { buf = bufnr })
 end
 
 -- Redraw the entire calendar view from the current state snapshot.
@@ -359,6 +370,16 @@ end
 --
 -- This order guarantees highlight application always matches final content.
 local function render(date_picker, bufnr, state)
+    -- Avoid rendering into an invalid or wiped buffer (race with window/BufWipeout).
+    if type(bufnr) ~= "number" then
+        return
+    end
+    if type(vim.api.nvim_buf_is_valid) == "function" then
+        local ok_buf, buf_valid = pcall(vim.api.nvim_buf_is_valid, bufnr)
+        if not ok_buf or not buf_valid then
+            return
+        end
+    end
     local payload = build_lines(date_picker, state)
     local top_pad = 0
     local line_offsets = {}
