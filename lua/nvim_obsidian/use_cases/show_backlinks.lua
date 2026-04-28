@@ -1,5 +1,9 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Use-case: list and navigate backlinks to current note.
+---
+---Builds backlinks by scanning markdown references and routes selection through
+---picker/navigation adapters.
 local M = {}
 
 M.contract = {
@@ -24,11 +28,17 @@ M.contract = {
     },
 }
 
+---@param path any
+---@return string
 local function basename(path)
     local p = tostring(path or ""):gsub("\\", "/")
     return p:match("[^/]+$") or p
 end
 
+---Execute backlinks discovery and navigation flow.
+---@param _ctx table
+---@param _input table
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {
@@ -282,7 +292,7 @@ function M.execute(_ctx, _input)
             }
         end
         local picked_line = tonumber((picked.item and picked.item.backlink_line) or picked.backlink_line or
-        line_by_path[picked.path])
+            line_by_path[picked.path])
         if picked_line and picked_line >= 1 and type(navigation.jump_to_line) == "function" then
             navigation.jump_to_line(picked_line)
         end

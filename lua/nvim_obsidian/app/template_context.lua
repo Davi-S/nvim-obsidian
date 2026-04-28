@@ -1,3 +1,8 @@
+---Template rendering context builder.
+---
+---This module assembles immutable context snapshots passed into template
+---rendering and placeholder resolvers. It intentionally avoids exposing live
+---mutable config references to keep template evaluation deterministic.
 local M = {}
 
 local ORIGIN_MAP = {
@@ -6,6 +11,9 @@ local ORIGIN_MAP = {
     link = "link_follow_create",
 }
 
+---@param value any
+---@param seen? table
+---@return any
 local function deep_copy(value, seen)
     if type(value) ~= "table" then
         return value
@@ -24,6 +32,9 @@ local function deep_copy(value, seen)
     return out
 end
 
+---@param value any
+---@param seen? table
+---@return any
 local function deep_readonly(value, seen)
     if type(value) ~= "table" then
         return value
@@ -48,6 +59,9 @@ local function deep_readonly(value, seen)
     })
 end
 
+---Build normalized time parts used in template contexts.
+---@param now_ts integer
+---@return table
 local function time_parts(now_ts)
     local t = os.date("*t", now_ts)
     return {
@@ -68,10 +82,21 @@ local function time_parts(now_ts)
     }
 end
 
+---Map high-level origin token into internal template origin key.
+---@param input_origin string|nil
+---@return string|nil
 function M.resolve_origin(input_origin)
     return ORIGIN_MAP[input_origin or ""]
 end
 
+---Build immutable template rendering context.
+---
+---Implementation notes:
+---1) `config_snapshot` is deep-copied then wrapped as readonly.
+---2) `time` contains both scalar fields and helper formatter.
+---3) `note` block is included only when minimum invariants are satisfied.
+---@param opts? table
+---@return table
 function M.build(opts)
     local options = opts or {}
     local now_ts = tonumber(options.now) or os.time()

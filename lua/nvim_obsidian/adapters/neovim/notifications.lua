@@ -1,5 +1,9 @@
 ---@diagnostic disable: undefined-global
 
+---Neovim notifications adapter.
+---
+---Maps plugin events to `vim.notify` with configurable severity filtering and
+---consistent message formatting.
 local M = {}
 
 local severity_order = {
@@ -8,6 +12,8 @@ local severity_order = {
     info = 3,
 }
 
+---@param s any
+---@return string|nil
 local function trim(s)
     if type(s) ~= "string" then return nil end
     local stripped = s:match("^%s*(.-)%s*$")
@@ -15,6 +21,8 @@ local function trim(s)
     return stripped
 end
 
+---@param level any
+---@return string
 local function normalize_level(level)
     local key = tostring(level or "warn"):lower()
     if severity_order[key] then
@@ -23,6 +31,8 @@ local function normalize_level(level)
     return "warn"
 end
 
+---@param ctx table|nil
+---@return table|nil
 local function resolve_vim(ctx)
     if type(ctx) == "table" and type(ctx.vim) == "table" then
         return ctx.vim
@@ -30,6 +40,9 @@ local function resolve_vim(ctx)
     return vim
 end
 
+---@param vim_ref table|nil
+---@param level any
+---@return integer|nil
 local function resolve_log_constant(vim_ref, level)
     local key = normalize_level(level)
     if not vim_ref or type(vim_ref.log) ~= "table" or type(vim_ref.log.levels) ~= "table" then
@@ -45,12 +58,17 @@ local function resolve_log_constant(vim_ref, level)
     return vim_ref.log.levels.INFO
 end
 
+---@param configured_level any
+---@param event_level any
+---@return boolean
 local function should_emit(configured_level, event_level)
     local configured = severity_order[normalize_level(configured_level)] or severity_order.warn
     local event = severity_order[normalize_level(event_level)] or severity_order.warn
     return event <= configured
 end
 
+---@param payload any
+---@return string|nil
 local function format_message(payload)
     if type(payload) == "string" then
         return trim(payload)
@@ -86,7 +104,7 @@ local function format_message(payload)
     return table.concat(parts, " | ")
 end
 
----Create a context-aware notification adapter.
+---Create severity-aware notifier bound to setup config.
 ---@param ctx table|nil { vim?: table, config?: table, title?: string }
 ---@return table
 function M.create_notifier(ctx)
@@ -150,14 +168,20 @@ local function default_notifier()
     })
 end
 
+---Send info-level notification using default notifier.
+---@param payload any
 function M.info(payload)
     return default_notifier().info(payload)
 end
 
+---Send warning-level notification using default notifier.
+---@param payload any
 function M.warn(payload)
     return default_notifier().warn(payload)
 end
 
+---Send error-level notification using default notifier.
+---@param payload any
 function M.error(payload)
     return default_notifier().error(payload)
 end

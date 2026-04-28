@@ -1,3 +1,7 @@
+---Dependency verification for required runtime plugins.
+---
+---The plugin assumes these integrations exist at startup because adapters and
+---use-cases depend on them directly. Fail fast to keep setup errors explicit.
 local M = {}
 
 local REQUIRED_DEPENDENCIES = {
@@ -19,6 +23,7 @@ local REQUIRED_DEPENDENCIES = {
     },
 }
 
+---Verify required runtime plugin dependencies are loadable.
 function M.verify_required_dependencies()
     for _, dep in ipairs(REQUIRED_DEPENDENCIES) do
         local ok = pcall(require, dep.module)

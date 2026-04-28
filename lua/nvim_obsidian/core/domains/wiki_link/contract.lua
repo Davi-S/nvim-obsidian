@@ -1,5 +1,9 @@
 local primitives = require("nvim_obsidian.core.shared.primitives")
 
+---Domain contract: wiki-link parsing and target resolution.
+---
+---Used by link-follow use-cases to transform cursor context into navigation
+---decisions (resolved, missing, or ambiguous targets).
 local M = {
     name = "wiki_link",
     version = "phase3-contract",

@@ -80,6 +80,8 @@ describe("neovim command adapter", function()
         _G.vim.api.nvim_list_bufs = function()
             return { 1 }
         end
+        _G.vim.uv = nil
+        _G.vim.loop = nil
     end)
 
     local function base_container(overrides)
@@ -149,6 +151,24 @@ describe("neovim command adapter", function()
         end
 
         return ctx
+    end
+
+    local function find_autocmd_callback(event_name)
+        for _, item in ipairs(autocmd_registry) do
+            local events = item.events
+            if type(events) == "string" then
+                if events == event_name then
+                    return item.opts and item.opts.callback
+                end
+            elseif type(events) == "table" then
+                for _, ev in ipairs(events) do
+                    if ev == event_name then
+                        return item.opts and item.opts.callback
+                    end
+                end
+            end
+        end
+        return nil
     end
 
     describe("command registration", function()
@@ -485,9 +505,9 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            assert.equals(1, #autocmd_registry)
+            assert.is_true(#autocmd_registry >= 1)
 
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufReadPost")
             assert.is_function(callback)
 
             callback({ event = "BufReadPost", buf = 7 })
@@ -531,7 +551,7 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufWritePost")
 
             callback({ event = "BufWritePost", buf = 7 })
             assert.equals(0, #calls) -- render is deferred via vim.schedule()
@@ -579,7 +599,7 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufWritePost")
 
             callback({ event = "BufWritePost", buf = 7 })
             assert.equals(0, #calls) -- render is deferred via vim.schedule()
@@ -621,7 +641,7 @@ describe("neovim command adapter", function()
             })
 
             commands.register(container)
-            local callback = autocmd_registry[1].opts.callback
+            local callback = find_autocmd_callback("BufWritePost")
 
             callback({ event = "BufWritePost", buf = 7 })
             assert.equals(0, #calls) -- render is deferred via vim.schedule()
@@ -630,6 +650,249 @@ describe("neovim command adapter", function()
             assert.equals(2, #calls)
             assert.equals(21, calls[1].buffer)
             assert.equals(23, calls[2].buffer)
+        end)
+    end)
+
+    describe(":ObsidianCalendar", function()
+        it("opens picker mode without journal note callback", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianCalendar"]({ args = "pick" })
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("buffer", observed.ui_variant)
+            assert.is_nil(observed.on_finish)
+        end)
+
+        it("opens floating picker without journal note callback", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianCalendarFloat"]({ args = "pick" })
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("floating", observed.ui_variant)
+            assert.is_nil(observed.on_finish)
+        end)
+    end)
+
+    describe(":ObsidianJournalCalendar", function()
+        it("registers floating calendar command variants", function()
+            local container = base_container()
+            commands.register(container)
+
+            assert.is_function(command_registry["ObsidianCalendarFloat"])
+            assert.is_function(command_registry["ObsidianJournalCalendarFloat"])
+        end)
+
+        it("opens floating calendar command with floating ui variant", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianCalendarFloat"]({ args = "pick" })
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("floating", observed.ui_variant)
+        end)
+
+        it("opens floating journal calendar with floating ui variant", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianJournalCalendarFloat"]()
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("floating", observed.ui_variant)
+            assert.is_function(observed.on_finish)
+        end)
+
+        it("registers secondary journal calendar command", function()
+            local container = base_container()
+            commands.register(container)
+
+            assert.is_function(command_registry["ObsidianJournalCalendar"])
+        end)
+
+        it("opens date picker in picker mode", function()
+            local observed = nil
+            local container = base_container({
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            observed = input
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            assert.is_function(command_registry["ObsidianJournalCalendar"])
+
+            command_registry["ObsidianJournalCalendar"]()
+
+            assert.is_table(observed)
+            assert.equals("picker", observed.mode)
+            assert.equals("buffer", observed.ui_variant)
+            assert.is_function(observed.on_finish)
+        end)
+
+        it("prompts before creating a missing note when confirmation is enabled", function()
+            local prompted = nil
+            local created = nil
+            local opened_picker = false
+            _G.vim.fn = _G.vim.fn or {}
+            _G.vim.fn.confirm = function(message, choices, default)
+                prompted = {
+                    message = message,
+                    choices = choices,
+                    default = default,
+                }
+                return 2
+            end
+
+            local container = base_container({
+                resolve_journal_title = function()
+                    return "2026-04-26"
+                end,
+                config = {
+                    calendar = {
+                        confirm_before_create = true,
+                    },
+                },
+                vault_catalog = {
+                    find_by_identity_token = function()
+                        return { matches = {} }
+                    end,
+                },
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            opened_picker = true
+                            input.on_finish({
+                                action = "selected",
+                                selected_kind = "daily",
+                                date = { year = 2026, month = 4, day = 26 },
+                            })
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                    ensure_open_note = {
+                        execute = function()
+                            created = true
+                            return { ok = true, path = "journal/daily/2026-04-26.md", created = true, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianJournalCalendar"]()
+
+            assert.is_true(opened_picker)
+            assert.is_table(prompted)
+            assert.matches("Create journal note", prompted.message)
+            assert.equals("&Create\n&Cancel", prompted.choices)
+            assert.equals(2, prompted.default)
+            assert.is_nil(created)
+        end)
+
+        it("does not prompt when the journal note already exists", function()
+            local confirm_called = false
+            local opened_picker = false
+            _G.vim.fn = _G.vim.fn or {}
+            _G.vim.fn.confirm = function()
+                confirm_called = true
+                return 1
+            end
+
+            local opened = nil
+            local container = base_container({
+                resolve_journal_title = function()
+                    return "2026-04-26"
+                end,
+                config = {
+                    calendar = {
+                        confirm_before_create = true,
+                    },
+                },
+                vault_catalog = {
+                    find_by_identity_token = function()
+                        return { matches = { { path = "/vault/journal/daily/2026-04-26.md" } } }
+                    end,
+                },
+                use_cases = {
+                    open_date_picker = {
+                        execute = function(_ctx, input)
+                            opened_picker = true
+                            input.on_finish({
+                                action = "selected",
+                                selected_kind = "daily",
+                                date = { year = 2026, month = 4, day = 26 },
+                            })
+                            return { ok = true, action = "opened", date = nil, cursor_date = nil, error = nil }
+                        end,
+                    },
+                    ensure_open_note = {
+                        execute = function()
+                            opened = true
+                            return { ok = true, path = "journal/daily/2026-04-26.md", created = false, error = nil }
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            command_registry["ObsidianJournalCalendar"]()
+
+            assert.is_true(opened_picker)
+            assert.is_false(confirm_called)
+            assert.is_true(opened)
         end)
     end)
 

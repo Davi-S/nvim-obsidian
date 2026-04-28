@@ -21,6 +21,7 @@ nvim-obsidian provides Obsidian-like workflows in Markdown vaults:
 - Wiki link follow under cursor
 - Backlinks lookup for current note
 - Journal note commands (today/next/prev)
+- Calendar visualizer and picker flows
 - Template insertion with placeholders
 - Dataview block rendering
 
@@ -88,6 +89,32 @@ Notes:
 :ObsidianSearch
   Vault-scoped text search.
 
+                                                  *:ObsidianCalendar*
+:ObsidianCalendar [visualizer|pick|picker]
+  Open calendar visualizer (default) or picker mode in the current split/window.
+  Picker mode selects a date without opening a journal note.
+
+                                           *:ObsidianCalendarFloat*
+:ObsidianCalendarFloat [visualizer|pick|picker]
+  Open the same calendar workflow in a centered floating window.
+  Picker mode selects a date without opening a journal note.
+
+                                            *:ObsidianJournalCalendar*
+:ObsidianJournalCalendar
+  Open journal calendar picker in current buffer.
+
+                                  *:ObsidianJournalCalendarFloat*
+:ObsidianJournalCalendarFloat
+  Open journal calendar picker in a centered floating window and open/create the selected journal note.
+
+                                      *:ObsidianJournalCalendarVSplit*
+:ObsidianJournalCalendarVSplit
+  Open journal calendar picker in a vertical split.
+
+                                      *:ObsidianJournalCalendarHSplit*
+:ObsidianJournalCalendarHSplit
+  Open journal calendar picker in a horizontal split.
+
                                                    *:ObsidianReindex*
 :ObsidianReindex
   Full vault reindex.
@@ -128,6 +155,19 @@ Dataview fields:
 - dataview.messages.task_no_results.enabled (boolean)
 - dataview.messages.task_no_results.text (non-empty string)
 
+Calendar fields:
+
+- calendar.week_start: "sunday" | "monday"
+- calendar.floating.width (number, default: 90)
+- calendar.floating.height (number, default: 24)
+- calendar.floating.border (string, default: "rounded")
+- calendar.highlights.title
+- calendar.highlights.weekday
+- calendar.highlights.in_month_day
+- calendar.highlights.outside_month_day
+- calendar.highlights.today
+- calendar.highlights.note_exists
+
 Journal fields (all optional):
 
 - journal.daily
@@ -143,6 +183,17 @@ Each provided journal section requires:
 Example: >
   require("nvim_obsidian").setup({
     vault_root = vim.fn.expand("~/ObsidianVault"),
+    calendar = {
+      week_start = "sunday",
+      highlights = {
+        title = "Title",
+        weekday = "Comment",
+        in_month_day = "Normal",
+        outside_month_day = "Comment",
+        today = "DiagnosticOk",
+        note_exists = "Bold",
+      },
+    },
     journal = {
       daily = {
         subdir = "daily",
@@ -201,6 +252,11 @@ Manual render command: >
 - Run |:ObsidianHealth| to verify command wiring.
 - Ensure all required dependencies are installed.
 - Ensure vault_root is absolute and points to an existing directory.
+- If files are removed via shell commands (for example `:!rm "%"`), index sync
+  runs on ShellCmdPost; use |:ObsidianReindex| if your environment blocks shell
+  events.
+- Closing a Yazi terminal triggers an automatic vault rescan when the terminal
+  name includes `yazi` or emits the Yazi close/leave user events.
 - For doc lookup problems, regenerate help tags with :helptags ALL.
 
 ===============================================================================

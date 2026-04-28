@@ -1,8 +1,14 @@
 local container = require("nvim_obsidian.app.container")
 local dependencies = require("nvim_obsidian.app.dependencies")
 
+---Application bootstrap orchestrator.
+---
+---This module wires dependency verification, container construction, command
+---registration, and deferred startup indexing into one setup entrypoint.
 local M = {}
 
+---Run initial vault reindex after setup.
+---@param c table Runtime dependency container.
 local function run_startup_reindex(c)
     local reindex = c.use_cases and c.use_cases.reindex_sync
     if type(reindex) ~= "table" or type(reindex.execute) ~= "function" then
@@ -42,6 +48,11 @@ local function run_startup_reindex(c)
     end
 end
 
+---Schedule startup reindex on Neovim event loop when available.
+---
+---Setup should return quickly to avoid blocking user startup. Reindexing is
+---therefore deferred unless scheduling is unavailable (tests/headless fallback).
+---@param c table Runtime dependency container.
 local function schedule_startup_reindex(c)
     if vim and type(vim.schedule) == "function" then
         vim.schedule(function()
@@ -53,6 +64,9 @@ local function schedule_startup_reindex(c)
     run_startup_reindex(c)
 end
 
+---Start plugin runtime and return the fully wired container.
+---@param opts? table User setup options.
+---@return table container
 function M.start(opts)
     dependencies.verify_required_dependencies()
 

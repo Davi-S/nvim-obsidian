@@ -1,5 +1,9 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Domain implementation: dataview parser and query evaluator.
+---
+---This module is pure and deterministic. It parses fenced dataview blocks and
+---evaluates query clauses against normalized note rows.
 local M = {}
 
 local function trim(s)
@@ -624,6 +628,10 @@ local function to_task_row(note)
     }
 end
 
+---Parse markdown and extract dataview query blocks.
+---@param markdown string
+---@return table[] blocks
+---@return table|nil error
 function M.parse_blocks(markdown)
     if type(markdown) ~= "string" then
         return {
@@ -800,6 +808,11 @@ local function task_render_text(row)
     return "- [" .. mark .. "] " .. task_text
 end
 
+---Execute one parsed dataview block against note identities.
+---@param block table
+---@param notes table[]
+---@return table result
+---@return table|nil error
 function M.execute_query(block, notes)
     if type(block) ~= "table" then
         return {

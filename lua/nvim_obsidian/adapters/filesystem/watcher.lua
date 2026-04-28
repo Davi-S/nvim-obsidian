@@ -1,3 +1,7 @@
+---Filesystem watcher adapter.
+---
+---Wraps libuv fs_event watching and emits normalized event payloads to the
+---container callback (`on_fs_event` / `handle_fs_event`).
 local M = {}
 local active = nil
 local errors = require("nvim_obsidian.core.shared.errors")
@@ -62,6 +66,10 @@ local function event_kind(events, path, loop)
     return "modify"
 end
 
+---Start watching configured vault root.
+---@param ctx table
+---@return boolean
+---@return table|nil
 function M.start(ctx)
     ctx = ctx or {}
     local cfg = ctx.config or {}
@@ -137,6 +145,8 @@ function M.start(ctx)
     return true, nil
 end
 
+---Stop active watcher and release resources.
+---@return boolean
 function M.stop()
     if not active then
         return true

@@ -1,5 +1,9 @@
 ---@diagnostic disable: undefined-global
 
+---Neovim command/augroup registration adapter.
+---
+---Binds user-facing commands to use-cases and wires autocmd-driven dataview and
+---filesystem-sync behaviors.
 local M = {}
 
 local function create_user_command(name, fn, opts)
@@ -269,6 +273,57 @@ local function journal_token_for(ctx, kind, direction)
     end
 
     return os.date("%Y-%m-%d", os.time())
+end
+
+local function basename_without_extension(path)
+    local normalized = tostring(path or ""):gsub("\\", "/")
+    local filename = normalized:match("([^/]+)$")
+    if type(filename) ~= "string" or filename == "" then
+        return nil
+    end
+    return filename:gsub("%.md$", "")
+end
+
+local function build_journal_calendar_marks(ctx)
+    local marks = {}
+    local vault_catalog = ctx and (ctx.vault_catalog or (ctx.domains and ctx.domains.vault_catalog))
+    local journal = ctx and (ctx.journal or (ctx.domains and ctx.domains.journal))
+
+    if type(vault_catalog) ~= "table" or type(vault_catalog.list_notes) ~= "function" then
+        return marks
+    end
+
+    local ok_notes, notes = pcall(vault_catalog.list_notes)
+    if not ok_notes or type(notes) ~= "table" then
+        return marks
+    end
+
+    for _, note in ipairs(notes) do
+        if type(note) == "table" then
+            local candidate = nil
+            if type(note.title) == "string" and note.title ~= "" then
+                candidate = note.title
+            else
+                candidate = basename_without_extension(note.path)
+            end
+
+            if type(candidate) == "string" and candidate ~= "" and type(journal) == "table" and type(journal.classify_input) == "function" then
+                local classified = journal.classify_input(candidate, os.time())
+                if type(classified) == "table" and classified.kind == "daily" then
+                    local parsed = parse_date_from_note_token(candidate, "daily")
+                    if type(parsed) == "table" then
+                        local token = string.format("%04d-%02d-%02d", parsed.year, parsed.month, parsed.day)
+                        marks[token] = {
+                            path = note.path,
+                            title = candidate,
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    return marks
 end
 
 get_current_buffer_path = function()
@@ -576,6 +631,449 @@ local function register_obsidian_insert_template(ctx)
     end, { desc = "Insert rendered template at cursor", nargs = "?" })
 end
 
+local function register_obsidian_calendar(ctx)
+    local function parse_calendar_mode(raw_args)
+        local mode = "visualizer"
+        if raw_args == "pick" or raw_args == "picker" then
+            mode = "picker"
+        elseif raw_args == "visualizer" then
+            mode = "visualizer"
+        end
+        return mode
+    end
+
+    -- Shared completion handler for journal picker mode.
+    --
+    -- Only the journal-specific calendar commands attach this callback.
+    -- Generic calendar picker modes return their selection without opening a note.
+    local function build_calendar_picker_on_finish(command_name)
+        return function(payload)
+            -- on_finish is invoked asynchronously by the calendar adapter when
+            -- user interaction ends. Keep this callback lightweight and side-effect
+            -- scoped to journal note resolution/opening.
+            if type(payload) ~= "table" or payload.action ~= "selected" then
+                return
+            end
+
+            local selected_kind = tostring(payload.selected_kind or "")
+            if selected_kind ~= "daily" and selected_kind ~= "weekly" and selected_kind ~= "monthly" and selected_kind ~= "yearly" then
+                return
+            end
+
+            local target_date = payload.date or payload.cursor_date
+            if type(target_date) ~= "table" then
+                return
+            end
+
+            if not ctx.use_cases.ensure_open_note or type(ctx.use_cases.ensure_open_note.execute) ~= "function" then
+                return
+            end
+
+            local journal_title = nil
+            if type(ctx.resolve_journal_title) == "function" then
+                local resolved = ctx.resolve_journal_title(selected_kind, target_date)
+                if type(resolved) == "string" and resolved ~= "" then
+                    journal_title = resolved
+                end
+            end
+
+            if not journal_title and type(ctx.journal) == "table" and type(ctx.journal.build_title) == "function" then
+                local built = ctx.journal.build_title(selected_kind, target_date, (ctx.config or {}).locale)
+                if type(built) == "table" and type(built.title) == "string" and built.title ~= "" then
+                    journal_title = built.title
+                end
+            end
+
+            if type(journal_title) ~= "string" or journal_title == "" then
+                return
+            end
+
+            local calendar_cfg = ctx.config and ctx.config.calendar or {}
+            local needs_confirmation = calendar_cfg.confirm_before_create == true
+
+            -- Only gate flows that create a note. Pure opens are not affected.
+            -- The picker result does not tell us whether the note already exists,
+            -- so we inspect the note catalog before deciding whether to prompt.
+            local ensure_open_note = ctx.use_cases.ensure_open_note
+            local candidate_exists = false
+            local vault_catalog = ctx.vault_catalog or (ctx.domains and ctx.domains.vault_catalog)
+            if type(vault_catalog) == "table" and type(vault_catalog.find_by_identity_token) == "function" then
+                local lookup = vault_catalog.find_by_identity_token(journal_title)
+                if type(lookup) == "table" and type(lookup.matches) == "table" and #lookup.matches > 0 then
+                    candidate_exists = true
+                end
+            end
+
+            if needs_confirmation and not candidate_exists then
+                local confirm_prompt = "Create journal note '" .. journal_title .. "'?"
+                local confirmed = true
+
+                if vim and vim.fn and type(vim.fn.confirm) == "function" then
+                    local choice = vim.fn.confirm(confirm_prompt, "&Create\n&Cancel", 2)
+                    confirmed = choice == 1
+                elseif ctx.adapters and ctx.adapters.notifications and type(ctx.adapters.notifications.warn) == "function" then
+                    ctx.adapters.notifications.warn({
+                        command = command_name,
+                        message = confirm_prompt,
+                        target = journal_title,
+                        next_step = "Enable vim.fn.confirm to require confirmation before creating notes",
+                    })
+                    confirmed = false
+                end
+
+                if not confirmed then
+                    if ctx.adapters and ctx.adapters.notifications and ctx.adapters.notifications.info then
+                        ctx.adapters.notifications.info({
+                            command = command_name,
+                            message = "Journal note creation cancelled",
+                            target = journal_title,
+                        })
+                    end
+                    return
+                end
+            end
+
+            local open_result = ensure_open_note.execute(ctx, {
+                title_or_token = journal_title,
+                create_if_missing = true,
+                origin = "journal",
+                journal_kind = selected_kind,
+                now = os.time(),
+            })
+
+            if not open_result.ok and ctx.adapters and ctx.adapters.notifications then
+                error_to_notification(ctx, open_result.error)
+                return
+            end
+
+            if ctx.adapters and ctx.adapters.notifications then
+                ctx.adapters.notifications.info({
+                    command = command_name,
+                    message = "Journal note opened",
+                    target = journal_title,
+                    next_step = "Use the calendar again to create another journal note family",
+                })
+            end
+        end
+    end
+
+    -- Shared opener that centralizes adapter invocation contract.
+    --
+    -- This keeps calendar commands aligned on:
+    -- - UI variant
+    -- - initial date seed
+    -- - optional completion callback
+    local function open_calendar(mode, command_name, extra_request)
+        local request = {
+            mode = mode,
+            ui_variant = "buffer",
+            initial_date = os.date("*t"),
+        }
+
+        if type(extra_request) == "table" then
+            for key, value in pairs(extra_request) do
+                request[key] = value
+            end
+        end
+
+        if request.on_finish == nil and request.journal_on_finish == true then
+            request.on_finish = build_calendar_picker_on_finish(command_name)
+        end
+
+        return ctx.use_cases.open_date_picker.execute(ctx, {
+            mode = request.mode,
+            ui_variant = request.ui_variant,
+            initial_date = request.initial_date,
+            layout = request.layout,
+            on_finish = request.on_finish,
+            marks = request.marks,
+        })
+    end
+
+    create_user_command("ObsidianCalendar", function(cmd)
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        -- MVP interface:
+        -- :ObsidianCalendar           -> visualizer mode (default)
+        -- :ObsidianCalendar pick      -> picker mode (returns selected date)
+        --
+        -- Keeping mode selection command-driven allows reviewers to validate both
+        -- interaction contracts immediately while we still have only one UI variant.
+        -- Parse optional mode argument.
+        --
+        -- Supported forms:
+        -- - :ObsidianCalendar
+        -- - :ObsidianCalendar visualizer
+        -- - :ObsidianCalendar pick
+        -- - :ObsidianCalendar picker
+        local raw_args = trim((cmd and cmd.args) or "")
+        local mode = parse_calendar_mode(raw_args)
+
+        local result = open_calendar(mode, "ObsidianCalendar")
+
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+
+        -- Non-blocking flow:
+        -- command returns immediately after successful calendar open; final outcomes
+        -- are delivered through on_finish callback above.
+    end, {
+        desc = "Open interactive calendar (visualizer or picker)",
+        nargs = "?",
+        complete = function()
+            return { "pick", "picker", "visualizer" }
+        end,
+    })
+
+    create_user_command("ObsidianCalendarFloat", function(cmd)
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local raw_args = trim((cmd and cmd.args) or "")
+        local mode = parse_calendar_mode(raw_args)
+        local result = open_calendar(mode, "ObsidianCalendarFloat", {
+            ui_variant = "floating",
+        })
+
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open floating calendar (visualizer or picker)",
+        nargs = "?",
+        complete = function()
+            return { "pick", "picker", "visualizer" }
+        end,
+    })
+
+    -- Secondary power-flow command for journal navigation/creation via calendar picker.
+    --
+    -- Product intent:
+    -- - Keep :ObsidianToday/:ObsidianNext/:ObsidianPrev as primary directional flows.
+    -- - Provide an explicit calendar-driven flow for users who want broad temporal access
+    --   (daily/weekly/monthly/yearly) from one interaction surface.
+    --
+    -- UX intent:
+    -- - No mode argument needed here: this command is always picker-first.
+    -- - Keeps discoverability high without changing existing directional command behavior.
+    create_user_command("ObsidianJournalCalendar", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianJournalCalendar", {
+            layout = "current",
+            marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
+        })
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open journal calendar picker in current buffer",
+        nargs = 0,
+    })
+
+    create_user_command("ObsidianJournalCalendarVSplit", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianJournalCalendarVSplit", {
+            layout = "vsplit",
+            marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
+        })
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open journal calendar picker in vertical split",
+        nargs = 0,
+    })
+
+    create_user_command("ObsidianJournalCalendarHSplit", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianJournalCalendarHSplit", {
+            layout = "hsplit",
+            marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
+        })
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open journal calendar picker in horizontal split",
+        nargs = 0,
+    })
+
+    create_user_command("ObsidianJournalCalendarFloat", function()
+        if not ctx or not ctx.use_cases or not ctx.use_cases.open_date_picker then
+            return
+        end
+
+        local result = open_calendar("picker", "ObsidianJournalCalendarFloat", {
+            ui_variant = "floating",
+            marks = build_journal_calendar_marks(ctx),
+            journal_on_finish = true,
+        })
+        if not result.ok then
+            error_to_notification(ctx, result.error)
+            return
+        end
+    end, {
+        desc = "Open floating journal calendar picker",
+        nargs = 0,
+    })
+end
+
+local function register_shell_delete_sync(ctx)
+    if not vim or not vim.api or type(vim.api.nvim_create_autocmd) ~= "function" then
+        return
+    end
+    if not ctx or not ctx.use_cases or not ctx.use_cases.reindex_sync or type(ctx.use_cases.reindex_sync.execute) ~= "function" then
+        return
+    end
+
+    local function file_exists(path)
+        if type(path) ~= "string" or path == "" then
+            return false
+        end
+
+        local uv = vim.uv or vim.loop
+        if type(uv) == "table" and type(uv.fs_stat) == "function" then
+            local ok, stat = pcall(uv.fs_stat, path)
+            if ok then
+                return stat ~= nil
+            end
+        end
+
+        local handle = io.open(path, "r")
+        if handle then
+            handle:close()
+            return true
+        end
+
+        return false
+    end
+
+    local group = nil
+    if type(vim.api.nvim_create_augroup) == "function" then
+        group = vim.api.nvim_create_augroup("NvimObsidianShellDeleteSync", { clear = true })
+    end
+
+    vim.api.nvim_create_autocmd("ShellCmdPost", {
+        group = group,
+        callback = function()
+            local path = get_current_buffer_path()
+            if type(path) ~= "string" or path == "" then
+                return
+            end
+            if not path:match("%.md$") then
+                return
+            end
+            if file_exists(path) then
+                return
+            end
+
+            local result = ctx.use_cases.reindex_sync.execute(ctx, {
+                mode = "event",
+                event = {
+                    kind = "delete",
+                    path = path,
+                },
+            })
+
+            if type(result) ~= "table" or result.ok ~= true then
+                local notifications = ctx.adapters and ctx.adapters.notifications
+                if notifications and type(notifications.warn) == "function" then
+                    local message = "shell delete sync failed"
+                    if type(result) == "table" and type(result.error) == "table" and type(result.error.message) == "string" then
+                        message = result.error.message
+                    end
+                    notifications.warn("Shell delete sync failed: " .. message)
+                end
+            end
+        end,
+    })
+end
+
+local function register_yazi_sync(ctx)
+    if not vim or not vim.api or type(vim.api.nvim_create_autocmd) ~= "function" then
+        return
+    end
+    if not ctx or not ctx.use_cases or not ctx.use_cases.reindex_sync or type(ctx.use_cases.reindex_sync.execute) ~= "function" then
+        return
+    end
+
+    local group = nil
+    if type(vim.api.nvim_create_augroup) == "function" then
+        group = vim.api.nvim_create_augroup("NvimObsidianYaziSync", { clear = true })
+    end
+
+    local function run_manual_sync(source)
+        local result = ctx.use_cases.reindex_sync.execute(ctx, {
+            mode = "manual",
+            event = nil,
+        })
+
+        if type(result) ~= "table" or result.ok ~= true then
+            local notifications = ctx.adapters and ctx.adapters.notifications
+            if notifications and type(notifications.warn) == "function" then
+                local message = source .. " sync failed"
+                if type(result) == "table" and type(result.error) == "table" and type(result.error.message) == "string" then
+                    message = result.error.message
+                end
+                notifications.warn("Yazi sync failed: " .. message)
+            end
+        end
+    end
+
+    vim.api.nvim_create_autocmd("TermClose", {
+        group = group,
+        callback = function(ev)
+            if not vim.api or type(vim.api.nvim_buf_get_name) ~= "function" then
+                return
+            end
+            if type(ev) ~= "table" or type(ev.buf) ~= "number" then
+                return
+            end
+
+            local ok_name, buf_name = pcall(vim.api.nvim_buf_get_name, ev.buf)
+            if not ok_name then
+                return
+            end
+
+            local term_name = tostring(buf_name or ""):lower()
+            if not term_name:match("yazi") then
+                return
+            end
+
+            run_manual_sync("TermClose")
+        end,
+    })
+
+    vim.api.nvim_create_autocmd("User", {
+        group = group,
+        pattern = { "YaziClosed", "YaziQuit", "YaziLeave" },
+        callback = function()
+            run_manual_sync("User event")
+        end,
+    })
+end
+
 local function register_obsidian_render_dataview(ctx)
     create_user_command("ObsidianRenderDataview", function()
         if not ctx or not ctx.use_cases or not ctx.use_cases.render_query_blocks then
@@ -830,6 +1328,8 @@ local function register_obsidian_health(ctx)
     end, { desc = "Check nvim-obsidian adapter wiring health" })
 end
 
+---Register all nvim-obsidian commands and autocmd integrations.
+---@param container table
 function M.register(container)
     if not container then
         return
@@ -844,8 +1344,11 @@ function M.register(container)
     register_obsidian_search(container)
     register_obsidian_reindex(container)
     register_obsidian_insert_template(container)
+    register_obsidian_calendar(container)
     register_obsidian_render_dataview(container)
     register_dataview_autocmds(container)
+    register_shell_delete_sync(container)
+    register_yazi_sync(container)
     register_obsidian_health(container)
 end
 

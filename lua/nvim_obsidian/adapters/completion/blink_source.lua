@@ -2,6 +2,10 @@
 ---@field display_name string
 ---@field opts table
 
+---blink.cmp completion source for wiki-link notes and anchors.
+---
+---Generates completion items from vault catalog entries and optional intra-note
+---anchor parsing when a note target is already selected.
 local M = {}
 
 local completion_item_kinds = (vim and vim.lsp and vim.lsp.protocol and vim.lsp.protocol.CompletionItemKind) or {}
@@ -407,10 +411,15 @@ local function build_note_items(notes, score_data, row, col, query_start)
     return items
 end
 
+---Return characters that trigger completion in blink.cmp.
+---@return string[]
 function M.get_trigger_characters()
     return { "[", "#" }
 end
 
+---Resolve completion item details lazily.
+---@param item table
+---@param callback function
 function M.resolve_completion_item(item, callback)
     if type(item) ~= "table" then
         return
@@ -424,6 +433,9 @@ function M.resolve_completion_item(item, callback)
     safe_callback(callback, resolved)
 end
 
+---Create blink completion source instance.
+---@param opts? table
+---@return table
 function M.new(opts)
     local source = {
         display_name = "Obsidian",

@@ -33,6 +33,52 @@ describe("app config schema", function()
         assert.equals("below_block", opts.dataview.placement)
         assert.equals(true, opts.dataview.messages.task_no_results.enabled)
         assert.equals("Dataview: No results to show for task query.", opts.dataview.messages.task_no_results.text)
+        assert.equals("sunday", opts.calendar.week_start)
+        assert.equals("Title", opts.calendar.highlights.title)
+        assert.equals("Comment", opts.calendar.highlights.weekday)
+        assert.equals("Normal", opts.calendar.highlights.in_month_day)
+        assert.equals("Comment", opts.calendar.highlights.outside_month_day)
+        assert.equals("DiagnosticOk", opts.calendar.highlights.today)
+        assert.equals("Bold", opts.calendar.highlights.note_exists)
+        assert.equals(false, opts.calendar.confirm_before_create)
+        assert.equals(90, opts.calendar.floating.width)
+        assert.equals(24, opts.calendar.floating.height)
+        assert.equals("rounded", opts.calendar.floating.border)
+    end)
+
+    it("accepts custom calendar highlight groups for day indicators", function()
+        local opts = config.normalize({
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                week_start = "monday",
+                confirm_before_create = true,
+                highlights = {
+                    title = "MyCalendarTitle",
+                    weekday = "MyCalendarWeekday",
+                    in_month_day = "MyCalendarDay",
+                    outside_month_day = "MyCalendarOutsideDay",
+                    today = "MyCalendarToday",
+                    note_exists = "MyCalendarHasNote",
+                },
+                floating = {
+                    width = 100,
+                    height = 28,
+                    border = "double",
+                },
+            },
+        })
+
+        assert.equals("monday", opts.calendar.week_start)
+        assert.equals(true, opts.calendar.confirm_before_create)
+        assert.equals("MyCalendarTitle", opts.calendar.highlights.title)
+        assert.equals("MyCalendarWeekday", opts.calendar.highlights.weekday)
+        assert.equals("MyCalendarDay", opts.calendar.highlights.in_month_day)
+        assert.equals("MyCalendarOutsideDay", opts.calendar.highlights.outside_month_day)
+        assert.equals("MyCalendarToday", opts.calendar.highlights.today)
+        assert.equals("MyCalendarHasNote", opts.calendar.highlights.note_exists)
+        assert.equals(100, opts.calendar.floating.width)
+        assert.equals(28, opts.calendar.floating.height)
+        assert.equals("double", opts.calendar.floating.border)
     end)
 
     it("does not mutate caller input tables", function()
@@ -120,6 +166,46 @@ describe("app config schema", function()
         })
         assert.is_false(ok)
         assert.is_truthy(tostring(err):find("journal.daily.title_format must be a non-empty string", 1, true))
+    end)
+
+    it("rejects invalid calendar confirmation flag", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                confirm_before_create = "yes",
+            },
+        })
+
+        assert.is_false(ok)
+        assert.matches("calendar.confirm_before_create must be a boolean", tostring(err))
+    end)
+
+    it("rejects invalid calendar floating width", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                floating = {
+                    width = 20,
+                },
+            },
+        })
+
+        assert.is_false(ok)
+        assert.matches("calendar.floating.width must be a number >= 40", tostring(err))
+    end)
+
+    it("rejects invalid calendar floating border", function()
+        local ok, err = pcall(config.normalize, {
+            vault_root = "/tmp/nvim_obsidian_vault",
+            calendar = {
+                floating = {
+                    border = "bevel",
+                },
+            },
+        })
+
+        assert.is_false(ok)
+        assert.matches("calendar.floating.border has invalid value", tostring(err))
     end)
 
     it("accepts valid optional journal configuration", function()

@@ -2,8 +2,16 @@ local config = require("nvim_obsidian.app.config")
 local journal_placeholders = require("nvim_obsidian.app.journal_placeholders")
 local notifications = require("nvim_obsidian.adapters.neovim.notifications")
 
+---Runtime dependency container builder.
+---
+---The container is the composition root for DDD layers:
+---1) domains and use-cases (core logic)
+---2) adapters (Neovim/filesystem/picker integrations)
+---3) bridge ports exposed at top-level for use-case contracts.
 local M = {}
 
+---@param path any
+---@return boolean
 local function is_absolute_path(path)
     if type(path) ~= "string" then
         return false
@@ -17,6 +25,9 @@ local function is_absolute_path(path)
     return false
 end
 
+---@param base any
+---@param leaf any
+---@return string
 local function join_path(base, leaf)
     local b = tostring(base or ""):gsub("\\", "/"):gsub("//+", "/")
     local l = tostring(leaf or ""):gsub("\\", "/"):gsub("^/+", "")
@@ -29,6 +40,8 @@ local function join_path(base, leaf)
     return b .. "/" .. l
 end
 
+---@param path any
+---@return boolean
 local function is_markdown_path(path)
     if type(path) ~= "string" or path == "" then
         return false
@@ -36,12 +49,16 @@ local function is_markdown_path(path)
     return path:match("%.md$") ~= nil
 end
 
+---Build the full runtime container and wire all composition dependencies.
+---@param user_opts? table
+---@return table container
 function M.build(user_opts)
     local opts = config.normalize(user_opts)
     local dataview_namespace = nil
 
     local vault_catalog = require("nvim_obsidian.core.domains.vault_catalog.impl")
     local journal = require("nvim_obsidian.core.domains.journal.impl")
+    local date_picker = require("nvim_obsidian.core.domains.date_picker.impl")
     local wiki_link = require("nvim_obsidian.core.domains.wiki_link.impl")
     local template = require("nvim_obsidian.core.domains.template.impl")
     local dataview = require("nvim_obsidian.core.domains.dataview.impl")
@@ -55,6 +72,7 @@ function M.build(user_opts)
     local show_backlinks = require("nvim_obsidian.use_cases.show_backlinks")
     local vault_search = require("nvim_obsidian.use_cases.vault_search")
     local insert_template = require("nvim_obsidian.use_cases.insert_template")
+    local open_date_picker = require("nvim_obsidian.use_cases.open_date_picker")
 
     local adapter_set = {
         commands = require("nvim_obsidian.adapters.neovim.commands"),
@@ -63,6 +81,8 @@ function M.build(user_opts)
             config = opts,
         }),
         navigation = require("nvim_obsidian.adapters.neovim.navigation"),
+        calendar_buffer = require("nvim_obsidian.adapters.neovim.calendar_buffer"),
+        calendar_floating = require("nvim_obsidian.adapters.neovim.calendar_floating"),
         telescope = require("nvim_obsidian.adapters.picker.telescope"),
         blink_source = require("nvim_obsidian.adapters.completion.blink_source"),
         fs_io = require("nvim_obsidian.adapters.filesystem.io"),
@@ -76,6 +96,7 @@ function M.build(user_opts)
         domains = {
             vault_catalog = vault_catalog,
             journal = journal,
+            date_picker = date_picker,
             wiki_link = wiki_link,
             template = template,
             dataview = dataview,
@@ -90,10 +111,12 @@ function M.build(user_opts)
             show_backlinks = show_backlinks,
             vault_search = vault_search,
             insert_template = insert_template,
+            open_date_picker = open_date_picker,
         },
         adapters = adapter_set,
 
-        -- Bridge fields to satisfy use-case contracts that depend on top-level ports.
+        -- Bridge fields to satisfy use-case contracts that depend on top-level
+        -- ports. This keeps use-cases decoupled from nested adapter/domain trees.
         navigation = adapter_set.navigation,
         notifications = adapter_set.notifications,
         fs_io = adapter_set.fs_io,
@@ -104,6 +127,7 @@ function M.build(user_opts)
 
         vault_catalog = vault_catalog,
         journal = journal,
+        date_picker = date_picker,
         wiki_link = wiki_link,
         template = template,
         dataview = dataview,
@@ -117,7 +141,11 @@ function M.build(user_opts)
         show_backlinks = show_backlinks,
         vault_search = vault_search,
         insert_template = insert_template,
+        open_date_picker = open_date_picker,
 
+        ---Read entire buffer as markdown text.
+        ---@param buffer integer
+        ---@return string|nil
         get_buffer_markdown = function(buffer)
             if not vim or not vim.api or type(vim.api.nvim_buf_get_lines) ~= "function" then
                 return nil
@@ -130,6 +158,16 @@ function M.build(user_opts)
 
             return table.concat(lines, "\n")
         end,
+        ---Apply dataview overlays using extmarks and virtual lines.
+        ---
+        ---Implementation note:
+        ---A dedicated namespace is lazily initialized and reused to support
+        ---idempotent redraws. Existing overlays are cleared before re-apply.
+        ---@param buffer integer
+        ---@param overlays table
+        ---@param highlight_config? table
+        ---@return boolean ok
+        ---@return string? err
         apply_rendered_blocks = function(buffer, overlays, highlight_config)
             if not vim or not vim.api then
                 return false, "nvim API is unavailable"
@@ -208,6 +246,8 @@ function M.build(user_opts)
             return true
         end,
 
+        ---Scan vault for markdown files.
+        ---@return string[]
         scan_markdown_files = function()
             local files, list_err = adapter_set.fs_io.list_markdown_files(opts.vault_root)
             if type(files) ~= "table" then
@@ -215,12 +255,22 @@ function M.build(user_opts)
             end
             return files
         end,
+        ---Replace vault catalog atomically.
+        ---@param notes table[]
+        ---@return boolean
+        ---@return string|nil
         replace_catalog = function(notes)
             if type(vault_catalog._replace_all) ~= "function" then
                 return false, "vault catalog does not support atomic replace"
             end
             return vault_catalog._replace_all(notes)
         end,
+        ---Resolve a journal note title for the given kind/date.
+        ---
+        ---Prefers user-provided title_format and falls back to domain defaults.
+        ---@param kind string
+        ---@param date table|nil
+        ---@return string
         resolve_journal_title = function(kind, date)
             if type(kind) ~= "string" or kind == "" then
                 error("nvim-obsidian setup: resolve_journal_title requires a non-empty kind")
@@ -241,6 +291,12 @@ function M.build(user_opts)
                 kind = kind,
             })
         end,
+        ---Resolve template file content from request context and config.
+        ---
+        ---Resolution order intentionally favors explicit query input, then
+        ---journal-kind template mapping, then standard template fallback.
+        ---@param req? table
+        ---@return string|nil
         resolve_template_content = function(req)
             local request = req or {}
             local query = nil
@@ -309,6 +365,8 @@ function M.build(user_opts)
         end,
     }
 
+    ---Handle normalized filesystem events and synchronize vault index.
+    ---@param event table
     container.on_fs_event = function(event)
         if type(event) ~= "table" then
             return
@@ -385,6 +443,7 @@ function M.build(user_opts)
         end
     end
 
+    -- Backward-compatible alias used by watcher adapters and tests.
     container.handle_fs_event = container.on_fs_event
 
     return container

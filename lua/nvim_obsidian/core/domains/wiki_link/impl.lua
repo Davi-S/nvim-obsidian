@@ -1,5 +1,9 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Domain implementation: wiki-link parser and resolver.
+---
+---Transforms cursor-local link syntax into normalized targets and resolves
+---those targets against vault note identities.
 local M = {}
 
 local function trim(text)
@@ -68,6 +72,11 @@ local function parse_inner(inner)
     }
 end
 
+---Parse wiki-link target under cursor position.
+---@param line string
+---@param col integer
+---@return table|nil target
+---@return table|nil error
 function M.parse_at_cursor(line, col)
     if type(line) ~= "string" then
         return {
@@ -142,6 +151,10 @@ local function note_matches_token(note, token)
     return false
 end
 
+---Resolve parsed target against candidate notes.
+---@param target table
+---@param candidate_notes table[]
+---@return table
 function M.resolve_target(target, candidate_notes)
     local t = target or {}
     local token = trim(t.note_ref)

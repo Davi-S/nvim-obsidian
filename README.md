@@ -14,8 +14,10 @@ This repository contains:
 - Backlinks lookup for the current note.
 - Vault indexing and manual reindex command.
 - Journal note workflows (today, next, previous).
+- Calendar visualizer and picker workflows, including journal calendar layouts.
 - Template insertion with custom placeholders.
 - Dataview block rendering (manual and event-driven).
+- Shell-command delete sync to keep index consistent after external file removal.
 
 ## Repository Layout
 
@@ -63,7 +65,31 @@ After setup, run:
 - `:ObsidianSearch`
 - `:ObsidianBacklinks`
 - `:ObsidianReindex`
+- `:ObsidianCalendar`
+- `:ObsidianCalendar pick`
+- `:ObsidianCalendarFloat`
+- `:ObsidianJournalCalendar`
+- `:ObsidianJournalCalendarVSplit`
+- `:ObsidianJournalCalendarHSplit`
+- `:ObsidianJournalCalendarFloat`
 - `:ObsidianHealth`
+
+Journal calendar layout behavior:
+- `:ObsidianJournalCalendar` opens the picker in the current buffer.
+- `:ObsidianJournalCalendarVSplit` opens in a vertical split.
+- `:ObsidianJournalCalendarHSplit` opens in a horizontal split.
+
+Calendar indicators are configurable via `calendar.highlights` in setup config
+(`today`, `outside_month_day`, `note_exists`, and related groups).
+
+You can optionally require confirmation before creating missing journal notes
+from calendar picker selections with `calendar.confirm_before_create = true`.
+Existing notes still open directly without a confirmation prompt.
+
+Closing a Yazi terminal triggers a vault rescan when the terminal name includes `yazi` or the Yazi close/leave user events fire.
+
+Floating calendar UI can be configured through `calendar.floating`:
+`width`, `height`, and `border` (for centered modal behavior).
 
 For full command semantics and API details, see `docs/NVIM_PLUGIN.md`.
 

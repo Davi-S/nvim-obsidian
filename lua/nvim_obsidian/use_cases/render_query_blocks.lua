@@ -1,5 +1,9 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Use-case: parse and render dataview query blocks into virtual overlays.
+---
+---Includes task-row caching for repeated task queries and supports multiple
+---render scopes through the navigation adapter.
 local M = {}
 
 local TASK_PATTERN = "^(%s*)%- %[(.)%]%s*(.*)$"
@@ -7,6 +11,8 @@ local task_row_cache = {
     by_path = {},
 }
 
+---@param text any
+---@return string[]
 local function split_lines(text)
     local src = tostring(text or "")
     if src == "" then
@@ -301,6 +307,8 @@ local function collect_task_rows(ctx, query)
     return task_rows
 end
 
+---Invalidate cached task rows globally or for specific files.
+---@param paths? string[]
 function M.invalidate_task_cache(paths)
     if paths == nil then
         task_row_cache.by_path = {}
@@ -345,6 +353,10 @@ M.contract = {
     },
 }
 
+---Execute query-block rendering orchestration.
+---@param _ctx table
+---@param _input table|nil
+---@return table
 function M.execute(_ctx, _input)
     if type(_ctx) ~= "table" then
         return {

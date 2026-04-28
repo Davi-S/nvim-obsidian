@@ -1,3 +1,7 @@
+---Domain contract: candidate ranking and display labeling for search UX.
+---
+---The implementation is deterministic and side-effect free so callers can reuse
+---it in picker and completion pathways.
 local M = {
     name = "search_ranking",
     version = "phase3-contract",

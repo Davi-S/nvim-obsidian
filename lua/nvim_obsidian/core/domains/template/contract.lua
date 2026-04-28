@@ -1,3 +1,6 @@
+---Domain contract: placeholder registry and template rendering.
+---
+---Used by note creation and explicit template insertion workflows.
 local M = {
     name = "template",
     version = "phase3-contract",

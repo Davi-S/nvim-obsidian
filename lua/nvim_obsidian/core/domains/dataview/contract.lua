@@ -1,5 +1,9 @@
 local primitives = require("nvim_obsidian.core.shared.primitives")
 
+---Domain contract: dataview query parsing and execution.
+---
+---This contract defines the pure API consumed by rendering use-cases for
+---extracting dataview blocks and evaluating them against vault notes.
 local M = {
     name = "dataview",
     version = "phase3-contract",

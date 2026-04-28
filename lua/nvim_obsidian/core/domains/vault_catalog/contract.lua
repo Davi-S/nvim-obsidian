@@ -1,5 +1,8 @@
 local primitives = require("nvim_obsidian.core.shared.primitives")
 
+---Domain contract: in-memory catalog of vault note identities.
+---
+---Provides normalized note upsert/remove and identity-token lookup operations.
 local M = {
     name = "vault_catalog",
     version = "phase3-contract",

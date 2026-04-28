@@ -109,7 +109,78 @@ Try these commands in a Markdown file within your vault:
 :ObsidianSearch        " Full-text search vault
 :ObsidianFollow        " Follow link under cursor
 :ObsidianReindex       " Refresh vault cache
+:ObsidianCalendar      " Open calendar visualizer
+:ObsidianCalendar pick " Open calendar picker
+:ObsidianCalendarFloat " Open floating calendar (visualizer by default)
+:ObsidianJournalCalendar        " Open journal picker in current buffer
+:ObsidianJournalCalendarVSplit  " Open journal picker in vertical split
+:ObsidianJournalCalendarHSplit  " Open journal picker in horizontal split
+:ObsidianJournalCalendarFloat   " Open floating journal picker that opens/creates the selected journal note
 ```
+
+### Calendar Picker Controls
+
+Use `:ObsidianCalendar pick` to choose a date without opening a journal note.
+Use `:ObsidianJournalCalendar*` when you want the picker to open or create a journal note after selection.
+
+Navigation:
+- `h` / `l`: move horizontally
+- `j` / `k`: move vertically
+- `H` / `L`: previous/next month
+- `J` / `K`: previous/next year
+- `t`: jump to today
+- `<CR>`: confirm selection
+- `q` or `<Esc>`: cancel
+
+Selection model:
+- Row 2 (month/year line):
+  - month cell -> monthly note
+  - year cell -> yearly note
+- Row 3 (weekday header): weekly note
+- Rows 4-9 (day grid): daily note
+
+Interaction notes:
+- Title row is informational and cannot receive picker focus.
+- Hovering over out-of-month day cells does not auto-switch the visible month.
+- Month changes only happen through month/year navigation keys.
+- When `calendar.confirm_before_create` is enabled, picker selections that
+  would create a missing journal note require explicit confirmation.
+- Selecting an existing note always opens directly (no confirmation step).
+
+Journal calendar layout notes:
+- `:ObsidianJournalCalendar` is current-buffer-first and replaces the active buffer with the calendar.
+- `:ObsidianJournalCalendarVSplit` and `:ObsidianJournalCalendarHSplit` keep your existing buffer visible and open the picker in a split.
+- `:ObsidianJournalCalendarFloat` opens the journal picker behavior in a centered floating modal window and opens the selected journal note.
+- Closing a Yazi terminal triggers a vault rescan when the terminal name includes `yazi` or the Yazi close/leave user events fire.
+
+### Calendar Indicator Styling
+
+Calendar visual indicators are fully configurable through highlight-group names:
+
+```lua
+require("nvim_obsidian").setup({
+  vault_root = vim.fn.expand("~/ObsidianVault"),
+  calendar = {
+    week_start = "sunday", -- or "monday"
+    confirm_before_create = false, -- set true to confirm before creating missing notes
+    floating = {
+      width = 90,
+      height = 24,
+      border = "rounded", -- rounded|single|double|solid|shadow|none
+    },
+    highlights = {
+      title = "Title",
+      weekday = "Comment",
+      in_month_day = "Normal",
+      outside_month_day = "Comment",
+      today = "DiagnosticOk",
+      note_exists = "Bold", -- day has an existing daily note
+    },
+  },
+})
+```
+
+These groups control day styling for today, out-of-month cells, and existing-note days without changing picker behavior.
 
 ---
 
@@ -732,8 +803,9 @@ Expected times:
 2. **Configure:** Set up journal, dataview, and custom templates for your workflow
 3. **Keybind:** Map commands to your preferred key combinations
 4. **Explore:** Run `:help nvim-obsidian` for built-in documentation
+5. **Calendar roadmap:** Floating-window calendar polishing and integration hardening are next
 
 ---
 
-**Last Updated:** March 28, 2026  
+**Last Updated:** April 27, 2026  
 **For Issues:** Report bugs on [GitHub Issues](https://github.com/Davi-S/nvim-obsidian/issues)

@@ -1,5 +1,9 @@
 local errors = require("nvim_obsidian.core.shared.errors")
 
+---Domain implementation: placeholder registration and template rendering.
+---
+---Resolvers are stored in-memory and invoked during `render` using a strict
+---placeholder-name grammar.
 local M = {}
 
 local state = {
@@ -17,6 +21,9 @@ local function to_string(value)
     return tostring(value)
 end
 
+---Register placeholder resolvers.
+---@param registry table<string, function>
+---@return table
 function M.register_placeholders(registry)
     if type(registry) ~= "table" then
         return {
@@ -52,6 +59,10 @@ function M.register_placeholders(registry)
     return { ok = true, error = nil }
 end
 
+---Render template content with registered placeholders.
+---@param content string
+---@param context table
+---@return table
 function M.render(content, context)
     local src = content
     if src == nil then
@@ -90,6 +101,7 @@ function M.render(content, context)
     }
 end
 
+---Test helper: clear registered resolvers.
 function M._reset_for_tests()
     state.resolvers = {}
 end

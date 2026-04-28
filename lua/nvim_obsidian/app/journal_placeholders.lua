@@ -1,3 +1,7 @@
+---Journal title placeholder engine.
+---
+---Supports built-in date placeholders plus user-registered custom resolvers.
+---The renderer leaves unknown placeholders untouched to preserve intent.
 local M = {}
 
 local localize_month
@@ -59,6 +63,9 @@ local WEEKDAY_NAMES = {
     },
 }
 
+---Normalize token text for accent-insensitive comparisons.
+---@param text any
+---@return string
 local function normalize_token(text)
     local s = tostring(text or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     local replacements = {
@@ -94,6 +101,9 @@ local function normalize_token(text)
     return s
 end
 
+---@param month any
+---@param locale any
+---@return string|nil
 local function month_name_by_locale(month, locale)
     local m = tonumber(month)
     if not m or m < 1 or m > 12 then
@@ -102,6 +112,9 @@ local function month_name_by_locale(month, locale)
     return localize_month(tostring(locale or "en-US"), m)
 end
 
+---@param wday any
+---@param locale any
+---@return string|nil
 local function weekday_name_by_locale(wday, locale)
     local d = tonumber(wday)
     if not d or d < 1 or d > 7 then
@@ -110,6 +123,9 @@ local function weekday_name_by_locale(wday, locale)
     return localize_weekday(tostring(locale or "en-US"), d)
 end
 
+---@param token any
+---@param locale any
+---@return integer|nil
 local function parse_month_token(token, locale)
     local raw = tostring(token or "")
     if raw == "" then
@@ -146,10 +162,15 @@ local function parse_month_token(token, locale)
     return nil
 end
 
+---@param name any
+---@return boolean
 local function is_valid_name(name)
     return type(name) == "string" and name:match("^[%a_][%w_]*$") ~= nil
 end
 
+---Normalize accepted date inputs into an os.date table.
+---@param date any
+---@return table
 local function normalize_date_input(date)
     if type(date) == "number" then
         return os.date("*t", date)
@@ -172,6 +193,8 @@ local function normalize_date_input(date)
     return os.date("*t")
 end
 
+---@param date_tbl table
+---@return integer
 local function to_timestamp(date_tbl)
     return os.time({
         year = date_tbl.year,
@@ -218,6 +241,12 @@ local function build_base_placeholders(date_tbl, locale)
     }
 end
 
+---Register a custom placeholder resolver.
+---@param name string
+---@param resolver fun(context: table): any
+---@param regex_fragment? string
+---@return boolean
+---@return string|nil
 function M.register_placeholder(name, resolver, regex_fragment)
     if not is_valid_name(name) then
         return false, "invalid placeholder name"
@@ -234,6 +263,10 @@ function M.register_placeholder(name, resolver, regex_fragment)
     return true, nil
 end
 
+---Render title format by replacing placeholder tokens.
+---@param title_format string
+---@param opts? table
+---@return string
 function M.render_title_format(title_format, opts)
     local pattern = tostring(title_format or "")
     local config = (opts and opts.config) or {}
@@ -266,18 +299,31 @@ function M.render_title_format(title_format, opts)
     return rendered
 end
 
+---@param month any
+---@param locale any
+---@return string|nil
 function M.month_name(month, locale)
     return month_name_by_locale(month, locale)
 end
 
+---@param wday any
+---@param locale any
+---@return string|nil
 function M.weekday_name(wday, locale)
     return weekday_name_by_locale(wday, locale)
 end
 
+---@param token any
+---@param locale any
+---@return integer|nil
 function M.parse_month_token(token, locale)
     return parse_month_token(token, locale)
 end
 
+---@param format string
+---@param date any
+---@param locale any
+---@return string
 function M.render_title(format, date, locale)
     return M.render_title_format(format, {
         date = date,
@@ -287,6 +333,7 @@ function M.render_title(format, date, locale)
     })
 end
 
+---Test helper to clear registered custom placeholders.
 function M._reset_for_tests()
     state.custom = {}
 end
