@@ -34,6 +34,21 @@ describe("app config schema", function()
         assert.equals(true, opts.dataview.messages.task_no_results.enabled)
         assert.equals("Dataview: No results to show for task query.", opts.dataview.messages.task_no_results.text)
         assert.equals("sunday", opts.calendar.week_start)
+        assert.equals("Obsidian Calendar (visualizer mode)", opts.calendar.title.visualizer)
+        assert.equals("Obsidian Calendar (picker mode)", opts.calendar.title.picker)
+        assert.equals("h", opts.calendar.keymaps.left)
+        assert.equals("l", opts.calendar.keymaps.right)
+        assert.equals("k", opts.calendar.keymaps.up)
+        assert.equals("j", opts.calendar.keymaps.down)
+        assert.equals("H", opts.calendar.keymaps.month_prev)
+        assert.equals("L", opts.calendar.keymaps.month_next)
+        assert.equals("J", opts.calendar.keymaps.year_prev)
+        assert.equals("K", opts.calendar.keymaps.year_next)
+        assert.equals("t", opts.calendar.keymaps.today)
+        assert.equals("<CR>", opts.calendar.keymaps.select)
+        assert.equals("q", opts.calendar.keymaps.cancel)
+        assert.equals("<Esc>", opts.calendar.keymaps.cancel_alt)
+        assert.equals("<LeftMouse>", opts.calendar.keymaps.mouse)
         assert.equals("Title", opts.calendar.highlights.title)
         assert.equals("Comment", opts.calendar.highlights.weekday)
         assert.equals("Normal", opts.calendar.highlights.in_month_day)
@@ -50,6 +65,25 @@ describe("app config schema", function()
         local opts = config.normalize({
             vault_root = "/tmp/nvim_obsidian_vault",
             calendar = {
+                title = {
+                    visualizer = "My Visualizer Title",
+                    picker = "My Picker Title",
+                },
+                keymaps = {
+                    left = "a",
+                    right = "d",
+                    up = "w",
+                    down = "s",
+                    month_prev = "A",
+                    month_next = "D",
+                    year_prev = "W",
+                    year_next = "S",
+                    today = "g",
+                    select = "x",
+                    cancel = "c",
+                    cancel_alt = "Z",
+                    mouse = "<MiddleMouse>",
+                },
                 week_start = "monday",
                 confirm_before_create = true,
                 highlights = {
@@ -70,6 +104,21 @@ describe("app config schema", function()
 
         assert.equals("monday", opts.calendar.week_start)
         assert.equals(true, opts.calendar.confirm_before_create)
+        assert.equals("My Visualizer Title", opts.calendar.title.visualizer)
+        assert.equals("My Picker Title", opts.calendar.title.picker)
+        assert.equals("a", opts.calendar.keymaps.left)
+        assert.equals("d", opts.calendar.keymaps.right)
+        assert.equals("w", opts.calendar.keymaps.up)
+        assert.equals("s", opts.calendar.keymaps.down)
+        assert.equals("A", opts.calendar.keymaps.month_prev)
+        assert.equals("D", opts.calendar.keymaps.month_next)
+        assert.equals("W", opts.calendar.keymaps.year_prev)
+        assert.equals("S", opts.calendar.keymaps.year_next)
+        assert.equals("g", opts.calendar.keymaps.today)
+        assert.equals("x", opts.calendar.keymaps.select)
+        assert.equals("c", opts.calendar.keymaps.cancel)
+        assert.equals("Z", opts.calendar.keymaps.cancel_alt)
+        assert.equals("<MiddleMouse>", opts.calendar.keymaps.mouse)
         assert.equals("MyCalendarTitle", opts.calendar.highlights.title)
         assert.equals("MyCalendarWeekday", opts.calendar.highlights.weekday)
         assert.equals("MyCalendarDay", opts.calendar.highlights.in_month_day)

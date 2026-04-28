@@ -58,6 +58,61 @@ local function resolve_highlights(value)
     }
 end
 
+local function resolve_title(value)
+    local user = type(value) == "table" and value or {}
+    local fallback = M and M.defaults and M.defaults.calendar and M.defaults.calendar.title or {
+        visualizer = "Obsidian Calendar (visualizer mode)",
+        picker = "Obsidian Calendar (picker mode)",
+    }
+
+    if type(value) == "string" then
+        return {
+            visualizer = value,
+            picker = value,
+        }
+    end
+
+    return {
+        visualizer = tostring(user.visualizer or fallback.visualizer),
+        picker = tostring(user.picker or fallback.picker),
+    }
+end
+
+local function resolve_keymaps(value)
+    local user = type(value) == "table" and value or {}
+    local fallback = M and M.defaults and M.defaults.calendar and M.defaults.calendar.keymaps or {
+        left = "h",
+        right = "l",
+        up = "k",
+        down = "j",
+        month_prev = "H",
+        month_next = "L",
+        year_prev = "J",
+        year_next = "K",
+        today = "t",
+        select = "<CR>",
+        cancel = "q",
+        cancel_alt = "<Esc>",
+        mouse = "<LeftMouse>",
+    }
+
+    return {
+        left = tostring(user.left or fallback.left),
+        right = tostring(user.right or fallback.right),
+        up = tostring(user.up or fallback.up),
+        down = tostring(user.down or fallback.down),
+        month_prev = tostring(user.month_prev or fallback.month_prev),
+        month_next = tostring(user.month_next or fallback.month_next),
+        year_prev = tostring(user.year_prev or fallback.year_prev),
+        year_next = tostring(user.year_next or fallback.year_next),
+        today = tostring(user.today or fallback.today),
+        select = tostring(user.select or fallback.select),
+        cancel = tostring(user.cancel or fallback.cancel),
+        cancel_alt = tostring(user.cancel_alt or fallback.cancel_alt),
+        mouse = tostring(user.mouse or fallback.mouse),
+    }
+end
+
 local function is_nvim_ready()
     return vim
         and type(vim) == "table"
@@ -82,11 +137,12 @@ local function normalize_layout(layout)
     return "vsplit"
 end
 
-local function build_title_line(mode)
-    if mode == "picker" then
-        return "Obsidian Calendar (picker mode)"
+local function build_title_line(state)
+    local title = type(state.title) == "table" and state.title or {}
+    if state.mode == "picker" then
+        return tostring(title.picker or title.visualizer or "Obsidian Calendar (picker mode)")
     end
-    return "Obsidian Calendar (visualizer mode)"
+    return tostring(title.visualizer or title.picker or "Obsidian Calendar (visualizer mode)")
 end
 
 local function month_label(date)
@@ -192,7 +248,7 @@ local function build_lines(date_picker, state)
     })
     local lines = {}
 
-    table.insert(lines, build_title_line(state.mode))
+    table.insert(lines, build_title_line(state))
     table.insert(lines, month_label(state.view_date))
     local weekday_labels = WEEKDAY_LABELS[state.week_start] or WEEKDAY_LABELS.sunday
     table.insert(lines, table.concat(weekday_labels, " "))
@@ -535,6 +591,10 @@ function M.open_calendar(ctx, request)
     local layout = normalize_layout(request and request.layout)
     local week_start = resolve_week_start(request and request.week_start)
     local highlights = resolve_highlights(request and request.highlights)
+    local calendar_config = type(ctx.config) == "table" and type(ctx.config.calendar) == "table" and ctx.config.calendar or
+    {}
+    local title = resolve_title(calendar_config.title)
+    local keymaps = resolve_keymaps(calendar_config.keymaps)
     local marks = type(request and request.marks) == "table" and request.marks or {}
     local on_finish = request and request.on_finish or nil
     local now = os.date("*t")
@@ -551,6 +611,8 @@ function M.open_calendar(ctx, request)
         close_on_finish = request and request.close_on_finish == true,
         center_content = request and request.center_content == true,
         window_size = type(request and request.window_size) == "table" and request.window_size or nil,
+        title = title,
+        keymaps = keymaps,
         week_start = week_start,
         highlights = highlights,
         marks = marks,
@@ -613,6 +675,15 @@ function M.open_calendar(ctx, request)
     state.bufnr = opened_bufnr
 
     ensure_buffer_opts(state.bufnr)
+    -- Debugging aid: when tests set ctx._debug_calendar, dump ctx and resolved title
+    if ctx and ctx._debug_calendar then
+        local ok_inspect, inspect = pcall(vim.inspect, ctx)
+        if ok_inspect then
+            pcall(print, "open_calendar ctx: " .. inspect)
+        end
+        pcall(print, "resolved title: " .. (vim.inspect and vim.inspect(title) or tostring(title)))
+    end
+
     render(date_picker, state.bufnr, state)
 
     local function refresh_after_cursor_shift(new_cursor)
@@ -796,47 +867,53 @@ function M.open_calendar(ctx, request)
         render(date_picker, state.bufnr, state)
     end
 
+    local function set_picker_keymap(lhs, handler)
+        if type(lhs) == "string" and lhs ~= "" then
+            vim.keymap.set("n", lhs, handler, map_opts)
+        end
+    end
+
     -- Buffer-local mappings keep calendar controls isolated from user global maps.
     local map_opts = { buffer = state.bufnr, silent = true, nowait = true }
 
-    vim.keymap.set("n", "h", function()
+    set_picker_keymap(state.keymaps.left, function()
         if state.mode == "picker" then
             move_picker_col(-1)
             return
         end
         move_by_days(-1)
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "l", function()
+    set_picker_keymap(state.keymaps.right, function()
         if state.mode == "picker" then
             move_picker_col(1)
             return
         end
         move_by_days(1)
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "j", function()
+    set_picker_keymap(state.keymaps.down, function()
         if state.mode == "picker" then
             move_picker_row(1)
             return
         end
         move_by_days(7)
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "k", function()
+    set_picker_keymap(state.keymaps.up, function()
         if state.mode == "picker" then
             move_picker_row(-1)
             return
         end
         move_by_days(-7)
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "H", function() move_by_months(-1) end, map_opts)
-    vim.keymap.set("n", "L", function() move_by_months(1) end, map_opts)
-    vim.keymap.set("n", "J", function() move_by_years(-1) end, map_opts)
-    vim.keymap.set("n", "K", function() move_by_years(1) end, map_opts)
+    set_picker_keymap(state.keymaps.month_prev, function() move_by_months(-1) end)
+    set_picker_keymap(state.keymaps.month_next, function() move_by_months(1) end)
+    set_picker_keymap(state.keymaps.year_prev, function() move_by_years(-1) end)
+    set_picker_keymap(state.keymaps.year_next, function() move_by_years(1) end)
 
-    vim.keymap.set("n", "t", function()
+    set_picker_keymap(state.keymaps.today, function()
         if state.mode == "picker" then
             local today = os.date("*t")
             state.cursor_date = {
@@ -855,14 +932,14 @@ function M.open_calendar(ctx, request)
             return
         end
         move_to_today()
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "<LeftMouse>", function()
+    set_picker_keymap(state.keymaps.mouse, function()
         vim.cmd("normal! <LeftMouse>")
         sync_cursor_from_window()
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "<CR>", function()
+    set_picker_keymap(state.keymaps.select, function()
         if state.mode == "picker" then
             -- The cursor row determines the journal kind. Cursor position inside
             -- the day grid selects daily notes; title/month/week rows select the
@@ -881,15 +958,15 @@ function M.open_calendar(ctx, request)
             return
         end
         finish("closed", nil, nil)
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "q", function()
+    set_picker_keymap(state.keymaps.cancel, function()
         finish("cancelled", nil, nil)
-    end, map_opts)
+    end)
 
-    vim.keymap.set("n", "<Esc>", function()
+    set_picker_keymap(state.keymaps.cancel_alt, function()
         finish("cancelled", nil, nil)
-    end, map_opts)
+    end)
 
     -- If the user closes the buffer/window manually, finalize state without freezing the UI.
     -- This replaces the previous blocking wait loop with event-driven completion.
