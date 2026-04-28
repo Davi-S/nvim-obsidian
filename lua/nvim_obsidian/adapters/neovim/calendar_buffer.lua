@@ -781,6 +781,47 @@ function M.open_calendar(ctx, request)
     -- NOTE: UI keybindings removed from in-buffer calendar to keep visual
     -- surface minimal. Keybinding documentation is preserved in the project
     -- docs. Consumers may bind keys externally if desired.
+    -- However, when the calendar is opened inside a floating window we want
+    -- to restore minimal in-buffer keybindings (close/select) so the UX for
+    -- floating pickers matches prior behavior (q to close, <CR> to select).
+    if request and request.floating and type(vim.keymap) == "table" and type(vim.keymap.set) == "function" then
+        pcall(vim.keymap.set, "n", "q", function()
+            if state.done then
+                return
+            end
+            if state.mode == "picker" then
+                finish("cancelled", nil, nil)
+            else
+                finish("closed", nil, nil)
+            end
+        end, { buffer = state.bufnr, silent = true })
+
+        pcall(vim.keymap.set, "n", "<CR>", function()
+            if state.done then
+                return
+            end
+
+            if state.mode == "picker" then
+                -- Determine selected_kind from cursor and map to date if possible.
+                local kind = selection_kind_for_cursor(state, state.cursor_row or 0, state.cursor_col or 0)
+                local selected_date = nil
+                if state.cursor_row and state.cursor_row >= 4 then
+                    local token = token_from_position(state, state.cursor_row, state.cursor_col or 0)
+                    if token then
+                        selected_date = parse_token(token)
+                    end
+                end
+                if not selected_date then
+                    selected_date = state.cursor_date
+                end
+                finish("selected", selected_date, kind)
+                return
+            end
+
+            -- Visualizer mode: Enter closes the view.
+            finish("closed", nil, nil)
+        end, { buffer = state.bufnr, silent = true })
+    end
 
     -- If the user closes the buffer/window manually, finalize state without freezing the UI.
     -- This replaces the previous blocking wait loop with event-driven completion.

@@ -117,6 +117,9 @@ function M.open_calendar(ctx, request)
 
     wrapped_request.layout = "current"
     wrapped_request.close_on_finish = true
+    -- Mark request so buffer adapter knows this was opened in a floating window
+    -- and may restore lightweight in-buffer keymaps for UX parity.
+    wrapped_request.floating = true
     wrapped_request.on_finish = function(payload)
         if type(vim.api.nvim_win_is_valid) == "function" and vim.api.nvim_win_is_valid(float_win) then
             pcall(vim.api.nvim_win_close, float_win, true)
