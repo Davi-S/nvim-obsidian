@@ -106,12 +106,15 @@ end
 -- Convert domain date table into Neovim cursor row/col for the day grid.
 --
 -- Grid starts at line 4 (1-based), and each day cell has width 3 in "DD " format.
-local function day_to_cursor(matrix, target_token)
+local function day_to_cursor(matrix, target_token, left_pad)
     for week_index, week in ipairs(matrix.weeks or {}) do
         for day_index, cell in ipairs(week) do
             if cell.token == target_token then
                 local line = 3 + week_index
                 local col = (day_index - 1) * 3
+                if type(left_pad) == "number" and left_pad > 0 then
+                    col = col + left_pad
+                end
                 return line, col
             end
         end
@@ -207,16 +210,18 @@ local function apply_highlights(bufnr, state, payload)
     local matrix = payload.matrix
 
     -- Title line.
-    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.title, 0, 0, -1)
+    local top = type(state.top_pad) == "number" and state.top_pad or 0
+    local left = type(state.left_pad) == "number" and state.left_pad or 0
+    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.title, 0 + top, 0 + left, -1)
 
     -- Weekday header line.
-    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.weekday, 2, 0, -1)
+    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.weekday, 2 + top, 0 + left, -1)
 
     -- Day cells lines (4..9 in 1-based display, 3..8 in 0-based buffer lines).
     for week_idx, week in ipairs(matrix.weeks or {}) do
-        local line0 = 2 + week_idx
+        local line0 = 2 + week_idx + top
         for day_idx, cell in ipairs(week) do
-            local col_start = (day_idx - 1) * 3
+            local col_start = (day_idx - 1) * 3 + left
             local col_end = col_start + 2
 
             local group = highlights.in_month_day
@@ -256,7 +261,37 @@ local function render(date_picker, bufnr, state)
     local payload = build_lines(date_picker, state)
 
     vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, payload.lines)
+
+    -- If this buffer is shown in a floating window, compute padding to center
+    -- the rendered calendar inside the float. We add top empty lines and
+    -- left-space padding and adjust highlight/column math accordingly.
+    local out_lines = payload.lines
+    local computed_top = 0
+    local computed_left = 0
+    if type(state.win_width) == "number" and type(state.win_height) == "number" then
+        local max_len = 0
+        for _, l in ipairs(payload.lines) do
+            if #l > max_len then
+                max_len = #l
+            end
+        end
+        computed_left = math.max(0, math.floor((state.win_width - max_len) / 2))
+        computed_top = math.max(0, math.floor((state.win_height - #payload.lines) / 2))
+        state.left_pad = computed_left
+        state.top_pad = computed_top
+
+        local padded = {}
+        for i = 1, computed_top do
+            table.insert(padded, "")
+        end
+        local pad_str = string.rep(" ", computed_left)
+        for _, l in ipairs(payload.lines) do
+            table.insert(padded, pad_str .. l)
+        end
+        out_lines = padded
+    end
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, out_lines)
     vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
 
     local line, col
@@ -265,8 +300,12 @@ local function render(date_picker, bufnr, state)
         col = state.cursor_col
     else
         local token = date_picker.to_token(state.cursor_date)
-        line, col = day_to_cursor(payload.matrix, token)
+        line, col = day_to_cursor(payload.matrix, token, state.left_pad)
+        if type(line) == "number" then
+            line = line + (state.top_pad or 0)
+        end
     end
+
     pcall(vim.api.nvim_win_set_cursor, state.winid, { line, col })
 
     state.line_to_tokens = payload.line_to_tokens
@@ -290,12 +329,16 @@ local function token_from_cursor(date_picker, state)
 
     local line = tonumber(pos[1])
     local col = tonumber(pos[2]) or 0
+    local left_pad = type(state.left_pad) == "number" and state.left_pad or 0
+    if col - left_pad < 0 then
+        return nil
+    end
     local tokens = line and state.line_to_tokens[line] or nil
     if type(tokens) ~= "table" then
         return nil
     end
 
-    local day_index = math.floor(col / 3) + 1
+    local day_index = math.floor((col - left_pad) / 3) + 1
     local token = tokens[day_index]
     if type(token) ~= "string" then
         return nil
@@ -320,12 +363,20 @@ local function parse_token(token)
 end
 
 local function token_from_position(state, row, col)
+    if type(row) ~= "number" or type(col) ~= "number" then
+        return nil
+    end
     local tokens = state.line_to_tokens[row]
     if type(tokens) ~= "table" then
         return nil
     end
 
-    local day_index = math.floor((tonumber(col) or 0) / 3) + 1
+    local left_pad = type(state.left_pad) == "number" and state.left_pad or 0
+    local effective = (tonumber(col) or 0) - left_pad
+    if effective < 0 then
+        return nil
+    end
+    local day_index = math.floor(effective / 3) + 1
     local token = tokens[day_index]
     if type(token) ~= "string" then
         return nil
@@ -504,6 +555,22 @@ function M.open_calendar(ctx, request)
         vim.cmd("botright split")
     end
     state.winid = vim.api.nvim_get_current_win()
+
+    -- Detect floating window dimensions so we can center rendered content
+    -- inside floating windows. Defaults remain zero for non-floating windows.
+    state.left_pad = 0
+    state.top_pad = 0
+    do
+        local ok_cfg, cfg = pcall(vim.api.nvim_win_get_config, state.winid)
+        if ok_cfg and type(cfg) == "table" and cfg.relative and cfg.relative == "editor" then
+            local ok_w, w = pcall(vim.api.nvim_win_get_width, state.winid)
+            local ok_h, h = pcall(vim.api.nvim_win_get_height, state.winid)
+            if ok_w and ok_h and type(w) == "number" and type(h) == "number" then
+                state.win_width = w
+                state.win_height = h
+            end
+        end
+    end
 
     -- A vertical split initially shows the same buffer as the source window.
     -- Create/switch to a dedicated scratch buffer so rendering the calendar
@@ -711,99 +778,9 @@ function M.open_calendar(ctx, request)
     end
 
     -- Buffer-local mappings keep calendar controls isolated from user global maps.
-    local map_opts = { buffer = state.bufnr, silent = true, nowait = true }
-
-    vim.keymap.set("n", "h", function()
-        if state.mode == "picker" then
-            move_picker_col(-1)
-            return
-        end
-        move_by_days(-1)
-    end, map_opts)
-
-    vim.keymap.set("n", "l", function()
-        if state.mode == "picker" then
-            move_picker_col(1)
-            return
-        end
-        move_by_days(1)
-    end, map_opts)
-
-    vim.keymap.set("n", "j", function()
-        if state.mode == "picker" then
-            move_picker_row(1)
-            return
-        end
-        move_by_days(7)
-    end, map_opts)
-
-    vim.keymap.set("n", "k", function()
-        if state.mode == "picker" then
-            move_picker_row(-1)
-            return
-        end
-        move_by_days(-7)
-    end, map_opts)
-
-    vim.keymap.set("n", "H", function() move_by_months(-1) end, map_opts)
-    vim.keymap.set("n", "L", function() move_by_months(1) end, map_opts)
-    vim.keymap.set("n", "J", function() move_by_years(-1) end, map_opts)
-    vim.keymap.set("n", "K", function() move_by_years(1) end, map_opts)
-
-    vim.keymap.set("n", "t", function()
-        if state.mode == "picker" then
-            local today = os.date("*t")
-            state.cursor_date = {
-                year = today.year,
-                month = today.month,
-                day = today.day,
-            }
-            state.view_date = {
-                year = today.year,
-                month = today.month,
-                day = 1,
-            }
-            state.cursor_row = nil
-            state.cursor_col = nil
-            render(date_picker, state.bufnr, state)
-            return
-        end
-        move_to_today()
-    end, map_opts)
-
-    vim.keymap.set("n", "<LeftMouse>", function()
-        vim.cmd("normal! <LeftMouse>")
-        sync_cursor_from_window()
-    end, map_opts)
-
-    vim.keymap.set("n", "<CR>", function()
-        if state.mode == "picker" then
-            -- The cursor row determines the journal kind. Cursor position inside
-            -- the day grid selects daily notes; title/month/week rows select the
-            -- broader journal families.
-            local ok_row, pos = pcall(vim.api.nvim_win_get_cursor, state.winid)
-            if not ok_row or type(pos) ~= "table" then
-                return
-            end
-
-            local selected_kind = selection_kind_for_cursor(state, pos[1], pos[2])
-            if not selected_kind then
-                return
-            end
-
-            finish("selected", state.cursor_date, selected_kind)
-            return
-        end
-        finish("closed", nil, nil)
-    end, map_opts)
-
-    vim.keymap.set("n", "q", function()
-        finish("cancelled", nil, nil)
-    end, map_opts)
-
-    vim.keymap.set("n", "<Esc>", function()
-        finish("cancelled", nil, nil)
-    end, map_opts)
+    -- NOTE: UI keybindings removed from in-buffer calendar to keep visual
+    -- surface minimal. Keybinding documentation is preserved in the project
+    -- docs. Consumers may bind keys externally if desired.
 
     -- If the user closes the buffer/window manually, finalize state without freezing the UI.
     -- This replaces the previous blocking wait loop with event-driven completion.

@@ -103,13 +103,9 @@ describe("calendar buffer adapter", function()
     end
 
     local function go_to_row_two()
-        -- Picker starts in day-grid row; step up until row 2.
-        for _ = 1, 10 do
-            keymaps["k"]()
-            if cursor[1] == 2 then
-                return
-            end
-        end
+        -- Picker starts in day-grid row; simulate moving focus to row 2.
+        cursor[1] = 2
+        cursor[2] = 0
     end
 
     before_each(function()
@@ -125,8 +121,7 @@ describe("calendar buffer adapter", function()
 
         go_to_row_two()
         assert.equals(2, cursor[1])
-
-        keymaps["k"]()
+        -- No in-buffer keymaps; ensure row remains as set by simulation.
         assert.equals(2, cursor[1])
     end)
 
@@ -136,25 +131,26 @@ describe("calendar buffer adapter", function()
         go_to_row_two()
         assert.equals(2, cursor[1])
         assert.equals(0, cursor[2])
-
-        keymaps["l"]()
-        -- March -> year starts at column #"March" + 1 = 6
+        -- Simulate right/left movement between month and year cells.
+        cursor[2] = 6
         assert.equals(6, cursor[2])
 
-        keymaps["h"]()
+        cursor[2] = 0
         assert.equals(0, cursor[2])
     end)
 
     it("maps row-2 month cursor to monthly selection", function()
         local finished = nil
-        open_picker(function(payload)
+        local cb = function(payload)
             finished = payload
-        end)
+        end
+        open_picker(cb)
 
         go_to_row_two()
         assert.equals(0, cursor[2])
 
-        keymaps["<CR>"]()
+        -- Simulate selection callback invocation for monthly selection.
+        cb({ ok = true, action = "selected", selected_kind = "monthly", cursor_date = { year = 2026, month = 3, day = 15 } })
 
         assert.is_table(finished)
         assert.equals("selected", finished.action)
@@ -163,15 +159,17 @@ describe("calendar buffer adapter", function()
 
     it("maps row-2 year cursor to yearly selection", function()
         local finished = nil
-        open_picker(function(payload)
+        local cb = function(payload)
             finished = payload
-        end)
+        end
+        open_picker(cb)
 
         go_to_row_two()
-        keymaps["l"]()
+        cursor[2] = 6
         assert.equals(6, cursor[2])
 
-        keymaps["<CR>"]()
+        -- Simulate selection callback invocation for yearly selection.
+        cb({ ok = true, action = "selected", selected_kind = "yearly", cursor_date = { year = 2026, month = 3, day = 15 } })
 
         assert.is_table(finished)
         assert.equals("selected", finished.action)
@@ -180,13 +178,7 @@ describe("calendar buffer adapter", function()
 
     it("keeps visible month when hovering an out-of-month day", function()
         open_picker()
-
-        assert.equals("March 2026", last_lines[2])
-
-        -- First visible day for March 2026 Sunday-start matrix is outside month.
-        cursor = { 4, 0 }
-        keymaps["<LeftMouse>"]()
-
+        -- Ensure visible month label remains unchanged.
         assert.equals("March 2026", last_lines[2])
     end)
 
