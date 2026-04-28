@@ -124,8 +124,7 @@ end
 local function resolve_content_padding(state)
     local padding = type(state.content_padding) == "table" and state.content_padding or {}
     local top = math.max(0, tonumber(padding.top) or 0)
-    local left = math.max(0, tonumber(padding.left) or 0)
-    return top, left
+    return top
 end
 
 local function shift_line_to_tokens(line_to_tokens, top_offset)
@@ -139,21 +138,46 @@ local function shift_line_to_tokens(line_to_tokens, top_offset)
     return shifted
 end
 
-local function pad_lines(lines, top_pad, left_pad)
+local function compute_line_offsets(lines, window_width)
+    local offsets = {}
+    local width = math.max(0, tonumber(window_width) or 0)
+
+    for index, line in ipairs(lines or {}) do
+        local line_width = #line
+        offsets[index] = math.max(0, math.floor((width - line_width) / 2))
+    end
+
+    return offsets
+end
+
+local function pad_lines(lines, top_pad, line_offsets)
     local padded = {}
     local top = math.max(0, tonumber(top_pad) or 0)
-    local left = math.max(0, tonumber(left_pad) or 0)
-    local prefix = string.rep(" ", left)
 
     for _ = 1, top do
         table.insert(padded, "")
     end
 
-    for _, line in ipairs(lines or {}) do
-        table.insert(padded, prefix .. line)
+    for index, line in ipairs(lines or {}) do
+        local left = math.max(0, tonumber(line_offsets and line_offsets[index]) or 0)
+        table.insert(padded, string.rep(" ", left) .. line)
     end
 
     return padded
+end
+
+local function line_offset_for_index(state, index)
+    local offsets = type(state.line_offsets) == "table" and state.line_offsets or {}
+    return math.max(0, tonumber(offsets[index]) or 0)
+end
+
+local function line_index_for_row(state, row)
+    local top_pad = resolve_content_padding(state)
+    local line = tonumber(row)
+    if not line then
+        return nil
+    end
+    return line - top_pad
 end
 
 -- Build all buffer lines plus metadata needed for click/cursor translation.
@@ -229,19 +253,20 @@ local function apply_highlights(bufnr, state, payload)
     local today_token = state.today_token
     local marks = type(state.marks) == "table" and state.marks or {}
     local matrix = payload.matrix
-    local top_pad, left_pad = resolve_content_padding(state)
+    local top_pad = resolve_content_padding(state)
 
     -- Title line.
-    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.title, top_pad, left_pad, -1)
+    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.title, top_pad, line_offset_for_index(state, 1), -1)
 
     -- Weekday header line.
-    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.weekday, top_pad + 2, left_pad, -1)
+    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.weekday, top_pad + 2, line_offset_for_index(state, 3), -1)
 
     -- Day cells lines (4..9 in 1-based display, 3..8 in 0-based buffer lines).
     for week_idx, week in ipairs(matrix.weeks or {}) do
         local line0 = top_pad + 2 + week_idx
+        local line_index = 3 + week_idx
         for day_idx, cell in ipairs(week) do
-            local col_start = left_pad + (day_idx - 1) * 3
+            local col_start = line_offset_for_index(state, line_index) + (day_idx - 1) * 3
             local col_end = col_start + 2
 
             local group = highlights.in_month_day
@@ -280,39 +305,32 @@ end
 local function render(date_picker, bufnr, state)
     local payload = build_lines(date_picker, state)
     local top_pad = 0
-    local left_pad = 0
+    local line_offsets = {}
 
     if state.center_content and type(state.window_size) == "table" then
         local content_height = #payload.lines
-        local content_width = 0
-        for _, line in ipairs(payload.lines) do
-            if #line > content_width then
-                content_width = #line
-            end
-        end
-
         top_pad = math.max(0, math.floor(((tonumber(state.window_size.height) or 0) - content_height) / 2))
-        left_pad = math.max(0, math.floor(((tonumber(state.window_size.width) or 0) - content_width) / 2))
+        line_offsets = compute_line_offsets(payload.lines, state.window_size.width)
     end
 
     state.content_padding = {
         top = top_pad,
-        left = left_pad,
     }
+    state.line_offsets = line_offsets
 
     vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, pad_lines(payload.lines, top_pad, left_pad))
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, pad_lines(payload.lines, top_pad, line_offsets))
     vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
 
     local line, col
     if state.mode == "picker" and type(state.cursor_row) == "number" and type(state.cursor_col) == "number" then
         line = state.cursor_row
-        col = state.cursor_col
+        col = state.cursor_col + line_offset_for_index(state, line_index_for_row(state, line) or 1)
     else
         local token = date_picker.to_token(state.cursor_date)
         line, col = day_to_cursor(payload.matrix, token)
         line = line + top_pad
-        col = col + left_pad
+        col = col + line_offset_for_index(state, 3 + (line - top_pad - 3))
     end
     pcall(vim.api.nvim_win_set_cursor, state.winid, { line, col })
 
@@ -438,7 +456,8 @@ local function selection_kind_for_cursor(state, row, col)
     if line == top_pad + 2 then
         local month_name = MONTH_NAMES[(state.view_date or {}).month] or "Month"
         local year_start_col = #month_name + 1
-        if column >= top_pad + year_start_col then
+        local line_left = line_offset_for_index(state, 2)
+        if column >= line_left + year_start_col then
             return "yearly"
         end
         return "monthly"
@@ -461,6 +480,12 @@ local function normalize_picker_row(state, row)
     end
     local top_pad = resolve_content_padding(state)
     return clamp(line, top_pad + 2, top_pad + 9)
+end
+
+local function line_col_from_cursor(state, row, col)
+    local line_index = line_index_for_row(state, row)
+    local left = line_index and line_offset_for_index(state, line_index) or 0
+    return math.max(0, (tonumber(col) or 0) - left)
 end
 
 -- Safe window closer helper used by finish paths.
@@ -755,7 +780,7 @@ function M.open_calendar(ctx, request)
 
         local new_row = tonumber(pos[1]) or state.cursor_row
         state.cursor_row = normalize_picker_row(state, new_row)
-        state.cursor_col = tonumber(pos[2]) or state.cursor_col
+        state.cursor_col = line_col_from_cursor(state, state.cursor_row, pos[2])
 
         local top_pad = resolve_content_padding(state)
         if state.cursor_row and state.cursor_row >= top_pad + 4 then

@@ -112,6 +112,12 @@ describe("calendar buffer adapter", function()
         end
     end
 
+    local function leading_spaces(line)
+        local value = tostring(line or "")
+        local trimmed = value:gsub("^%s+", "")
+        return #value - #trimmed
+    end
+
     before_each(function()
         setup_vim_mocks()
     end)
@@ -188,6 +194,23 @@ describe("calendar buffer adapter", function()
         keymaps["<LeftMouse>"]()
 
         assert.equals("March 2026", last_lines[2])
+    end)
+
+    it("centers each calendar line independently in floating layout", function()
+        calendar_buffer.open_calendar({ date_picker = date_picker }, {
+            mode = "visualizer",
+            layout = "current",
+            center_content = true,
+            window_size = {
+                width = 80,
+                height = 24,
+            },
+            initial_date = { year = 2026, month = 3, day = 15 },
+        })
+
+        assert.is_true(leading_spaces(last_lines[1]) > 0)
+        assert.is_true(leading_spaces(last_lines[2]) > leading_spaces(last_lines[1]))
+        assert.is_true(leading_spaces(last_lines[3]) > leading_spaces(last_lines[1]))
     end)
 
     it("highlights marked existing-note days with existing_note_day group", function()
