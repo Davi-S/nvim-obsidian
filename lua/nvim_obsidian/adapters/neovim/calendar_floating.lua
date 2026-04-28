@@ -69,7 +69,7 @@ function M.open_calendar(ctx, request)
 
     local width = math.max(40, math.min(editor_width - 4, math.floor(floating_cfg.width)))
     local height = math.max(12, math.min(editor_height - 4, math.floor(floating_cfg.height)))
-    local row = math.max(1, math.floor((editor_height - height) / 2) - 1)
+    local row = math.max(0, math.floor((editor_height - height) / 2))
     local col = math.max(0, math.floor((editor_width - width) / 2))
 
     local ok_buf, seed_buf = pcall(vim.api.nvim_create_buf, false, true)
@@ -117,9 +117,6 @@ function M.open_calendar(ctx, request)
 
     wrapped_request.layout = "current"
     wrapped_request.close_on_finish = true
-    -- Mark request so buffer adapter knows this was opened in a floating window
-    -- and may restore lightweight in-buffer keymaps for UX parity.
-    wrapped_request.floating = true
     wrapped_request.on_finish = function(payload)
         if type(vim.api.nvim_win_is_valid) == "function" and vim.api.nvim_win_is_valid(float_win) then
             pcall(vim.api.nvim_win_close, float_win, true)
