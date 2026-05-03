@@ -233,6 +233,16 @@ function M.execute(_ctx, _input)
         end
     end
 
+    -- If the token was classified as a journal kind, treat creation as a
+    -- journal-origin creation for purposes of filename, target subdir, and
+    -- template resolution. This ensures following a wiki-link that names a
+    -- journal (e.g. "2026 Maio") will create the note in the configured
+    -- journal subdir and apply the journal template.
+    local treated_as_journal = false
+    if note_kind ~= "none" then
+        treated_as_journal = true
+    end
+
     local function join_path(base, leaf)
         if type(base) ~= "string" then
             error("join_path base must be a string")
@@ -320,7 +330,7 @@ function M.execute(_ctx, _input)
         }
     end
 
-    if input.origin == "journal" and note_kind ~= "none" then
+    if (input.origin == "journal" or treated_as_journal) and note_kind ~= "none" then
         local journal_cfg = type(cfg.journal) == "table" and cfg.journal[note_kind] or nil
         -- For journal navigation commands (Today/Next/Prev), title_or_token already
         -- represents the exact target note title and must not be recomputed from "now".
@@ -331,7 +341,7 @@ function M.execute(_ctx, _input)
     end
 
     local filename_base = slugify_title(note_title)
-    if input.origin == "journal" or input.origin == "omni" then
+    if input.origin == "journal" or input.origin == "omni" or treated_as_journal then
         filename_base = preserve_title_filename(note_title)
     end
 
@@ -369,8 +379,13 @@ function M.execute(_ctx, _input)
 
     local content = ""
     if type(ctx.resolve_template_content) == "function" and type(ctx.template) == "table" and type(ctx.template.render) == "function" then
+        local template_origin = input.origin
+        if note_kind ~= "none" then
+            template_origin = "journal"
+        end
+
         local template_content = ctx.resolve_template_content({
-            origin = input.origin,
+            origin = template_origin,
             kind = note_kind,
             title = note_title,
             token = token,
