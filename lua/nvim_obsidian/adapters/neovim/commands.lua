@@ -1,11 +1,30 @@
 ---@diagnostic disable: undefined-global
 
----Neovim command/augroup registration adapter.
----
----Binds user-facing commands to use-cases and wires autocmd-driven dataview and
----filesystem-sync behaviors.
+-- Neovim command/augroup registration adapter.
+--
+-- Responsibilities / design notes:
+-- - Register user-facing `:Obsidian*` commands and a small set of autocmds.
+-- - Commands act as thin adapters between editor state (buffers, cursor)
+--     and the plugin's use-cases. They should be safe to call in constrained
+--     environments (headless tests or partial Neovim mocks), so most helpers
+--     defensively guard `vim.api` usage and use `pcall` where appropriate.
+-- - Keep side-effects minimal and surfaced through the container's adapters
+--     (notifications, navigation) rather than doing editor I/O directly.
+-- - Performance: some helpers iterate the vault catalog to build marks; they
+--     are intentionally conservative and only used for optional commands.
+--
+-- Rationale for defensive coding:
+-- - Tests run in a headless environment that may mock only some `vim` APIs.
+-- - End-users may disable parts of the config, so commands must no-op when
+--   required use-cases/adapters are not wired.
+-- - Notifications are centralized through `ctx.adapters.notifications` so
+--   command code stays focused on intent, not presentation.
 local M = {}
 
+-- Safely create a Neovim user command when the runtime supports it.
+-- This is a very small abstraction to avoid sprinkling the same nil checks
+-- multiple places and to ensure `force = true` by default so repeated
+-- registrations (e.g. on reload) don't fail.
 local function create_user_command(name, fn, opts)
     if not vim or not vim.api or not vim.api.nvim_create_user_command then
         return
@@ -14,6 +33,10 @@ local function create_user_command(name, fn, opts)
     vim.api.nvim_create_user_command(name, fn, merged)
 end
 
+-- Read the current buffer line and cursor column in a defensive way.
+-- Many follow/selection commands require both pieces of information; when
+-- either is unavailable we return `nil` so callers can show a helpful
+-- notification instead of raising an error.
 local function get_current_line_and_col()
     if not vim or not vim.api then
         return nil, nil
@@ -22,6 +45,7 @@ local function get_current_line_and_col()
         return nil, nil
     end
 
+    -- Use pcall because test runners may stub or mutate these APIs.
     local ok_line, line = pcall(vim.api.nvim_get_current_line)
     local ok_cur, cur = pcall(vim.api.nvim_win_get_cursor, 0)
     if not ok_line or not ok_cur or type(line) ~= "string" or type(cur) ~= "table" then
@@ -36,6 +60,11 @@ local function get_current_line_and_col()
     return line, col
 end
 
+-- Map domain errors to user-facing notifications. The `ctx.adapters.notifications`
+-- abstraction is used so the command code does not need to know how notifications
+-- are presented (vim.notify, telescope, etc.). We intentionally keep mapping
+-- rules small — callers of use-cases should provide well-structured error
+-- objects with `.code` and `.message`.
 local function error_to_notification(ctx, error_obj)
     if not ctx or not ctx.adapters or not ctx.adapters.notifications then
         return
@@ -47,13 +76,18 @@ local function error_to_notification(ctx, error_obj)
     if code == "invalid_input" then
         ctx.adapters.notifications.warn(msg)
     elseif code == "parse_failure" then
+        -- Parse failures are recoverable/warn-level problems.
         ctx.adapters.notifications.warn(msg)
     else
-        -- internal_error, not_found, ambiguous_target, missing_anchor, etc
+        -- internal_error, not_found, ambiguous_target, missing_anchor, etc.
+        -- treat these as errors to attract user attention.
         ctx.adapters.notifications.error(msg)
     end
 end
 
+-- Lightweight string trim that returns `nil` for empty or non-string input.
+-- Returning `nil` simplifies call-sites that want to test presence without
+-- an additional `== ""` check.
 local function trim(s)
     if type(s) ~= "string" then return nil end
     local out = s:gsub("^%s+", ""):gsub("%s+$", "")
@@ -61,6 +95,9 @@ local function trim(s)
     return out
 end
 
+-- Normalize a small set of accentuated characters used in journal titles.
+-- We avoid a heavy dependency and only replace characters commonly found in
+-- Portuguese/Spanish/English month names to allow robust month-name matching.
 local function strip_accents(text)
     local s = tostring(text or "")
     local replacements = {
@@ -94,6 +131,9 @@ local function strip_accents(text)
     return s
 end
 
+-- Month name -> numeric month index map. Includes Portuguese spellings used by
+-- some users and common English names. This mapping keeps date parsing
+-- tolerant to localized journal titles (e.g., "março" / "marco").
 local MONTH_INDEX = {
     january = 1,
     fevereiro = 2,
@@ -121,6 +161,11 @@ local MONTH_INDEX = {
     janeiro = 1,
 }
 
+-- Compute the ISO-week's Monday date for a given ISO year/week.
+-- Implementation note: ISO weeks are defined such that week 1 contains Jan 4th.
+-- We choose noon on Jan 4 to avoid DST transitions and then back-calculate the
+-- Monday of week 1, finally advancing `iso_week - 1` weeks. Returns a simple
+-- table { year, month, day } suitable for downstream `ensure_open_note` calls.
 local function iso_week_start(iso_year, iso_week)
     local jan4 = os.time({ year = iso_year, month = 1, day = 4, hour = 12 })
     local jan4_wday = tonumber(os.date("%u", jan4)) or 1
@@ -130,6 +175,13 @@ local function iso_week_start(iso_year, iso_week)
     return { year = dt.year, month = dt.month, day = dt.day }
 end
 
+-- Parse a journal-identifying token (file basename or title) into a canonical
+-- date table for the requested `kind` (daily/weekly/monthly/yearly).
+--
+-- Supported formats are intentionally permissive to accommodate real-world
+-- filename variations produced by different locale/templating strategies.
+-- The function returns `{ year=<n>, month=<n>, day=<n> }` or `nil` when parsing
+-- fails. It is used to seed calendar pickers and compute adjacent journal targets.
 local function parse_date_from_note_token(token, kind)
     local raw = tostring(token or "")
     if raw == "" then
@@ -284,6 +336,15 @@ local function basename_without_extension(path)
     return filename:gsub("%.md$", "")
 end
 
+-- Build a map of journal-marked dates (YYYY-MM-DD -> metadata) for the
+-- calendar visualizer/picker. This is used by the journal calendar commands to
+-- visually indicate which dates already have notes.
+--
+-- Implementation notes / trade-offs:
+-- - This iterates `vault_catalog.list_notes()` which may be moderately
+--   expensive for very large vaults. We assume it is acceptable for explicit
+--   user commands (not on every keystroke). If this becomes a hotspot, we
+--   could add caching or a lightweight index.
 local function build_journal_calendar_marks(ctx)
     local marks = {}
     local vault_catalog = ctx and (ctx.vault_catalog or (ctx.domains and ctx.domains.vault_catalog))

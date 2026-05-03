@@ -1,7 +1,18 @@
----Neovim navigation adapter.
----
----Encapsulates file opening, cursor movement, and anchor/block navigation with
----defensive API checks and normalized errors.
+-- Neovim navigation adapter.
+--
+-- Responsibilities and design notes:
+-- - Provide a small, test-friendly surface for editor navigation: opening
+--   files, inserting text at cursor, and jumping to headings or block-ids.
+-- - Strongly defensive about `vim.api` availability because unit tests run
+--   in headless contexts and some runtime environments may partially mock
+--   the `vim` table. All public methods return `(true, nil)` on success and
+--   `(false, error)` on failure using the shared `errors` helper so callers
+--   can map adapter failures to user-facing notifications.
+-- - Heading matching supports both human-readable normalized matching and
+--   the common 'slugified' anchor form produced by many markdown renderers
+--   (e.g., "My Heading" -> "my-heading"). This increases robustness when
+--   navigating between rendered anchors and source headings.
+--
 local M = {}
 local errors = require("nvim_obsidian.core.shared.errors")
 
@@ -20,6 +31,10 @@ local function split_lines(text)
     return out
 end
 
+-- Split a block of text into lines preserving order. This is a tiny helper
+-- that keeps adapter code independent from external string libraries and
+-- normalizes input types (non-string inputs become their `tostring` value).
+
 local function normalize_heading_token(value)
     local s = tostring(value or "")
     s = s:lower()
@@ -28,6 +43,10 @@ local function normalize_heading_token(value)
     s = s:gsub("^%s+", ""):gsub("%s+$", "")
     return s
 end
+
+-- Produce a simplified, comparable form of a heading for fuzzy matching.
+-- It removes common markdown punctuation, collapses whitespace, and lowercases
+-- the result so that different cosmetic heading forms match predictably.
 
 local function slugify_heading(value)
     local s = tostring(value or "")
@@ -39,6 +58,11 @@ local function slugify_heading(value)
     s = s:gsub("^%-+", ""):gsub("%-+$", "")
     return s
 end
+
+-- Convert a heading to a slug (URL/anchor-like form) by removing punctuation
+-- and replacing whitespace with dashes. Some tools generate anchors using a
+-- slugified form; comparing both normalized and slugified forms improves
+-- chances of matching an anchor in the buffer.
 
 local function find_heading_line(lines, anchor)
     local anchor_norm = normalize_heading_token(anchor)
@@ -55,6 +79,10 @@ local function find_heading_line(lines, anchor)
     end
     return nil
 end
+
+-- Scan the provided lines for a markdown heading that matches `anchor`.
+-- Matching tests both the normalized visible heading and its slugified
+-- counterpart to tolerate different anchor generation rules.
 
 local function find_block_line(lines, block_id)
     local id = tostring(block_id or "")
@@ -81,6 +109,10 @@ local function find_block_line(lines, block_id)
     end
     return nil
 end
+
+-- Look for a block id (Obsidian-style `^blockid`) in the lines. The search
+-- escapes non-word characters in the provided id and ensures the match is
+-- not followed by an identifier character to avoid partial collisions.
 
 ---Open file path in current window.
 ---@param path string
@@ -111,6 +143,10 @@ function M.open_path(path)
     return true, nil
 end
 
+-- Note: callers expect a normalized adapter-style `(ok, error)` response. We
+-- intentionally avoid exposing raw `vim.api` errors and instead wrap failures
+-- using `adapter_error` so higher layers can convert them to notifications.
+
 ---Insert text at current cursor position.
 ---@param text string
 ---@return boolean
@@ -130,6 +166,10 @@ function M.insert_text_at_cursor(text)
 
     return true, nil
 end
+
+-- This helper inserts arbitrary text at the current cursor position. It uses
+-- `nvim_put` with `follow = true` and `block = true` to match typical paste
+-- semantics. Failures are converted to adapter errors for consistent handling.
 
 ---Jump cursor to given 1-based line.
 ---@param line integer
@@ -155,6 +195,10 @@ function M.jump_to_line(line)
 
     return true, nil
 end
+
+-- Move the cursor to a specific 1-based line in the current window. The
+-- adapter verifies the required window APIs are present and returns a structured
+-- error otherwise.
 
 ---Jump to heading anchor or block id within current buffer.
 ---@param target table
@@ -197,5 +241,9 @@ function M.jump_to_anchor(target)
 
     return M.jump_to_line(line_no)
 end
+
+-- `jump_to_anchor` tries block-id matching first then falls back to heading
+-- matching. On success it delegates to `jump_to_line` so cursor movement
+-- behavior and error mapping remains consistent.
 
 return M

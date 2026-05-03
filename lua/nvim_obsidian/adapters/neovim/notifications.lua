@@ -4,6 +4,19 @@
 ---
 ---Maps plugin events to `vim.notify` with configurable severity filtering and
 ---consistent message formatting.
+-- Neovim notifications adapter.
+--
+-- Responsibilities and design notes:
+-- - Provide a small adapter that surfaces plugin events as Neovim
+--   notifications via `vim.notify` (or a substituted `vim` table supplied in
+--   `ctx.vim` for testing).
+-- - Support configurable log-level filtering so callers can emit noisy debug
+--  /info events without overwhelming users when `config.log_level` is set to
+--   a higher severity.
+-- - Ensure message formatting is consistent (title, target, next step) and
+--   return boolean success indicators so callers can decide whether to fall
+--   back to alternate presentation channels.
+--
 local M = {}
 
 local severity_order = {
@@ -11,6 +24,10 @@ local severity_order = {
     warn = 2,
     info = 3,
 }
+
+-- `severity_order` is a numeric ordering used to decide whether an event
+-- should be emitted given a configured minimum level. Lower numbers are
+-- higher-severity.
 
 ---@param s any
 ---@return string|nil
@@ -20,6 +37,9 @@ local function trim(s)
     if stripped == "" then return nil end
     return stripped
 end
+
+-- Trim helper that returns `nil` for empty or non-string input. This simplifies
+-- message construction by allowing presence checks with simple `if` tests.
 
 ---@param level any
 ---@return string
@@ -31,6 +51,8 @@ local function normalize_level(level)
     return "warn"
 end
 
+-- Normalize arbitrary inputs into the adapter's allowed severity keys.
+
 ---@param ctx table|nil
 ---@return table|nil
 local function resolve_vim(ctx)
@@ -39,6 +61,9 @@ local function resolve_vim(ctx)
     end
     return vim
 end
+
+-- Allow tests to inject a fake `vim` implementation via `ctx.vim` so the
+-- adapter can be exercised without depending on the real Neovim runtime.
 
 ---@param vim_ref table|nil
 ---@param level any
@@ -58,6 +83,10 @@ local function resolve_log_constant(vim_ref, level)
     return vim_ref.log.levels.INFO
 end
 
+-- Map the textual severity to Neovim's `vim.log.levels` constants when
+-- available. Returns `nil` when the log API is not present; callers then
+-- fall back to calling `vim.notify` with a no-op level in a safe `pcall`.
+
 ---@param configured_level any
 ---@param event_level any
 ---@return boolean
@@ -66,6 +95,9 @@ local function should_emit(configured_level, event_level)
     local event = severity_order[normalize_level(event_level)] or severity_order.warn
     return event <= configured
 end
+
+-- Decide whether an event at `event_level` should be shown given
+-- `configured_level` (both can be any value; they are normalized first).
 
 ---@param payload any
 ---@return string|nil
@@ -104,6 +136,11 @@ local function format_message(payload)
     return table.concat(parts, " | ")
 end
 
+-- Format a structured payload into a compact, human-readable single-line
+-- message. Supported fields: `message`/`msg`, `command`, `target`, and
+-- `next_step`. Unknown payload shapes are ignored so callers can evolve
+-- payload contents without breaking the notifier.
+
 ---Create severity-aware notifier bound to setup config.
 ---@param ctx table|nil { vim?: table, config?: table, title?: string }
 ---@return table
@@ -127,6 +164,9 @@ function M.create_notifier(ctx)
             return false
         end
 
+        -- Build a single-line message from the payload. If formatting yields
+        -- nothing (e.g., empty message) we silently drop the event and return
+        -- false so callers can optionally fall back to other presenters.
         local msg = format_message(payload)
         if not msg then
             return false
@@ -142,6 +182,8 @@ function M.create_notifier(ctx)
         }
         local log_level = resolve_log_constant(vim_ref, event_level)
 
+        -- `vim.notify` may be unavailable or may raise; pcall protects the
+        -- caller and returns a boolean success flag.
         local ok = pcall(vim_ref.notify, msg, log_level, opts)
         return ok
     end
