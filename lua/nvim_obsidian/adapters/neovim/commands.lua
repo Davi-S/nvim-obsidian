@@ -794,6 +794,17 @@ local function register_obsidian_calendar(ctx)
                 end
             end
 
+            -- Honor optional payload hint to open the note in a split. This
+            -- is set by the calendar picker when the user pressed <C-v>
+            -- (vertical split) or <C-x> (horizontal split).
+            if type(payload.open_in) == "string" then
+                if payload.open_in == "vsplit" then
+                    pcall(vim.cmd, "vsplit")
+                elseif payload.open_in == "hsplit" then
+                    pcall(vim.cmd, "split")
+                end
+            end
+
             local open_result = ensure_open_note.execute(ctx, {
                 title_or_token = journal_title,
                 create_if_missing = true,

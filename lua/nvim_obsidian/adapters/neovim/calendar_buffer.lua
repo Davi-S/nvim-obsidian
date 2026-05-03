@@ -697,7 +697,7 @@ function M.open_calendar(ctx, request)
         refresh_picker_from_cursor()
     end
 
-    local function finish(action, selected_date, selected_kind)
+    local function finish(action, selected_date, selected_kind, opts)
         if state.done then
             return
         end
@@ -716,6 +716,7 @@ function M.open_calendar(ctx, request)
             date = state.result.date,
             cursor_date = state.result.cursor_date,
             selected_kind = state.result.selected_kind,
+            open_in = opts and opts.open_in or nil,
             error = nil,
 
         }
@@ -881,6 +882,42 @@ function M.open_calendar(ctx, request)
             return
         end
         finish("closed", nil, nil)
+    end, map_opts)
+
+    vim.keymap.set("n", "<C-v>", function()
+        if state.mode ~= "picker" then
+            return
+        end
+
+        local ok_row, pos = pcall(vim.api.nvim_win_get_cursor, state.winid)
+        if not ok_row or type(pos) ~= "table" then
+            return
+        end
+
+        local selected_kind = selection_kind_for_cursor(state, pos[1], pos[2])
+        if not selected_kind then
+            return
+        end
+
+        finish("selected", state.cursor_date, selected_kind, { open_in = "vsplit" })
+    end, map_opts)
+
+    vim.keymap.set("n", "<C-x>", function()
+        if state.mode ~= "picker" then
+            return
+        end
+
+        local ok_row, pos = pcall(vim.api.nvim_win_get_cursor, state.winid)
+        if not ok_row or type(pos) ~= "table" then
+            return
+        end
+
+        local selected_kind = selection_kind_for_cursor(state, pos[1], pos[2])
+        if not selected_kind then
+            return
+        end
+
+        finish("selected", state.cursor_date, selected_kind, { open_in = "hsplit" })
     end, map_opts)
 
     vim.keymap.set("n", "q", function()
