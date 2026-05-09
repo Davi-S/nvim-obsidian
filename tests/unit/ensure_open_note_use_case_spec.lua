@@ -260,7 +260,7 @@ describe("ensure_open_note use case", function()
         local ctx = base_ctx({
             journal = {
                 classify_input = function()
-                    return { kind = "daily" }
+                    return { kind = "none" }
                 end,
             },
         })

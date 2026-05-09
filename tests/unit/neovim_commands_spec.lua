@@ -896,6 +896,110 @@ describe("neovim command adapter", function()
         end)
     end)
 
+    describe(":ObsidianHealth", function()
+        it("opens a read-only diagnostics buffer with container details", function()
+            local created_bufnr = nil
+            local current_bufnr = nil
+            local written_lines = nil
+            local options_by_name = {}
+
+            _G.vim.api.nvim_create_buf = function(_listed, _scratch)
+                created_bufnr = 91
+                return created_bufnr
+            end
+            _G.vim.api.nvim_set_current_buf = function(bufnr)
+                current_bufnr = bufnr
+            end
+            _G.vim.api.nvim_buf_set_lines = function(_bufnr, _start, _end, _strict, lines)
+                written_lines = lines
+            end
+            _G.vim.api.nvim_buf_set_option = function(_bufnr, name, value)
+                options_by_name[name] = value
+            end
+            _G.vim.api.nvim_get_commands = function(_opts)
+                local out = {}
+                for name, _ in pairs(command_registry) do
+                    out[name] = {}
+                end
+                return out
+            end
+
+            local container = base_container({
+                config = {
+                    vault_root = "/vault",
+                    new_notes_subdir = "notes",
+                    locale = "pt-BR",
+                    log_level = "warn",
+                    force_create_key = "<S-CR>",
+                    templates = {
+                        standard = "08 Templates/Nota padrao.md",
+                    },
+                    journal = {
+                        daily = {
+                            subdir = "01 Daily",
+                            title_format = "{{year}}-{{month}}-{{day}}",
+                            template = "08 Templates/Nota diaria.md",
+                        },
+                    },
+                },
+                resolve_template_content = function(_req)
+                    return "template body"
+                end,
+            })
+
+            commands.register(container)
+            assert.is_function(command_registry["ObsidianHealth"])
+
+            command_registry["ObsidianHealth"]()
+
+            assert.equals(91, created_bufnr)
+            assert.equals(91, current_bufnr)
+            assert.is_table(written_lines)
+            assert.is_true(#written_lines > 20)
+            assert.equals(false, options_by_name.modifiable)
+            assert.equals(true, options_by_name.readonly)
+            assert.equals("nofile", options_by_name.buftype)
+            assert.equals("wipe", options_by_name.bufhidden)
+            assert.equals(false, options_by_name.swapfile)
+            assert.equals("nvim_obsidian_health", options_by_name.filetype)
+
+            local joined = table.concat(written_lines, "\n")
+            assert.matches("nvim%-obsidian Health Report", joined)
+            assert.matches("vault_root: /vault", joined)
+            assert.matches("Registered Commands", joined)
+            assert.matches("ObsidianHealth", joined)
+            assert.matches("Templates", joined)
+            assert.matches("Use Cases", joined)
+            assert.matches("Adapters", joined)
+        end)
+
+        it("warns when diagnostics buffer APIs are unavailable", function()
+            local warned = nil
+
+            _G.vim.api.nvim_create_buf = nil
+            _G.vim.api.nvim_set_current_buf = nil
+            _G.vim.api.nvim_buf_set_lines = nil
+
+            local container = base_container({
+                adapters = {
+                    notifications = {
+                        warn = function(msg)
+                            warned = msg
+                        end,
+                    },
+                },
+            })
+
+            commands.register(container)
+            assert.is_function(command_registry["ObsidianHealth"])
+
+            command_registry["ObsidianHealth"]()
+
+            assert.is_string(warned)
+            assert.matches("unable to open diagnostics buffer", warned)
+        end)
+    end)
+
     describe("error handling", function()
         it("should normalize domain errors to notifications", function()
             local notifications = {}

@@ -304,12 +304,12 @@ end
 -- This order guarantees highlight application always matches final content.
 local function render(date_picker, bufnr, state)
     local payload = build_lines(date_picker, state)
-    local top_pad = 0
+    local top_pad = resolve_content_padding(state)
     local line_offsets = {}
 
     if state.center_content and type(state.window_size) == "table" then
-        local content_height = #payload.lines
-        top_pad = math.max(0, math.floor(((tonumber(state.window_size.height) or 0) - content_height) / 2))
+        -- Keep calendar rows anchored to their canonical line numbers.
+        -- We only center horizontally here so picker row math remains stable.
         line_offsets = compute_line_offsets(payload.lines, state.window_size.width)
     end
 

@@ -1393,11 +1393,279 @@ local function register_dataview_autocmds(ctx)
 end
 
 local function register_obsidian_health(ctx)
-    create_user_command("ObsidianHealth", function()
-        if ctx and ctx.adapters and ctx.adapters.notifications then
-            ctx.adapters.notifications.info("nvim-obsidian health: ok")
+    ---@param path any
+    ---@return string|nil
+    local function trim_or_nil(path)
+        if type(path) ~= "string" then
+            return nil
         end
-    end, { desc = "Check nvim-obsidian adapter wiring health" })
+        local v = path:gsub("^%s+", ""):gsub("%s+$", "")
+        if v == "" then
+            return nil
+        end
+        return v
+    end
+
+    ---@param base any
+    ---@param leaf any
+    ---@return string|nil
+    local function join_path(base, leaf)
+        local b = trim_or_nil(base)
+        local l = trim_or_nil(leaf)
+        if not b or not l then
+            return nil
+        end
+        local base_norm = b:gsub("\\", "/"):gsub("//+", "/")
+        local leaf_norm = l:gsub("\\", "/"):gsub("^/+", "")
+        if leaf_norm:match("^/") or leaf_norm:match("^%a:[/\\]") then
+            return leaf_norm
+        end
+        if base_norm:sub(-1) == "/" then
+            return base_norm .. leaf_norm
+        end
+        return base_norm .. "/" .. leaf_norm
+    end
+
+    ---@param path any
+    ---@return boolean
+    local function file_exists(path)
+        local fs_io = ctx and (ctx.fs_io or (ctx.adapters and ctx.adapters.fs_io))
+        if type(fs_io) ~= "table" or type(fs_io.read_file) ~= "function" then
+            return false
+        end
+        local content = fs_io.read_file(path)
+        return type(content) == "string"
+    end
+
+    ---@param label string
+    ---@param template_ref any
+    ---@param lines string[]
+    local function append_template_status(label, template_ref, lines)
+        local raw_ref = trim_or_nil(template_ref)
+        if not raw_ref then
+            table.insert(lines, string.format("- %s: not configured", label))
+            return
+        end
+
+        local vault_root = trim_or_nil(ctx and ctx.config and ctx.config.vault_root)
+        local candidate = raw_ref
+        if not raw_ref:match("^/") and not raw_ref:match("^%a:[/\\]") and vault_root then
+            candidate = join_path(vault_root, raw_ref) or raw_ref
+        end
+
+        local try_paths = { candidate }
+        if not candidate:match("%.md$") then
+            table.insert(try_paths, candidate .. ".md")
+        end
+
+        local resolved = nil
+        for _, path in ipairs(try_paths) do
+            if file_exists(path) then
+                resolved = path
+                break
+            end
+        end
+
+        if resolved then
+            table.insert(lines, string.format("- %s: OK (%s)", label, resolved))
+            return
+        end
+
+        table.insert(lines, string.format("- %s: missing (%s)", label, candidate))
+    end
+
+    ---@return string[]
+    local function build_health_lines()
+        local lines = {}
+        local cfg = ctx and ctx.config or {}
+        local journal_cfg = type(cfg.journal) == "table" and cfg.journal or {}
+        local templates_cfg = type(cfg.templates) == "table" and cfg.templates or {}
+
+        table.insert(lines, "nvim-obsidian Health Report")
+        table.insert(lines, string.rep("=", 28))
+        table.insert(lines, string.format("Generated: %s", os.date("%Y-%m-%d %H:%M:%S")))
+        table.insert(lines, "")
+
+        table.insert(lines, "Container")
+        table.insert(lines, "---------")
+        table.insert(lines, string.format("- available: %s", tostring(type(ctx) == "table")))
+        table.insert(lines, string.format("- domains: %s", tostring(type(ctx and ctx.domains) == "table")))
+        table.insert(lines, string.format("- use_cases: %s", tostring(type(ctx and ctx.use_cases) == "table")))
+        table.insert(lines, string.format("- adapters: %s", tostring(type(ctx and ctx.adapters) == "table")))
+        table.insert(lines,
+            string.format("- resolve_template_content: %s",
+                tostring(type(ctx and ctx.resolve_template_content) == "function")))
+        table.insert(lines,
+            string.format("- resolve_journal_title: %s", tostring(type(ctx and ctx.resolve_journal_title) == "function")))
+        table.insert(lines, "")
+
+        table.insert(lines, "Config")
+        table.insert(lines, "------")
+        table.insert(lines, string.format("- vault_root: %s", tostring(trim_or_nil(cfg.vault_root) or "<unset>")))
+        table.insert(lines,
+            string.format("- new_notes_subdir: %s", tostring(trim_or_nil(cfg.new_notes_subdir) or "<unset>")))
+        table.insert(lines, string.format("- locale: %s", tostring(trim_or_nil(cfg.locale) or "<unset>")))
+        table.insert(lines, string.format("- log_level: %s", tostring(trim_or_nil(cfg.log_level) or "<unset>")))
+        table.insert(lines,
+            string.format("- force_create_key: %s", tostring(trim_or_nil(cfg.force_create_key) or "<unset>")))
+        table.insert(lines, "")
+
+        table.insert(lines, "Registered Commands")
+        table.insert(lines, "-------------------")
+        local command_names = {}
+        if type(vim) == "table" and type(vim.api) == "table" and type(vim.api.nvim_get_commands) == "function" then
+            local ok_commands, commands_map = pcall(vim.api.nvim_get_commands, { builtin = false })
+            if ok_commands and type(commands_map) == "table" then
+                for name, _ in pairs(commands_map) do
+                    if tostring(name):match("^Obsidian") then
+                        table.insert(command_names, tostring(name))
+                    end
+                end
+            end
+        end
+
+        table.sort(command_names)
+        table.insert(lines, string.format("- count: %d", #command_names))
+        for _, name in ipairs(command_names) do
+            table.insert(lines, "- " .. name)
+        end
+        if #command_names == 0 then
+            table.insert(lines, "- (none found)")
+        end
+        table.insert(lines, "")
+
+        table.insert(lines, "Journal")
+        table.insert(lines, "-------")
+        table.insert(lines,
+            string.format("- classify_input: %s",
+                tostring(type(ctx and ctx.journal and ctx.journal.classify_input) == "function")))
+        table.insert(lines,
+            string.format("- compute_adjacent: %s",
+                tostring(type(ctx and ctx.journal and ctx.journal.compute_adjacent) == "function")))
+        table.insert(lines,
+            string.format("- build_title: %s",
+                tostring(type(ctx and ctx.journal and ctx.journal.build_title) == "function")))
+        for _, kind in ipairs({ "daily", "weekly", "monthly", "yearly" }) do
+            local section = type(journal_cfg[kind]) == "table" and journal_cfg[kind] or {}
+            table.insert(lines,
+                string.format("- %s.subdir: %s", kind, tostring(trim_or_nil(section.subdir) or "<unset>")))
+            table.insert(lines,
+                string.format("- %s.title_format: %s", kind, tostring(trim_or_nil(section.title_format) or "<unset>")))
+            table.insert(lines,
+                string.format("- %s.template: %s", kind, tostring(trim_or_nil(section.template) or "<unset>")))
+        end
+        table.insert(lines, "")
+
+        table.insert(lines, "Templates")
+        table.insert(lines, "---------")
+        append_template_status("standard", templates_cfg.standard, lines)
+        for _, kind in ipairs({ "daily", "weekly", "monthly", "yearly" }) do
+            local section = type(journal_cfg[kind]) == "table" and journal_cfg[kind] or {}
+            append_template_status(kind, section.template, lines)
+        end
+
+        table.insert(lines, "")
+        table.insert(lines, "Use Cases")
+        table.insert(lines, "---------")
+        local use_cases = type(ctx and ctx.use_cases) == "table" and ctx.use_cases or {}
+        local names = {
+            "ensure_open_note",
+            "follow_link",
+            "search_open_create",
+            "show_backlinks",
+            "vault_search",
+            "reindex_sync",
+            "insert_template",
+            "render_query_blocks",
+            "open_date_picker",
+        }
+        for _, name in ipairs(names) do
+            local uc = use_cases[name]
+            table.insert(lines,
+                string.format("- %s.execute: %s", name, tostring(type(uc) == "table" and type(uc.execute) == "function")))
+        end
+
+        table.insert(lines, "")
+        table.insert(lines, "Adapters")
+        table.insert(lines, "--------")
+        local adapters = type(ctx and ctx.adapters) == "table" and ctx.adapters or {}
+        local adapter_checks = {
+            { "notifications.info",            type(adapters.notifications) == "table" and type(adapters.notifications.info) == "function" },
+            { "notifications.warn",            type(adapters.notifications) == "table" and type(adapters.notifications.warn) == "function" },
+            { "notifications.error",           type(adapters.notifications) == "table" and type(adapters.notifications.error) == "function" },
+            { "navigation.open_path",          type(adapters.navigation) == "table" and type(adapters.navigation.open_path) == "function" },
+            { "telescope.open_omni",           type(adapters.telescope) == "table" and type(adapters.telescope.open_omni) == "function" },
+            { "calendar_buffer.open",          type(adapters.calendar_buffer) == "table" and type(adapters.calendar_buffer.open) == "function" },
+            { "calendar_floating.open",        type(adapters.calendar_floating) == "table" and type(adapters.calendar_floating.open) == "function" },
+            { "fs_io.read_file",               type(adapters.fs_io) == "table" and type(adapters.fs_io.read_file) == "function" },
+            { "watcher.start",                 type(adapters.watcher) == "table" and type(adapters.watcher.start) == "function" },
+            { "markdown.extract_wiki_link_at", type(adapters.markdown) == "table" and type(adapters.markdown.extract_wiki_link_at) == "function" },
+        }
+        for _, item in ipairs(adapter_checks) do
+            table.insert(lines, string.format("- %s: %s", item[1], tostring(item[2] and true or false)))
+        end
+
+        return lines
+    end
+
+    ---Open a read-only scratch buffer with health lines.
+    ---
+    ---This intentionally uses direct nvim API calls (instead of a picker/window
+    ---adapter) so the diagnostics report remains available even when optional
+    ---integrations are missing or partially wired.
+    ---@param lines string[]
+    ---@return boolean
+    local function show_health_buffer(lines)
+        if type(vim) ~= "table" or type(vim.api) ~= "table" then
+            return false
+        end
+        if type(vim.api.nvim_create_buf) ~= "function"
+            or type(vim.api.nvim_set_current_buf) ~= "function"
+            or type(vim.api.nvim_buf_set_lines) ~= "function"
+        then
+            return false
+        end
+
+        local ok_buf, bufnr = pcall(vim.api.nvim_create_buf, false, true)
+        if not ok_buf or type(bufnr) ~= "number" then
+            return false
+        end
+
+        local ok_set = pcall(vim.api.nvim_set_current_buf, bufnr)
+        if not ok_set then
+            return false
+        end
+
+        pcall(vim.api.nvim_buf_set_lines, bufnr, 0, -1, false, lines)
+
+        local function set_buf_option(name, value)
+            if type(vim.api.nvim_set_option_value) == "function" then
+                local ok = pcall(vim.api.nvim_set_option_value, name, value, { buf = bufnr })
+                if ok then
+                    return
+                end
+            end
+            if type(vim.api.nvim_buf_set_option) == "function" then
+                pcall(vim.api.nvim_buf_set_option, bufnr, name, value)
+            end
+        end
+
+        set_buf_option("buftype", "nofile")
+        set_buf_option("bufhidden", "wipe")
+        set_buf_option("swapfile", false)
+        set_buf_option("modifiable", false)
+        set_buf_option("readonly", true)
+        set_buf_option("filetype", "nvim_obsidian_health")
+        return true
+    end
+
+    create_user_command("ObsidianHealth", function()
+        local lines = build_health_lines()
+        local opened = show_health_buffer(lines)
+        if not opened and ctx and ctx.adapters and ctx.adapters.notifications then
+            ctx.adapters.notifications.warn("nvim-obsidian health: unable to open diagnostics buffer")
+        end
+    end, { desc = "Open detailed nvim-obsidian diagnostics buffer" })
 end
 
 ---Register all nvim-obsidian commands and autocmd integrations.

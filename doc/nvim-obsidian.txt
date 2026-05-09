@@ -129,7 +129,10 @@ Notes:
 
                                                     *:ObsidianHealth*
 :ObsidianHealth
-  Check plugin wiring health.
+  Open a detailed read-only diagnostics buffer.
+  The report includes container wiring, registered `:Obsidian*` commands,
+  effective core config values, journal section settings, template resolution
+  status, and adapter/use-case availability checks.
 
 ===============================================================================
 5. CONFIGURATION                                      *nvim-obsidian-configuration*
@@ -250,6 +253,7 @@ Manual render command: >
 8. TROUBLESHOOTING                                  *nvim-obsidian-troubleshooting*
 
 - Run |:ObsidianHealth| to verify command wiring.
+  The command opens a scratch diagnostics buffer; close it with `:bd`.
 - Ensure all required dependencies are installed.
 - Ensure vault_root is absolute and points to an existing directory.
 - If files are removed via shell commands (for example `:!rm "%"`), index sync

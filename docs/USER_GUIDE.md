@@ -90,10 +90,11 @@ Run the health check command:
 :ObsidianHealth
 ```
 
-Expected output:
-```
-nvim-obsidian health: ok
-```
+Expected behavior:
+- Opens a read-only diagnostics scratch buffer
+- Shows command registration (`:Obsidian*`), container wiring, vault paths,
+  journal settings, template status, and adapter/use-case checks
+- Close the report buffer with `:bd`
 
 If it fails, check:
 1. Is the vault path correct and accessible?
