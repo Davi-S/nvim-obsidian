@@ -313,6 +313,18 @@ local function render(date_picker, bufnr, state)
     local line_offsets = {}
 
     if state.center_content and type(state.window_size) == "table" then
+        -- VERTICAL CENTERING FIX:
+        -- When center_content is enabled, we must recalculate BOTH vertical and
+        -- horizontal padding. Previously, only horizontal offsets were recalculated,
+        -- leaving vertical padding stale or zero. This caused content to stick to
+        -- the top border with excessive space at the bottom.
+        --
+        -- Calculate vertical padding by centering content_height in window_height.
+        -- Example: 12-line calendar in 24-row window => (24-12)/2 = 6 rows top padding
+        local content_height = #payload.lines
+        local window_height = tonumber(state.window_size.height) or 0
+        top_pad = math.max(0, math.floor((window_height - content_height) / 2))
+
         -- Compute horizontal centering offsets for each line.
         -- These offsets tell us how many spaces were prepended to center lines.
         -- We use these to convert between logical columns (for state) and
