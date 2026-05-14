@@ -232,4 +232,115 @@ describe("calendar buffer adapter", function()
 
         assert.is_true(found)
     end)
+
+    it("moves cursor right by exactly one day cell on first keypress (without centering)", function()
+        -- This tests the navigation bug fix:
+        -- The first keypress should move by exactly one day (3 logical columns),
+        -- not jump to the last day of the week or behave unexpectedly.
+
+        open_picker()
+
+        -- Start position: day 15 (Sunday), which is at logical column 0
+        -- Before the fix, first keypress would jump to column 18 (last day)
+        -- After the fix, first keypress should move to column 3 (day 16)
+        local initial_col = cursor[2]
+        assert.is_true(initial_col >= 0)
+
+        keymaps["l"]() -- Move right
+
+        -- Cursor should have moved right by exactly 3 columns (one day)
+        assert.equals(initial_col + 3, cursor[2])
+    end)
+
+    it("moves cursor left by exactly one day cell on first keypress (without centering)", function()
+        open_picker()
+
+        -- Move to a middle position first (day 16, column 3)
+        keymaps["l"]()
+        local middle_col = cursor[2]
+        assert.equals(3, middle_col)
+
+        -- Now move left - should go back by one cell
+        keymaps["h"]()
+        assert.equals(middle_col - 3, cursor[2])
+    end)
+
+    it("moves cursor correctly with consecutive keypresses (without centering)", function()
+        -- After the first keypress fix, all subsequent presses should work correctly.
+        open_picker()
+
+        local initial_col = cursor[2]
+
+        -- Right, right, right, left, left
+        keymaps["l"]()
+        keymaps["l"]()
+        keymaps["l"]()
+        local col_after_three_rights = cursor[2]
+        assert.equals(initial_col + 9, col_after_three_rights)
+
+        keymaps["h"]()
+        keymaps["h"]()
+        local col_after_two_lefts = cursor[2]
+        assert.equals(col_after_three_rights - 6, col_after_two_lefts)
+    end)
+
+    it("moves cursor right by exactly one day cell on first keypress (with centering)", function()
+        -- This is the critical test case: with centering enabled, line offsets are added.
+        -- The bug manifested most clearly with centered layouts where logical vs buffer
+        -- column confusion caused first keypress to jump incorrectly.
+
+        calendar_buffer.open_calendar({ date_picker = date_picker }, {
+            mode = "picker",
+            layout = "current",
+            center_content = true,
+            window_size = {
+                width = 80,
+                height = 24,
+            },
+            initial_date = { year = 2026, month = 3, day = 15 },
+        })
+
+        local initial_col = cursor[2]
+
+        -- With centering, line offsets are added to visual columns.
+        -- The state should track logical columns, so navigation should still move by 3.
+        keymaps["l"]()
+
+        local col_after_right = cursor[2]
+        -- With offsets, the buffer column includes padding, but the movement should
+        -- still be consistent: next_buffer_col = old_buffer_col + 3 + (new_offset - old_offset)
+        -- For same row, offsets are identical, so: movement = 3
+        assert.equals(initial_col + 3, col_after_right)
+    end)
+
+    it("alternates left-right navigation correctly with centering", function()
+        calendar_buffer.open_calendar({ date_picker = date_picker }, {
+            mode = "picker",
+            layout = "current",
+            center_content = true,
+            window_size = {
+                width = 80,
+                height = 24,
+            },
+            initial_date = { year = 2026, month = 3, day = 15 },
+        })
+
+        local col_0 = cursor[2]
+
+        keymaps["l"]()
+        local col_1 = cursor[2]
+        assert.equals(col_0 + 3, col_1)
+
+        keymaps["l"]()
+        local col_2 = cursor[2]
+        assert.equals(col_1 + 3, col_2)
+
+        keymaps["h"]()
+        local col_back_1 = cursor[2]
+        assert.equals(col_1, col_back_1)
+
+        keymaps["h"]()
+        local col_back_0 = cursor[2]
+        assert.equals(col_0, col_back_0)
+    end)
 end)

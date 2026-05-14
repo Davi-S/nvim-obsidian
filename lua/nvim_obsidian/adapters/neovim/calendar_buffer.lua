@@ -302,14 +302,21 @@ end
 -- 3) highlights
 --
 -- This order guarantees highlight application always matches final content.
+--
+-- CRITICAL INVARIANT FOR PICKER MODE:
+-- state.cursor_col is ALWAYS a LOGICAL COLUMN (unaffected by horizontal line offsets).
+-- When placing the cursor on screen, we add the line offset to get the buffer column.
+-- This ensures move_picker_col() and all navigation handlers work consistently.
 local function render(date_picker, bufnr, state)
     local payload = build_lines(date_picker, state)
     local top_pad = resolve_content_padding(state)
     local line_offsets = {}
 
     if state.center_content and type(state.window_size) == "table" then
-        -- Keep calendar rows anchored to their canonical line numbers.
-        -- We only center horizontally here so picker row math remains stable.
+        -- Compute horizontal centering offsets for each line.
+        -- These offsets tell us how many spaces were prepended to center lines.
+        -- We use these to convert between logical columns (for state) and
+        -- buffer columns (for actual cursor positioning).
         line_offsets = compute_line_offsets(payload.lines, state.window_size.width)
     end
 
@@ -324,9 +331,14 @@ local function render(date_picker, bufnr, state)
 
     local line, col
     if state.mode == "picker" and type(state.cursor_row) == "number" and type(state.cursor_col) == "number" then
+        -- Restoring from previous picker state:
+        -- state.cursor_row and state.cursor_col are LOGICAL positions (no offsets).
+        -- Convert cursor_col to buffer column by adding the offset for this line.
         line = state.cursor_row
         col = state.cursor_col + line_offset_for_index(state, line_index_for_row(state, line) or 1)
     else
+        -- Initial cursor placement from cursor_date:
+        -- day_to_cursor returns logical column (0, 3, 6, ... for days 1, 2, 3, ...)
         local token = date_picker.to_token(state.cursor_date)
         line, col = day_to_cursor(payload.matrix, token)
         line = line + top_pad
@@ -338,7 +350,10 @@ local function render(date_picker, bufnr, state)
 
     if state.mode == "picker" and type(state.cursor_row) ~= "number" then
         state.cursor_row = line
-        state.cursor_col = col
+        -- CRITICAL FIX: Store the LOGICAL column, not the buffer column.
+        -- This maintains the invariant that state.cursor_col never includes offsets.
+        -- The offset is added only when actually setting the cursor on screen (see col calculation above).
+        state.cursor_col = col - line_offset_for_index(state, line_index_for_row(state, line) or 1)
     end
 
     apply_highlights(bufnr, state, payload)
@@ -646,11 +661,24 @@ function M.open_calendar(ctx, request)
     end
 
     local function move_picker_row(delta)
+        -- Navigate vertically within the calendar picker.
+        --
+        -- state.cursor_row is normalized to stay within the interactive zones:
+        -- - top_pad + 2: month/year selection row
+        -- - top_pad + 3: weekday header (non-interactive for selection)
+        -- - top_pad + 4 to top_pad + 9: day grid (up to 6 weeks)
+        --
+        -- When changing rows, we reset cursor_col to 0 if entering the header rows.
+        -- This prevents invalid column positions in non-day-grid zones.
+
         state.cursor_row = normalize_picker_row(state, (state.cursor_row or 4) + delta)
 
+        -- Header rows (month/year and weekday) don't use meaningful column positions.
+        -- Reset to column 0 when entering these zones.
         if is_picker_header_row(state, state.cursor_row) then
             state.cursor_col = 0
         else
+            -- In day grid rows, preserve the logical column (clamped to valid range).
             state.cursor_col = clamp(state.cursor_col or 0, 0, 18)
         end
 
@@ -658,29 +686,44 @@ function M.open_calendar(ctx, request)
     end
 
     local function move_picker_col(delta)
+        -- Navigate horizontally within the calendar picker.
+        --
+        -- INVARIANT: state.cursor_col is ALWAYS a LOGICAL column.
+        -- It represents the unpadded cursor position in day cells (0, 3, 6, 9, ...).
+        -- Line offsets (horizontal centering) are applied ONLY when rendering to screen.
+        --
+        -- This ensures that keyboard navigation, mouse clicks, and token lookups all
+        -- use the same coordinate system, preventing off-by-one errors on first input.
+
         local top_pad = resolve_content_padding(state)
         if not state.cursor_row or state.cursor_row < top_pad + 2 then
             return
         end
 
         if state.cursor_row == top_pad + 2 then
-            -- Treat row 2 as two logical cells:
-            -- 1) month cell (left side)
-            -- 2) year cell (right side)
+            -- MONTH/YEAR row (top_pad + 2): Two logical navigation zones.
+            -- Left zone: month name selector
+            -- Right zone: year selector
             --
-            -- This matches the day-grid navigation model where one keypress
-            -- moves one logical unit, not individual characters.
+            -- Each zone is treated as one logical cell for navigation.
+            -- Left/right arrows move between zones, not individual characters.
+            --
+            -- This matches the day-grid model where delta*3 moves one day cell.
+            -- For month/year, we use character boundaries instead.
+
             local month_name = MONTH_NAMES[(state.view_date or {}).month] or "Month"
             local year_start_col = #month_name + 1
             local current_col = tonumber(state.cursor_col) or 0
 
             if delta > 0 then
+                -- Moving right: jump to year zone if not already there
                 if current_col < year_start_col then
                     state.cursor_col = year_start_col
                 else
                     state.cursor_col = year_start_col
                 end
             elseif delta < 0 then
+                -- Moving left: jump to month zone if not already there
                 if current_col >= year_start_col then
                     state.cursor_col = 0
                 else
@@ -692,7 +735,15 @@ function M.open_calendar(ctx, request)
             return
         end
 
-        -- Week/day grid rows are visually chunked in 3-character cells.
+        -- DAY GRID rows (top_pad + 4 through top_pad + 9):
+        -- Each day occupies 3 characters: "DD " (2-digit day + space).
+        -- Valid logical columns are 0, 3, 6, 9, 12, 15, 18 (representing 7 days of the week).
+        --
+        -- When the user presses left/right, we move by delta*3 logical columns.
+        -- This keeps navigation in sync with the visual cell layout.
+        --
+        -- Clamping to 0-18 ensures we never go past the 7-day week boundary.
+
         state.cursor_col = clamp((state.cursor_col or 0) + (delta * 3), 0, 18)
         refresh_picker_from_cursor()
     end
