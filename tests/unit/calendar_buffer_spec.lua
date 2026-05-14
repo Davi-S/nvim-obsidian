@@ -539,9 +539,9 @@ describe("calendar buffer adapter", function()
             end
             _G.vim.api.nvim_get_hl_by_name = function(hl_name, _as_cterm)
                 if hl_name == "Comment" then
-                    return { foreground = 0x717791 }  -- muted color
+                    return { foreground = 0x717791 } -- muted color
                 elseif hl_name == "Normal" then
-                    return { foreground = 0xdeddda }  -- text color
+                    return { foreground = 0xdeddda } -- text color
                 end
                 return { foreground = 0xffffff }
             end
@@ -550,7 +550,7 @@ describe("calendar buffer adapter", function()
         local function extract_day_highlights()
             local day_hls = {}
             for i, call in ipairs(highlight_calls) do
-                if i > 2 then  -- Skip title and weekday highlights
+                if i > 2 then -- Skip title and weekday highlights
                     table.insert(day_hls, call.group)
                 end
             end

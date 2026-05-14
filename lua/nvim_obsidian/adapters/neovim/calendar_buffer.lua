@@ -549,9 +549,9 @@ function M.open_calendar(ctx, request)
         }
     end
 
-    -- Initialize highlight merging system once per calendar open.
-    -- This reads colorscheme colors and caches merged highlight groups.
-    pcall(highlights.setup)
+    -- Highlight merging system is initialized at plugin setup time in bootstrap.lua,
+    -- which reads colorscheme colors and caches merged highlight groups.
+    -- No need to call highlights.setup() here again.
 
     local date_picker = ctx and ctx.date_picker
     if type(date_picker) ~= "table" or type(date_picker.normalize_date) ~= "function" then

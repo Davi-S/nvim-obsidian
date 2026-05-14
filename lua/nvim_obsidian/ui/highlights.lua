@@ -58,23 +58,35 @@ local function rgb_to_hex(rgb)
 end
 
 ---Setup calendar base highlight attributes once at plugin load.
----Reads from base groups and caches attributes for later merging.
-function M.setup()
-    -- Read muted color (for out-of-month) from Comment group.
-    local muted_fg = get_hl_color(FALLBACK_GROUPS.comment)
+---Reads from user-configured highlight groups and caches attributes for later merging.
+---
+---@param hl_config table User configuration with outside_month_day, note_exists, today groups
+function M.setup(hl_config)
+    hl_config = type(hl_config) == "table" and hl_config or {}
+
+    -- Read muted color from user's configured outside_month_day group (or fallback to Comment).
+    local outside_group = tostring(hl_config.outside_month_day or FALLBACK_GROUPS.comment)
+    local muted_fg = get_hl_color(outside_group)
     if muted_fg then
         cached_base_attrs.muted_fg = rgb_to_hex(muted_fg)
     end
 
-    -- Read text color (for notes) from Normal group.
-    local text_fg = get_hl_color(FALLBACK_GROUPS.normal)
+    -- Read text color from user's configured note_exists group (or fallback to Normal).
+    local note_group = tostring(hl_config.note_exists or FALLBACK_GROUPS.normal)
+    local text_fg = get_hl_color(note_group)
     if text_fg then
         cached_base_attrs.text_fg = rgb_to_hex(text_fg)
     end
 
-    -- Sapphire is typically a branding color not available in base highlights.
-    -- We assume it's defined in the colorscheme or use fallback.
-    cached_base_attrs.sapphire_fg = FALLBACK_SAPPHIRE
+    -- Read sapphire color from user's configured today group (or use fallback).
+    -- Try to extract primary color from today group, fallback to hardcoded sapphire.
+    local today_group = tostring(hl_config.today or "DiagnosticOk")
+    local today_fg = get_hl_color(today_group)
+    if today_fg then
+        cached_base_attrs.sapphire_fg = rgb_to_hex(today_fg)
+    else
+        cached_base_attrs.sapphire_fg = FALLBACK_SAPPHIRE
+    end
 end
 
 ---Get or create a merged highlight group for a day cell with given flags.
