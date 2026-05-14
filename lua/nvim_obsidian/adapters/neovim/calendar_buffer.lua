@@ -1,6 +1,7 @@
 ---@diagnostic disable: undefined-global
 
 local errors = require("nvim_obsidian.core.shared.errors")
+local highlights = require("nvim_obsidian.ui.highlights")
 
 ---Neovim calendar buffer adapter.
 ---
@@ -249,19 +250,22 @@ local function apply_highlights(bufnr, state, payload)
         vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
     end
 
-    local highlights = state.highlights
+    local hl_config = state.highlights
     local today_token = state.today_token
     local marks = type(state.marks) == "table" and state.marks or {}
     local matrix = payload.matrix
     local top_pad = resolve_content_padding(state)
 
     -- Title line.
-    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.title, top_pad, line_offset_for_index(state, 1), -1)
+    vim.api.nvim_buf_add_highlight(bufnr, ns, hl_config.title, top_pad, line_offset_for_index(state, 1), -1)
 
     -- Weekday header line.
-    vim.api.nvim_buf_add_highlight(bufnr, ns, highlights.weekday, top_pad + 2, line_offset_for_index(state, 3), -1)
+    vim.api.nvim_buf_add_highlight(bufnr, ns, hl_config.weekday, top_pad + 2, line_offset_for_index(state, 3), -1)
 
     -- Day cells lines (4..9 in 1-based display, 3..8 in 0-based buffer lines).
+    -- Use highlight merging to combine traits: italic for out-of-month, bold for notes,
+    -- sapphire for today. Each cell gets a single merged highlight group that combines
+    -- the appropriate attributes.
     for week_idx, week in ipairs(matrix.weeks or {}) do
         local line0 = top_pad + 2 + week_idx
         local line_index = 3 + week_idx
@@ -269,16 +273,14 @@ local function apply_highlights(bufnr, state, payload)
             local col_start = line_offset_for_index(state, line_index) + (day_idx - 1) * 3
             local col_end = col_start + 2
 
-            local group = highlights.in_month_day
-            if not cell.in_view_month then
-                group = highlights.outside_month_day
-            end
-            if marks[cell.token] then
-                group = highlights.note_exists
-            end
-            if cell.token == today_token then
-                group = highlights.today
-            end
+            -- Compute three independent flags for this day cell.
+            local is_outside_month = not cell.in_view_month
+            local has_note = marks[cell.token] == true
+            local is_today = cell.token == today_token
+
+            -- Query merged highlight group for this flag combination.
+            -- The highlights module handles all combinations and caches results.
+            local group = highlights.get_day_hl_group(is_outside_month, has_note, is_today)
 
             vim.api.nvim_buf_add_highlight(bufnr, ns, group, line0, col_start, col_end)
         end
@@ -546,6 +548,10 @@ function M.open_calendar(ctx, request)
             error = errors.new(errors.codes.INTERNAL, "Neovim APIs required for calendar are unavailable"),
         }
     end
+
+    -- Initialize highlight merging system once per calendar open.
+    -- This reads colorscheme colors and caches merged highlight groups.
+    pcall(highlights.setup)
 
     local date_picker = ctx and ctx.date_picker
     if type(date_picker) ~= "table" or type(date_picker.normalize_date) ~= "function" then
