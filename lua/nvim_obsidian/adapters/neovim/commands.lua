@@ -770,7 +770,15 @@ local function register_obsidian_calendar(ctx)
                 local confirmed = true
 
                 if vim and vim.fn and type(vim.fn.confirm) == "function" then
-                    local choice = vim.fn.confirm(confirm_prompt, "&Create\n&Cancel", 2)
+                    -- Use distinct accelerator letters so the user can type
+                    -- a single-character hotkey to choose between the two
+                    -- actions. Previously both choices used the letter 'C'
+                    -- ("&Create\n&Cancel"), which made the accelerator
+                    -- ambiguous: pressing 'C' always selected the first
+                    -- option. Switch the second option to use a different
+                    -- accelerator ("&Abort") so accelerators are unique
+                    -- (Create -> 'C', Abort -> 'A'). Update tests to match.
+                    local choice = vim.fn.confirm(confirm_prompt, "&Create\n&Abort", 2)
                     confirmed = choice == 1
                 elseif ctx.adapters and ctx.adapters.notifications and type(ctx.adapters.notifications.warn) == "function" then
                     ctx.adapters.notifications.warn({
