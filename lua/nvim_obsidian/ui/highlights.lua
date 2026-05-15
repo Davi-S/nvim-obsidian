@@ -80,7 +80,8 @@ end
 
 local function merge_attrs(is_outside_month, has_note, is_today)
     local attrs = {}
-    local outside_style = extract_style(normalize_group_name(cached_config.outside_month_day, DEFAULT_CONFIG.outside_month_day))
+    local outside_style = extract_style(normalize_group_name(cached_config.outside_month_day,
+    DEFAULT_CONFIG.outside_month_day))
     local note_style = extract_style(normalize_group_name(cached_config.note_exists, DEFAULT_CONFIG.note_exists))
     local today_style = extract_style(normalize_group_name(cached_config.today, DEFAULT_CONFIG.today))
 

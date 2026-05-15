@@ -275,7 +275,7 @@ local function apply_highlights(bufnr, state, payload)
 
             -- Compute three independent flags for this day cell.
             local is_outside_month = not cell.in_view_month
-            local has_note = marks[cell.token] == true
+            local has_note = marks[cell.token] ~= nil and marks[cell.token] ~= false
             local is_today = cell.token == today_token
 
             -- Query merged highlight group for this flag combination.

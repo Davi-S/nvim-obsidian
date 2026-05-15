@@ -585,7 +585,7 @@ describe("calendar buffer adapter", function()
                 mode = "visualizer",
                 layout = "current",
                 initial_date = { year = 2026, month = 3, day = 15 },
-                marks = { [march_5_token] = true },
+                marks = { [march_5_token] = { path = "notes/2026-03-05.md", title = "2026-03-05" } },
             })
 
             local day_hls = extract_day_highlights()
