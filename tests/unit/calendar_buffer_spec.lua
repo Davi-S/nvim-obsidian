@@ -542,6 +542,8 @@ describe("calendar buffer adapter", function()
                     return { foreground = 0x717791 } -- muted color
                 elseif hl_name == "Normal" then
                     return { foreground = 0xdeddda } -- text color
+                elseif hl_name == "Bold" then
+                    return { bold = true }
                 end
                 return { foreground = 0xffffff }
             end
@@ -595,6 +597,10 @@ describe("calendar buffer adapter", function()
                 end
             end
             assert.is_true(found_note, "Should apply note highlight")
+
+            local note_group = highlight_groups["ObsidianCalendar_note"]
+            assert.is_true(note_group ~= nil, "Merged note highlight should be created")
+            assert.is_true(note_group.bold == true, "Merged note highlight should be bold")
         end)
 
         it("creates merged highlight groups with combined attributes", function()

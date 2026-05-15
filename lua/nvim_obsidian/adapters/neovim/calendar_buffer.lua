@@ -549,10 +549,6 @@ function M.open_calendar(ctx, request)
         }
     end
 
-    -- Initialize highlight merging system once per calendar open.
-    -- This reads colorscheme colors and caches merged highlight groups.
-    pcall(highlights.setup)
-
     local date_picker = ctx and ctx.date_picker
     if type(date_picker) ~= "table" or type(date_picker.normalize_date) ~= "function" then
         return {
@@ -572,6 +568,10 @@ function M.open_calendar(ctx, request)
     local on_finish = request and request.on_finish or nil
     local now = os.date("*t")
     local start_date = date_picker.normalize_date(request and request.initial_date or now)
+
+    -- Initialize highlight merging system once per calendar open.
+    -- This reads the configured highlight groups and caches merged styles.
+    pcall(highlights.setup, highlights_config)
 
     -- Interactive state is centralized in one table so every mapping callback
     -- mutates one source of truth and re-renders from it.
