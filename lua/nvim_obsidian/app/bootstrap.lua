@@ -1,6 +1,5 @@
 local container = require("nvim_obsidian.app.container")
 local dependencies = require("nvim_obsidian.app.dependencies")
-local highlights = require("nvim_obsidian.ui.highlights")
 
 ---Application bootstrap orchestrator.
 ---
@@ -73,14 +72,6 @@ function M.start(opts)
 
     local c = container.build(opts)
     c.adapters.commands.register(c)
-
-    -- Initialize calendar highlights at plugin setup time with user-configured groups.
-    -- This extracts colors from user highlight settings early, before calendar is opened.
-    -- The config has hl_config in structure: c.config.calendar.highlights
-    local hl_config = type(c.config) == "table" 
-        and type(c.config.calendar) == "table"
-        and c.config.calendar.highlights or {}
-    pcall(highlights.setup, hl_config)
 
     -- Keep setup non-blocking: startup reindex runs after setup returns.
     schedule_startup_reindex(c)

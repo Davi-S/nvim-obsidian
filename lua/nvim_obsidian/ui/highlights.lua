@@ -1,173 +1,56 @@
----Calendar highlight merging and theming.
+---Calendar highlight group selection.
 ---
----This module creates and manages Neovim highlight groups for calendar cells
----that combine multiple visual traits (italic for out-of-month, bold for notes,
----sapphire color for today) into single merged highlight groups.
+---This module maps day cell states (outside_month, has_note, is_today) to
+---pre-defined highlight group names. The actual highlight definitions are
+---provided by the user's colorscheme configuration.
 ---
----Merging happens at setup time; per-cell rendering only looks up cached group names.
+---Highlight groups expected to be defined by colorscheme:
+--- - ObsidianCalendarInMonth: Regular in-month day
+--- - ObsidianCalendar_outside: Outside month (italic + muted)
+--- - ObsidianCalendar_note: Day with existing note (bold + text color)
+--- - ObsidianCalendar_today: Today (sapphire color)
+--- - ObsidianCalendar_outside_note: Outside month + has note (italic + bold + muted)
+--- - ObsidianCalendar_outside_today: Outside month + is today (italic + sapphire)
+--- - ObsidianCalendar_note_today: Has note + is today (bold + sapphire)
+--- - ObsidianCalendar_outside_note_today: All three (italic + bold + sapphire)
 
 local M = {}
 
--- Cached base highlight attributes: {fg, bold, italic, etc.}
-local cached_base_attrs = {}
-
--- Cached merged highlight groups: {[flags_key] = "GroupName"}
-local cached_merged_groups = {}
-
--- Well-known highlight group names for fallback retrieval.
-local FALLBACK_GROUPS = {
-    comment = "Comment",
-    normal = "Normal",
-    diagnostic_ok = "DiagnosticOk",
-}
-
--- Default sapphire hex if colorscheme doesn't define one.
-local FALLBACK_SAPPHIRE = "#4fc8ff"
-
----Extract fg color from a Neovim highlight group.
----Returns {r, g, b} table or nil if not found.
-local function get_hl_color(hl_name)
-    if type(vim.api.nvim_get_hl_by_name) ~= "function" then
-        return nil
-    end
-
-    local ok, hl = pcall(vim.api.nvim_get_hl_by_name, hl_name, true)
-    if not ok or not hl or not hl.foreground then
-        return nil
-    end
-
-    local fg = hl.foreground
-    if type(fg) ~= "number" then
-        return nil
-    end
-
-    -- Convert RGB integer to {r, g, b} for comparison.
-    return {
-        r = bit.band(bit.rshift(fg, 16), 0xFF),
-        g = bit.band(bit.rshift(fg, 8), 0xFF),
-        b = bit.band(fg, 0xFF),
-    }
+---Setup function (kept for API compatibility, no-op now that groups are in colorscheme).
+function M.setup()
+    -- Color extraction now handled by colorscheme configuration.
+    -- This function kept for backward compatibility.
 end
 
----Convert {r, g, b} back to hex string for vim.api.nvim_set_hl.
-local function rgb_to_hex(rgb)
-    if not rgb or not rgb.r or not rgb.g or not rgb.b then
-        return nil
-    end
-    return string.format("#%02x%02x%02x", rgb.r, rgb.g, rgb.b)
-end
-
----Setup calendar base highlight attributes once at plugin load.
----Reads from user-configured highlight groups and caches attributes for later merging.
----
----@param hl_config table User configuration with outside_month_day, note_exists, today groups
-function M.setup(hl_config)
-    hl_config = type(hl_config) == "table" and hl_config or {}
-
-    -- Read muted color from user's configured outside_month_day group (or fallback to Comment).
-    local outside_group = tostring(hl_config.outside_month_day or FALLBACK_GROUPS.comment)
-    local muted_fg = get_hl_color(outside_group)
-    if muted_fg then
-        cached_base_attrs.muted_fg = rgb_to_hex(muted_fg)
-    end
-
-    -- Read text color from user's configured note_exists group (or fallback to Normal).
-    local note_group = tostring(hl_config.note_exists or FALLBACK_GROUPS.normal)
-    local text_fg = get_hl_color(note_group)
-    if text_fg then
-        cached_base_attrs.text_fg = rgb_to_hex(text_fg)
-    end
-
-    -- Read sapphire color from user's configured today group (or use fallback).
-    -- Try to extract primary color from today group, fallback to hardcoded sapphire.
-    local today_group = tostring(hl_config.today or "DiagnosticOk")
-    local today_fg = get_hl_color(today_group)
-    if today_fg then
-        cached_base_attrs.sapphire_fg = rgb_to_hex(today_fg)
-    else
-        cached_base_attrs.sapphire_fg = FALLBACK_SAPPHIRE
-    end
-end
-
----Get or create a merged highlight group for a day cell with given flags.
----
----Returns the highlight group name (string) to apply to the cell.
+---Get the highlight group name for a day cell with given flags.
 ---
 ---@param is_outside_month boolean — day is outside the current view month
 ---@param has_note boolean — day has an existing journal/daily note
 ---@param is_today boolean — day is today
 ---@return string highlight_group_name
 function M.get_day_hl_group(is_outside_month, has_note, is_today)
-    -- Build a cache key from the flags.
-    local key = string.format("o=%s,n=%s,t=%s", tostring(is_outside_month), tostring(has_note), tostring(is_today))
+    -- Build group name from flags.
+    local parts = {}
 
-    -- Return cached group if already created.
-    if cached_merged_groups[key] then
-        return cached_merged_groups[key]
-    end
-
-    -- Compute merged attributes based on flags and precedence rules.
-    local attrs = {}
-
-    -- Base: start with in_month_day style (normal text, no special traits).
-    -- This is overridden by the following flags.
-
-    -- Rule 1: is_outside_month contributes italic + muted color.
-    -- BUT if is_today, we'll override the color (see Rule 3).
     if is_outside_month then
-        attrs.italic = true
-        if not is_today then
-            -- Only use muted color if NOT today (today color takes precedence).
-            attrs.fg = cached_base_attrs.muted_fg or FALLBACK_GROUPS.comment
-        end
+        table.insert(parts, "outside")
     end
 
-    -- Rule 2: has_note contributes bold + text color.
-    -- UNLESS is_today, then we use sapphire instead (see Rule 3).
     if has_note then
-        attrs.bold = true
-        if not is_today then
-            attrs.fg = cached_base_attrs.text_fg or FALLBACK_GROUPS.normal
-        end
+        table.insert(parts, "note")
     end
 
-    -- Rule 3: is_today takes precedence for color.
-    -- Sapphire overrides both muted (outside) and text (note) colors.
     if is_today then
-        attrs.fg = cached_base_attrs.sapphire_fg or FALLBACK_SAPPHIRE
-        -- Bold is preserved from has_note if present; if not, no bold needed for today-only.
+        table.insert(parts, "today")
     end
 
-    -- Create deterministic group name from flags.
-    local group_parts = {}
-    if is_outside_month then
-        table.insert(group_parts, "outside")
-    end
-    if has_note then
-        table.insert(group_parts, "note")
-    end
-    if is_today then
-        table.insert(group_parts, "today")
+    -- No flags: use default in-month style
+    if #parts == 0 then
+        return "ObsidianCalendarInMonth"
     end
 
-    local group_name
-    if #group_parts == 0 then
-        -- No special flags: use default in_month style (Normal).
-        group_name = "ObsidianCalendarInMonth"
-    else
-        group_name = "ObsidianCalendar_" .. table.concat(group_parts, "_")
-    end
-
-    -- Define the highlight group via Neovim API.
-    -- Use pcall for safety in case Neovim API is not available.
-    if type(vim.api.nvim_set_hl) == "function" then
-        pcall(vim.api.nvim_set_hl, 0, group_name, attrs)
-    end
-
-    -- Cache the group name for this flag combination.
-    cached_merged_groups[key] = group_name
-
-    return group_name
+    -- Combine flags into group name
+    return "ObsidianCalendar_" .. table.concat(parts, "_")
 end
 
 return M
