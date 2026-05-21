@@ -275,6 +275,25 @@ describe("ensure_open_note use case", function()
         assert.equals("notes/my note.md", out.path)
     end)
 
+    it("preserves spaces in filenames for link origin", function()
+        local ctx = base_ctx({
+            journal = {
+                classify_input = function()
+                    return { kind = "none" }
+                end,
+            },
+        })
+
+        local out = use_case.execute(ctx, {
+            title_or_token = "Foo Bar",
+            create_if_missing = true,
+            origin = "link",
+        })
+
+        assert.is_true(out.ok)
+        assert.equals("notes/Foo Bar.md", out.path)
+    end)
+
     it("sanitizes invalid filename characters while preserving spaces for omni origin", function()
         local ctx = base_ctx()
 

@@ -341,7 +341,7 @@ function M.execute(_ctx, _input)
     end
 
     local filename_base = slugify_title(note_title)
-    if input.origin == "journal" or input.origin == "omni" or treated_as_journal then
+    if input.origin == "journal" or input.origin == "omni" or input.origin == "link" or treated_as_journal then
         filename_base = preserve_title_filename(note_title)
     end
 
